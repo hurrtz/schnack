@@ -39,3 +39,9 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# secrets
+src/config.ts
+
+# internal tooling
+.superpowers/
