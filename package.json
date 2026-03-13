@@ -14,6 +14,7 @@
     "expo": "~55.0.6",
     "expo-av": "^16.0.8",
     "expo-constants": "~55.0.7",
+    "expo-file-system": "~55.0.10",
     "expo-linking": "~55.0.7",
     "expo-router": "~55.0.5",
     "expo-status-bar": "~55.0.4",
@@ -31,6 +32,7 @@
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.2",
     "jest": "^30.3.0",
+    "react-test-renderer": "^19.2.0",
     "ts-jest": "^29.4.6",
     "typescript": "~5.9.2"
   },
