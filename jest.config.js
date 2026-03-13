@@ -8,5 +8,4 @@ module.exports = {
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   testMatch: ['**/__tests__/**/*.test.(ts|tsx|js)'],
-  setupFilesAfterFramework: ['@testing-library/jest-native/extend-expect'],
 };
