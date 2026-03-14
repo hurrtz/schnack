@@ -49,6 +49,30 @@ describe("useConversations", () => {
     expect(result.current.activeConversation!.messages).toHaveLength(1);
   });
 
+  it("persists a rolling context summary on the active conversation", async () => {
+    const { result } = renderHook(() => useConversations());
+
+    await act(async () => {
+      result.current.createConversation("Test");
+    });
+
+    await act(async () => {
+      result.current.updateConversationContextSummary(
+        "User prefers concise answers and is planning a launch.",
+        4
+      );
+    });
+
+    expect(result.current.activeConversation?.contextSummary).toBe(
+      "User prefers concise answers and is planning a launch."
+    );
+    expect(result.current.activeConversation?.summarizedMessageCount).toBe(4);
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      "@voxai/conversation/test-uuid-123",
+      expect.stringContaining('"summarizedMessageCount":4')
+    );
+  });
+
   it("appends messages even when using a stale callback from before conversation creation", async () => {
     const { result } = renderHook(() => useConversations());
     const staleAddMessage = result.current.addMessage;

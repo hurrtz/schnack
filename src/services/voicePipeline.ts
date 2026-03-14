@@ -1,6 +1,7 @@
 import { transcribeAudio } from "./whisper";
-import { streamChat } from "./llm";
+import { streamChat, summarizeConversationContext } from "./llm";
 import { synthesizeSpeech } from "./tts";
+import { buildConversationContextPlan } from "./conversationContext";
 import {
   AssistantResponseLength,
   AssistantResponseTone,
@@ -24,6 +25,7 @@ export function splitIntoSentences(text: string): string[] {
 
 interface PipelineCallbacks {
   onTranscription: (text: string) => void;
+  onContextSummary?: (summary: string, summarizedMessageCount: number) => void;
   onChunk: (text: string) => void;
   onResponseDone: (fullText: string) => void;
   onAudioReady: (audioUri: string) => void;
@@ -39,6 +41,8 @@ export async function runVoicePipeline(params: {
   openAIApiKey: string;
   ttsVoice: string;
   ttsPlayback: "stream" | "wait";
+  contextSummary?: string;
+  summarizedMessageCount?: number;
   assistantInstructions: string;
   responseLength: AssistantResponseLength;
   responseTone: AssistantResponseTone;
@@ -54,6 +58,8 @@ export async function runVoicePipeline(params: {
     openAIApiKey,
     ttsVoice,
     ttsPlayback,
+    contextSummary,
+    summarizedMessageCount,
     assistantInstructions,
     responseLength,
     responseTone,
@@ -66,7 +72,58 @@ export async function runVoicePipeline(params: {
   callbacks.onTranscription(transcription);
   if (abortSignal?.aborted) return transcription;
 
-  const allMessages: Message[] = [...messages, { id: "pending", role: "user", content: transcription, model: null, provider: null, timestamp: new Date().toISOString() }];
+  const contextPlan = buildConversationContextPlan({
+    messages,
+    contextSummary,
+    summarizedMessageCount,
+  });
+  let effectiveSummary = contextSummary?.trim() ?? "";
+  let contextualMessages = contextPlan.recentMessages;
+
+  if (contextPlan.needsSummaryUpdate) {
+    try {
+      const updatedSummary = await summarizeConversationContext({
+        existingSummary: effectiveSummary,
+        messages: contextPlan.messagesToSummarize,
+        model,
+        provider,
+        apiKey: providerApiKey,
+        abortSignal,
+      });
+
+      if (abortSignal?.aborted) {
+        return transcription;
+      }
+
+      if (updatedSummary) {
+        effectiveSummary = updatedSummary;
+        callbacks.onContextSummary?.(
+          updatedSummary,
+          contextPlan.targetSummarizedCount
+        );
+      } else if (!effectiveSummary) {
+        contextualMessages = contextPlan.fallbackRecentMessages;
+      }
+    } catch {
+      if (abortSignal?.aborted) {
+        return transcription;
+      }
+
+      contextualMessages = contextPlan.fallbackRecentMessages;
+    }
+  }
+
+  const allMessages: Message[] = [
+    ...contextualMessages,
+    {
+      id: "pending",
+      role: "user",
+      content: transcription,
+      model: null,
+      provider: null,
+      timestamp: new Date().toISOString(),
+    },
+  ];
 
   let sentenceBuffer = "";
   const ttsQueue: Promise<void>[] = [];
@@ -86,6 +143,7 @@ export async function runVoicePipeline(params: {
     assistantInstructions,
     responseLength,
     responseTone,
+    conversationSummary: effectiveSummary || undefined,
     abortSignal,
     onChunk: (text) => {
       if (abortSignal?.aborted) return;

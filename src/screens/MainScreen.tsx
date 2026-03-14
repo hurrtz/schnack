@@ -48,6 +48,7 @@ export function MainScreen() {
     createConversation,
     selectConversation,
     addMessage,
+    updateConversationContextSummary,
     deleteConversation,
     clearActiveConversation,
   } = useConversations();
@@ -203,6 +204,8 @@ export function MainScreen() {
         const transcription = await runVoicePipeline({
           audioUri,
           messages: activeConversation?.messages || [],
+          contextSummary: activeConversation?.contextSummary,
+          summarizedMessageCount: activeConversation?.summarizedMessageCount,
           model,
           provider,
           providerApiKey,
@@ -227,6 +230,9 @@ export function MainScreen() {
                   provider: null,
                 });
               }, 0);
+            },
+            onContextSummary: (summary, summarizedCount) => {
+              updateConversationContextSummary(summary, summarizedCount);
             },
             onChunk: (text) => {
               setPipelinePhase("thinking");
@@ -275,6 +281,7 @@ export function MainScreen() {
       settings.responseLength,
       settings.responseTone,
       showToast,
+      updateConversationContextSummary,
     ]
   );
 

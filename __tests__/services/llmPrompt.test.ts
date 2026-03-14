@@ -35,4 +35,21 @@ describe("buildSystemPrompt", () => {
       "Speak like an enthusiastic expert who loves going deep. Use technical terminology freely, geek out about details, assume the user can keep up."
     );
   });
+
+  it("appends the compacted conversation summary as background context", () => {
+    const prompt = buildSystemPrompt({
+      assistantInstructions: "Keep the reply grounded in prior user preferences.",
+      responseLength: "brief",
+      responseTone: "concise",
+      conversationSummary:
+        "User prefers answers in German and is evaluating providers mainly on latency and cost.",
+    });
+
+    expect(prompt).toContain(
+      "Earlier conversation context for background memory only."
+    );
+    expect(prompt).toContain(
+      "User prefers answers in German and is evaluating providers mainly on latency and cost."
+    );
+  });
 });

@@ -167,6 +167,26 @@ export function useConversations() {
     });
   }, [saveConversation, setActiveConversationValue]);
 
+  const updateConversationContextSummary = useCallback(
+    (contextSummary: string, summarizedMessageCount: number) => {
+      const currentConversation = activeConversationRef.current;
+
+      if (!currentConversation) {
+        return;
+      }
+
+      const updated: Conversation = {
+        ...currentConversation,
+        contextSummary: contextSummary.trim(),
+        summarizedMessageCount,
+      };
+
+      setActiveConversationValue(updated);
+      saveConversation(updated);
+    },
+    [saveConversation, setActiveConversationValue]
+  );
+
   const deleteConversation = useCallback((id: string) => {
     AsyncStorage.removeItem(conversationKey(id));
     setConversations((prev) => {
@@ -189,6 +209,7 @@ export function useConversations() {
     createConversation,
     selectConversation,
     addMessage,
+    updateConversationContextSummary,
     deleteConversation,
     clearActiveConversation,
   };

@@ -95,6 +95,8 @@ export interface Conversation {
   createdAt: string;
   updatedAt: string;
   messages: Message[];
+  contextSummary?: string;
+  summarizedMessageCount?: number;
 }
 
 export interface ConversationMeta {
