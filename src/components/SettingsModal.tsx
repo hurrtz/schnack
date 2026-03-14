@@ -1,16 +1,24 @@
 import React, { useEffect } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
   Modal,
   ScrollView,
   StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import Animated, { useAnimatedStyle, withTiming, useSharedValue, Easing } from "react-native-reanimated";
-import { useTheme } from "../theme/ThemeContext";
-import { Settings, InputMode, TtsPlayback, ThemeMode } from "../types";
+import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { OPENAI_MODELS, ANTHROPIC_MODELS, TTS_VOICES } from "../constants/models";
+import { Settings, InputMode, TtsPlayback, ThemeMode } from "../types";
+import { useTheme } from "../theme/ThemeContext";
+import { fonts } from "../theme/typography";
 import { Picker } from "./Picker";
 
 interface SettingsModalProps {
@@ -32,43 +40,86 @@ function RadioGroup<T extends string>({
   onChange: (v: T) => void;
 }) {
   const { colors } = useTheme();
+
   return (
-    <View style={styles.section}>
+    <View
+      style={[
+        styles.sectionCard,
+        { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+      ]}
+    >
       <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
         {label}
       </Text>
       <View style={styles.radioRow}>
         {options.map((opt) => {
           const active = value === opt.value;
+
           return (
             <TouchableOpacity
               key={opt.value}
-              style={[
-                styles.radioButton,
-                {
-                  borderColor: active ? colors.accent : colors.border,
-                  backgroundColor: active ? colors.accentSoft : colors.background,
-                  shadowColor: active ? colors.glow : "transparent",
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: active ? 1 : 0,
-                  shadowRadius: active ? 6 : 0,
-                  elevation: active ? 4 : 0,
-                },
-              ]}
+              style={styles.radioButtonWrap}
               onPress={() => onChange(opt.value)}
+              activeOpacity={0.9}
             >
-              <Text
-                style={[
-                  styles.radioLabel,
-                  { color: active ? colors.accent : colors.textSecondary },
-                ]}
-              >
-                {opt.label}
-              </Text>
+              {active ? (
+                <LinearGradient
+                  colors={[colors.accentGradientStart, colors.accentGradientEnd]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[
+                    styles.radioButton,
+                    styles.radioButtonActive,
+                    { shadowColor: colors.glowStrong },
+                  ]}
+                >
+                  <Text style={[styles.radioLabel, styles.radioLabelActive]}>
+                    {opt.label}
+                  </Text>
+                </LinearGradient>
+              ) : (
+                <View
+                  style={[
+                    styles.radioButton,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.radioLabel,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           );
         })}
       </View>
+    </View>
+  );
+}
+
+function PickerSection({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { colors } = useTheme();
+
+  return (
+    <View
+      style={[
+        styles.sectionCard,
+        { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+      ]}
+    >
+      {children}
     </View>
   );
 }
@@ -81,46 +132,99 @@ export function SettingsModal({
 }: SettingsModalProps) {
   const { colors } = useTheme();
 
-  const scale = useSharedValue(0.95);
+  const scale = useSharedValue(0.96);
+  const translateY = useSharedValue(16);
   const opacity = useSharedValue(0);
 
   useEffect(() => {
     if (visible) {
-      scale.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.ease) });
-      opacity.value = withTiming(1, { duration: 200 });
+      scale.value = withTiming(1, {
+        duration: 240,
+        easing: Easing.out(Easing.ease),
+      });
+      translateY.value = withTiming(0, {
+        duration: 240,
+        easing: Easing.out(Easing.ease),
+      });
+      opacity.value = withTiming(1, { duration: 220 });
     } else {
-      scale.value = 0.95;
+      scale.value = 0.96;
+      translateY.value = 16;
       opacity.value = 0;
     }
-  }, [visible]);
+  }, [visible, opacity, scale, translateY]);
 
   const modalAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    transform: [{ scale: scale.value }, { translateY: translateY.value }],
     opacity: opacity.value,
   }));
 
   return (
     <Modal visible={visible} transparent animationType="none">
       <TouchableOpacity
-        style={styles.overlay}
+        style={[styles.overlay, { backgroundColor: colors.overlay }]}
         activeOpacity={1}
         onPress={onClose}
       >
         <Animated.View
-          style={[styles.modal, { backgroundColor: colors.surface }, modalAnimStyle]}
+          style={[
+            styles.modal,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              shadowColor: colors.glow,
+            },
+            modalAnimStyle,
+          ]}
           onStartShouldSetResponder={() => true}
         >
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
+          <LinearGradient
+            colors={[
+              colors.accentSoft,
+              "rgba(255, 255, 255, 0)",
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroGlow}
+          />
+
+          <View
+            style={[
+              styles.header,
+              { borderBottomColor: colors.border },
+            ]}
+          >
+            <View style={styles.headerCopy}>
+              <Text style={[styles.eyebrow, { color: colors.accent }]}>
+                Conversation System
+              </Text>
+              <Text style={[styles.title, { color: colors.text }]}>
+                Settings
+              </Text>
+              <Text
+                style={[styles.subtitle, { color: colors.textSecondary }]}
+              >
+                Shape how VoxAI listens, speaks, and renders the room around it.
+              </Text>
+            </View>
             <TouchableOpacity
-              style={[styles.closeButton, { backgroundColor: colors.background }]}
+              style={[
+                styles.closeButton,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                },
+              ]}
               onPress={onClose}
             >
-              <Text style={{ color: colors.text, fontSize: 14 }}>✕</Text>
+              <Feather name="x" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.content}
+          >
             <RadioGroup<InputMode>
               label="Input Mode"
               options={[
@@ -141,35 +245,41 @@ export function SettingsModal({
               onChange={(v) => onUpdate({ ttsPlayback: v })}
             />
 
-            <Picker
-              label="OpenAI Model"
-              value={settings.openaiModel}
-              options={OPENAI_MODELS.map((m) => ({
-                value: m.id,
-                label: m.name,
-              }))}
-              onChange={(v) => onUpdate({ openaiModel: v })}
-            />
+            <PickerSection>
+              <Picker
+                label="OpenAI Model"
+                value={settings.openaiModel}
+                options={OPENAI_MODELS.map((m) => ({
+                  value: m.id,
+                  label: m.name,
+                }))}
+                onChange={(v) => onUpdate({ openaiModel: v })}
+              />
+            </PickerSection>
 
-            <Picker
-              label="Anthropic Model"
-              value={settings.anthropicModel}
-              options={ANTHROPIC_MODELS.map((m) => ({
-                value: m.id,
-                label: m.name,
-              }))}
-              onChange={(v) => onUpdate({ anthropicModel: v })}
-            />
+            <PickerSection>
+              <Picker
+                label="Anthropic Model"
+                value={settings.anthropicModel}
+                options={ANTHROPIC_MODELS.map((m) => ({
+                  value: m.id,
+                  label: m.name,
+                }))}
+                onChange={(v) => onUpdate({ anthropicModel: v })}
+              />
+            </PickerSection>
 
-            <Picker
-              label="TTS Voice"
-              value={settings.ttsVoice}
-              options={TTS_VOICES.map((v) => ({
-                value: v,
-                label: v.charAt(0).toUpperCase() + v.slice(1),
-              }))}
-              onChange={(v) => onUpdate({ ttsVoice: v })}
-            />
+            <PickerSection>
+              <Picker
+                label="TTS Voice"
+                value={settings.ttsVoice}
+                options={TTS_VOICES.map((v) => ({
+                  value: v,
+                  label: v.charAt(0).toUpperCase() + v.slice(1),
+                }))}
+                onChange={(v) => onUpdate({ ttsVoice: v })}
+              />
+            </PickerSection>
 
             <RadioGroup<ThemeMode>
               label="Theme"
@@ -193,42 +303,111 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
+    padding: 16,
   },
   modal: {
-    width: "90%",
-    maxHeight: "80%",
-    borderRadius: 16,
-    padding: 20,
+    width: "100%",
+    maxWidth: 460,
+    maxHeight: "86%",
+    borderRadius: 30,
+    borderWidth: 1,
+    overflow: "hidden",
+    shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.16,
+    shadowRadius: 42,
+    elevation: 12,
+  },
+  heroGlow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 180,
   },
   header: {
     flexDirection: "row",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
+    gap: 16,
+    paddingHorizontal: 22,
+    paddingTop: 22,
+    paddingBottom: 18,
+    borderBottomWidth: 1,
   },
-  title: { fontSize: 18, fontWeight: "700" },
+  headerCopy: {
+    flex: 1,
+    gap: 6,
+  },
+  eyebrow: {
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    fontFamily: fonts.mono,
+  },
+  title: {
+    fontSize: 28,
+    lineHeight: 32,
+    fontFamily: fonts.displayHeavy,
+  },
+  subtitle: {
+    fontSize: 14,
+    lineHeight: 21,
+    fontFamily: fonts.body,
+  },
   closeButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
   },
-  section: { marginBottom: 18 },
+  content: {
+    padding: 18,
+    gap: 14,
+  },
+  sectionCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 16,
+  },
   sectionLabel: {
     fontSize: 11,
     textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 8,
+    letterSpacing: 1.1,
+    marginBottom: 12,
+    fontFamily: fonts.mono,
   },
-  radioRow: { flexDirection: "row", gap: 6 },
+  radioRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginHorizontal: -4,
+  },
+  radioButtonWrap: {
+    width: "50%",
+    paddingHorizontal: 4,
+    paddingBottom: 8,
+  },
   radioButton: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 2,
+    minHeight: 50,
+    borderRadius: 18,
+    borderWidth: 1,
     alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
   },
-  radioLabel: { fontSize: 12, fontWeight: "600" },
+  radioButtonActive: {
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.16,
+    shadowRadius: 22,
+    elevation: 7,
+  },
+  radioLabel: {
+    fontSize: 14,
+    textAlign: "center",
+    fontFamily: fonts.display,
+  },
+  radioLabelActive: {
+    color: "#F4F8FF",
+  },
 });

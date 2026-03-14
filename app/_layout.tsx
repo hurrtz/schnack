@@ -1,10 +1,10 @@
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack } from "expo-router";
+import { SettingsProvider, useSharedSettings } from "../src/context/SettingsContext";
 import { ThemeProvider } from "../src/theme/ThemeContext";
-import { useSettings } from "../src/hooks/useSettings";
 
 function RootLayoutInner() {
-  const { settings } = useSettings();
+  const { settings } = useSharedSettings();
 
   return (
     <ThemeProvider mode={settings.theme}>
@@ -16,7 +16,9 @@ function RootLayoutInner() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <RootLayoutInner />
+      <SettingsProvider>
+        <RootLayoutInner />
+      </SettingsProvider>
     </GestureHandlerRootView>
   );
 }

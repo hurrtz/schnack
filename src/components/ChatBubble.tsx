@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../theme/ThemeContext";
+import { fonts } from "../theme/typography";
 import { Message } from "../types";
 
 interface ChatBubbleProps {
@@ -9,31 +10,77 @@ interface ChatBubbleProps {
 }
 
 export function ChatBubble({ message }: ChatBubbleProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const isUser = message.role === "user";
+  const providerLabel =
+    message.provider === "anthropic" ? "Anthropic" : "OpenAI";
 
   const bubbleContent = (
     <>
       {!isUser && message.model && (
-        <Text style={[styles.modelLabel, { color: colors.accent }]}>{message.model}</Text>
+        <View
+          style={[
+            styles.modelChip,
+            {
+              backgroundColor: colors.accentSoft,
+              borderColor: colors.borderStrong,
+            },
+          ]}
+        >
+          <Text style={[styles.providerLabel, { color: colors.accent }]}>
+            {providerLabel}
+          </Text>
+          <Text style={[styles.modelLabel, { color: colors.textSecondary }]}>
+            {message.model}
+          </Text>
+        </View>
       )}
-      <Text style={[styles.content, { color: colors.text }]}>{message.content}</Text>
+      <Text
+        style={[
+          styles.content,
+          { color: isUser ? "#F5FBFF" : colors.text },
+        ]}
+      >
+        {message.content}
+      </Text>
     </>
   );
 
   return (
-    <View style={[styles.wrapper, isUser ? styles.wrapperUser : styles.wrapperAssistant]}>
+    <View
+      style={[
+        styles.wrapper,
+        isUser ? styles.wrapperUser : styles.wrapperAssistant,
+      ]}
+    >
       {isUser ? (
         <LinearGradient
-          colors={["rgba(74, 158, 255, 0.25)", "rgba(74, 158, 255, 0.12)"]}
-          start={{ x: 0, y: 0 }}
+          colors={[colors.accentGradientStart, colors.accentGradientEnd]}
+          start={{ x: 0.08, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.bubble, styles.bubbleUser, { shadowColor: "rgba(74, 158, 255, 0.3)", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6, elevation: 3 }]}
+          style={[
+            styles.bubble,
+            styles.bubbleUser,
+            {
+              borderColor: "rgba(255, 255, 255, 0.14)",
+              shadowColor: colors.glowStrong,
+            },
+          ]}
         >
           {bubbleContent}
         </LinearGradient>
       ) : (
-        <View style={[styles.bubble, styles.bubbleAssistant, { backgroundColor: colors.surfaceElevated, shadowColor: "rgba(0, 0, 0, 0.4)", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.5, shadowRadius: 4, elevation: 2 }]}>
+        <View
+          style={[
+            styles.bubble,
+            styles.bubbleAssistant,
+            {
+              backgroundColor: colors.bubbleAssistant,
+              borderColor: colors.border,
+              shadowColor: isDark ? "#000000" : colors.glow,
+            },
+          ]}
+        >
           {bubbleContent}
         </View>
       )}
@@ -42,12 +89,50 @@ export function ChatBubble({ message }: ChatBubbleProps) {
 }
 
 const styles = StyleSheet.create({
-  wrapper: { marginVertical: 3, paddingHorizontal: 16 },
+  wrapper: { marginVertical: 5, paddingHorizontal: 18 },
   wrapperUser: { alignItems: "flex-end" },
   wrapperAssistant: { alignItems: "flex-start" },
-  bubble: { maxWidth: "80%", padding: 12, borderRadius: 16 },
-  bubbleUser: { borderBottomRightRadius: 4 },
-  bubbleAssistant: { borderBottomLeftRadius: 4 },
-  modelLabel: { fontSize: 10, fontWeight: "500", letterSpacing: 0.5, marginBottom: 3 },
-  content: { fontSize: 14, lineHeight: 20 },
+  bubble: {
+    maxWidth: "86%",
+    paddingHorizontal: 15,
+    paddingVertical: 13,
+    borderRadius: 22,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 6,
+  },
+  bubbleUser: {
+    borderBottomRightRadius: 8,
+  },
+  bubbleAssistant: {
+    borderBottomLeftRadius: 8,
+  },
+  modelChip: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  providerLabel: {
+    fontSize: 10,
+    letterSpacing: 1.1,
+    textTransform: "uppercase",
+    fontFamily: fonts.mono,
+  },
+  modelLabel: {
+    fontSize: 10,
+    fontFamily: fonts.mono,
+  },
+  content: {
+    fontSize: 15,
+    lineHeight: 22,
+    fontFamily: fonts.body,
+  },
 });
