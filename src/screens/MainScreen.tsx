@@ -96,6 +96,11 @@ export function MainScreen() {
     : player.isPlaying
       ? player.meteringData
       : -160;
+  const signalLevels = recorder.isRecording
+    ? recorder.waveformData
+    : player.isPlaying
+      ? player.waveformData
+      : undefined;
 
   const showToast = useCallback(
     (message: string, onRetry?: () => void) => {
@@ -598,6 +603,7 @@ export function MainScreen() {
               />
               <WaveformCircle
                 metering={metering}
+                levels={signalLevels}
                 isActive={isActive}
                 phase={visualPhase}
                 providerLabel={providerLabel}
@@ -734,6 +740,7 @@ export function MainScreen() {
           <View style={styles.expandedStageBar}>
             <WaveformBar
               metering={metering}
+              levels={signalLevels}
               isActive={isActive}
               phase={visualPhase}
               inputMode={settings.inputMode}

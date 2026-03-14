@@ -2,12 +2,22 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import {
   setAudioModeAsync,
   useAudioPlayer as useExpoAudioPlayer,
+  useAudioSampleListener,
   useAudioPlayerStatus,
 } from "expo-audio";
+import {
+  EMPTY_VISUAL_LEVELS,
+  averageLevels,
+  blendLevels,
+  buildFallbackSpeechLevels,
+  buildSampleLevels,
+  levelToMetering,
+} from "../utils/audioVisualization";
 
 export interface PlayerState {
   isPlaying: boolean;
   meteringData: number;
+  waveformData: number[];
 }
 
 export function useAudioPlayer() {
@@ -17,10 +27,18 @@ export function useAudioPlayer() {
   });
   const status = useAudioPlayerStatus(player);
   const [meteringData, setMeteringData] = useState(-160);
+  const [waveformData, setWaveformData] = useState(EMPTY_VISUAL_LEVELS);
   const queueRef = useRef<string[]>([]);
   const playingRef = useRef(false);
   const cancelledRef = useRef(false);
   const didFinishRef = useRef(false);
+
+  useAudioSampleListener(player, (sample) => {
+    const levels = buildSampleLevels(sample.channels);
+
+    setWaveformData((previous) => blendLevels(previous, levels, 0.28));
+    setMeteringData(levelToMetering(averageLevels(levels)));
+  });
 
   const playNext = useCallback(async () => {
     if (playingRef.current || cancelledRef.current) return;
@@ -28,6 +46,7 @@ export function useAudioPlayer() {
 
     if (!audioUri) {
       setMeteringData(-160);
+      setWaveformData(EMPTY_VISUAL_LEVELS);
       return;
     }
 
@@ -56,17 +75,27 @@ export function useAudioPlayer() {
   useEffect(() => {
     if (!status.playing) {
       setMeteringData(-160);
+      setWaveformData(EMPTY_VISUAL_LEVELS);
       return;
     }
 
+    if (player.isAudioSamplingSupported) {
+      return;
+    }
+
+    const baseTime = player.currentTime;
+    const startedAt = Date.now();
     const interval = setInterval(() => {
-      setMeteringData(-20 + Math.random() * 20);
-    }, 100);
+      const elapsed = (Date.now() - startedAt) / 1000;
+      const levels = buildFallbackSpeechLevels(baseTime + elapsed);
+      setWaveformData(levels);
+      setMeteringData(levelToMetering(averageLevels(levels)));
+    }, 80);
 
     return () => {
       clearInterval(interval);
     };
-  }, [status.playing]);
+  }, [player.id, player.isAudioSamplingSupported, status.playing]);
 
   const enqueueAudio = useCallback((audioUri: string) => {
     if (cancelledRef.current) return;
@@ -83,6 +112,7 @@ export function useAudioPlayer() {
     player.replace(null);
     playingRef.current = false;
     setMeteringData(-160);
+    setWaveformData(EMPTY_VISUAL_LEVELS);
   }, [player]);
 
   const resetCancellation = useCallback(() => { cancelledRef.current = false; }, []);
@@ -90,6 +120,7 @@ export function useAudioPlayer() {
   return {
     isPlaying: status.playing,
     meteringData,
+    waveformData,
     enqueueAudio,
     stopPlayback,
     resetCancellation,

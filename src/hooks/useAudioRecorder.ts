@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import {
   RecordingPresets,
   requestRecordingPermissionsAsync,
@@ -6,10 +6,15 @@ import {
   useAudioRecorder as useExpoAudioRecorder,
   useAudioRecorderState,
 } from "expo-audio";
+import {
+  EMPTY_VISUAL_LEVELS,
+  appendMeterHistory,
+} from "../utils/audioVisualization";
 
 export interface RecorderState {
   isRecording: boolean;
   meteringData: number;
+  waveformData: number[];
 }
 
 const RECORDING_OPTIONS = {
@@ -22,6 +27,18 @@ export function useAudioRecorder() {
   const recorder = useExpoAudioRecorder(RECORDING_OPTIONS);
   const recorderState = useAudioRecorderState(recorder, 100);
   const startTimeRef = useRef<number>(0);
+  const [waveformData, setWaveformData] = useState(EMPTY_VISUAL_LEVELS);
+
+  useEffect(() => {
+    if (!recorderState.isRecording) {
+      setWaveformData(EMPTY_VISUAL_LEVELS);
+      return;
+    }
+
+    setWaveformData((previous) =>
+      appendMeterHistory(previous, recorderState.metering ?? -160)
+    );
+  }, [recorderState.isRecording, recorderState.metering]);
 
   const startRecording = useCallback(async () => {
     if (recorderState.isRecording) {
@@ -65,6 +82,7 @@ export function useAudioRecorder() {
   return {
     isRecording: recorderState.isRecording,
     meteringData: recorderState.metering ?? -160,
+    waveformData,
     startRecording,
     stopRecording,
   };

@@ -14,6 +14,7 @@ import { InputMode, VoiceVisualPhase } from "../types";
 
 interface WaveformBarProps {
   metering: number;
+  levels?: number[];
   isActive: boolean;
   phase: VoiceVisualPhase;
   inputMode: InputMode;
@@ -24,6 +25,7 @@ interface WaveformBarProps {
 
 export function WaveformBar({
   metering,
+  levels,
   isActive,
   phase,
   inputMode,
@@ -78,18 +80,21 @@ export function WaveformBar({
           {phase === "thinking" ? "Waiting on model" : "Converting speech"}
         </Text>
       ) : (
-        <Waveform
-          metering={metering}
-          maxHeight={26}
-          barCount={28}
-          barWidth={2}
-          barGap={1}
-          barColor={isActive ? "rgba(255, 255, 255, 0.95)" : colors.accent}
-          barColorInactive={
-            isActive ? "rgba(255, 255, 255, 0.55)" : colors.textMuted
-          }
-          isActive={isActive}
-        />
+        <View style={styles.waveformWrap}>
+          <Waveform
+            metering={metering}
+            levels={levels}
+            maxHeight={26}
+            barCount={28}
+            barWidth={2}
+            barGap={1}
+            barColor={isActive ? "rgba(255, 255, 255, 0.95)" : colors.accent}
+            barColorInactive={
+              isActive ? "rgba(255, 255, 255, 0.55)" : colors.textMuted
+            }
+            isActive={isActive}
+          />
+        </View>
       )}
     </View>
   );
@@ -161,6 +166,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
+  },
+  waveformWrap: {
+    flex: 1,
+    minHeight: 28,
+    justifyContent: "center",
   },
   stateBadge: {
     minWidth: 64,

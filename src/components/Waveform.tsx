@@ -3,11 +3,14 @@ import { View, StyleSheet } from "react-native";
 import Animated, {
   useAnimatedStyle,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { useTheme } from "../theme/ThemeContext";
+import { normalizeMetering, resampleLevels } from "../utils/audioVisualization";
 
 interface WaveformProps {
   metering: number; // -160 to 0
+  levels?: number[];
   barCount?: number;
   barWidth?: number;
   barGap?: number;
@@ -20,6 +23,7 @@ interface WaveformProps {
 
 export function Waveform({
   metering,
+  levels,
   barCount = 20,
   barWidth = 3,
   barGap = 2,
@@ -30,17 +34,28 @@ export function Waveform({
   isActive = true,
 }: WaveformProps) {
   const { colors } = useTheme();
-  // Normalize metering from [-160, 0] to [0, 1]
-  const normalized = Math.max(0, (metering + 160) / 160);
+  const normalized = normalizeMetering(metering);
+  const resolvedLevels = levels?.length
+    ? resampleLevels(levels, barCount)
+    : Array.from({ length: barCount }, (_, index) => {
+        const midpoint = Math.max(1, (barCount - 1) / 2);
+        const distance = Math.abs(index - midpoint) / midpoint;
+        const focus = 1 - distance * 0.42;
 
-  const bars = Array.from({ length: barCount }, (_, i) => {
-    // Create variation per bar using simple deterministic pattern
-    const variation = Math.sin(i * 0.7 + Date.now() * 0.001) * 0.3 + 0.7;
-    const height = Math.max(
-      4,
-      normalized * maxHeight * variation
-    );
-    return height;
+        return Math.min(1, normalized * focus);
+      });
+
+  const bars = resolvedLevels.map((level, index) => {
+    const midpoint = Math.max(1, (barCount - 1) / 2);
+    const distance = Math.abs(index - midpoint) / midpoint;
+    const focus = 0.78 + (1 - distance) * 0.22;
+    const restingLevel = isActive ? 0.02 : 0.08;
+    const shapedLevel = restingLevel + level * (isActive ? 0.98 : 0.34);
+
+    return {
+      height: Math.max(3, shapedLevel * maxHeight * focus),
+      opacity: isActive ? 0.5 + level * 0.5 : 0.24 + level * 0.36,
+    };
   });
 
   return (
@@ -50,10 +65,11 @@ export function Waveform({
         horizontal ? styles.horizontal : styles.vertical,
       ]}
     >
-      {bars.map((height, i) => (
+      {bars.map((bar, i) => (
         <AnimatedBar
           key={i}
-          height={height}
+          height={bar.height}
+          opacity={bar.opacity}
           width={barWidth}
           color={barColor ? (isActive ? barColor : (barColorInactive || barColor)) : colors.accent}
           gap={barGap}
@@ -65,17 +81,20 @@ export function Waveform({
 
 function AnimatedBar({
   height,
+  opacity,
   width,
   color,
   gap,
 }: {
   height: number;
+  opacity: number;
   width: number;
   color: string;
   gap: number;
 }) {
   const style = useAnimatedStyle(() => ({
     height: withSpring(height, { damping: 15, stiffness: 200 }),
+    opacity: withTiming(opacity, { duration: 140 }),
   }));
 
   return (

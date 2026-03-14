@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   TouchableOpacity,
@@ -15,16 +15,18 @@ import Animated, {
   withDelay,
   withSequence,
   Easing,
+  interpolate,
 } from "react-native-reanimated";
-import { useEffect } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Waveform } from "./Waveform";
 import { InputMode, VoiceVisualPhase } from "../types";
+import { normalizeMetering } from "../utils/audioVisualization";
 
 interface WaveformCircleProps {
   metering: number;
+  levels?: number[];
   isActive: boolean;
   phase: VoiceVisualPhase;
   providerLabel: string;
@@ -132,6 +134,7 @@ function RippleRing({ delay, color, isActive, intensity }: { delay: number; colo
 
 export function WaveformCircle({
   metering,
+  levels,
   isActive,
   phase,
   providerLabel,
@@ -141,9 +144,62 @@ export function WaveformCircle({
   onPress,
 }: WaveformCircleProps) {
   const { colors } = useTheme();
-  const intensity = Math.max(0, (metering + 160) / 160);
+  const intensity = normalizeMetering(metering);
   const isProcessing = phase === "transcribing" || phase === "thinking";
   const isSpeaking = phase === "speaking";
+  const pulse = useSharedValue(0);
+  const orbit = useSharedValue(0);
+  const energy = useSharedValue(intensity);
+
+  useEffect(() => {
+    orbit.value = withRepeat(
+      withTiming(1, { duration: 4600, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+  }, [orbit]);
+
+  useEffect(() => {
+    energy.value = withTiming(intensity, {
+      duration: 120,
+      easing: Easing.out(Easing.ease),
+    });
+  }, [energy, intensity]);
+
+  useEffect(() => {
+    const highPoint =
+      phase === "idle"
+        ? 0.38
+        : phase === "speaking"
+          ? 1
+          : phase === "recording"
+            ? 0.86
+            : 0.68;
+    const duration =
+      phase === "idle"
+        ? 2600
+        : phase === "speaking"
+          ? 1180
+          : phase === "recording"
+            ? 1380
+            : 1820;
+
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(highPoint, {
+          duration,
+          easing: Easing.inOut(Easing.ease),
+        }),
+        withTiming(0, {
+          duration,
+          easing: Easing.inOut(Easing.ease),
+        })
+      ),
+      -1,
+      false
+    );
+  }, [phase, pulse]);
+
   const interactionHint =
     phase === "recording"
       ? "Listening"
@@ -165,77 +221,158 @@ export function WaveformCircle({
         colors.accentGradientEnd,
       ];
 
+  const outerRingStyle = useAnimatedStyle(() => ({
+    opacity: 0.38 + pulse.value * 0.15,
+    transform: [{ scale: 0.98 + pulse.value * 0.03 + energy.value * 0.03 }],
+  }));
+
+  const innerRingStyle = useAnimatedStyle(() => ({
+    opacity: 0.52 + pulse.value * 0.12,
+    transform: [{ scale: 0.995 + pulse.value * 0.025 + energy.value * 0.02 }],
+  }));
+
+  const circleShellStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 0.992 + pulse.value * 0.028 + energy.value * 0.025 }],
+  }));
+
+  const topAuraStyle = useAnimatedStyle(() => ({
+    opacity: 0.16 + pulse.value * 0.14 + energy.value * 0.12,
+    transform: [
+      { translateX: interpolate(orbit.value, [0, 1], [-12, 12]) },
+      { translateY: interpolate(orbit.value, [0, 1], [6, -8]) },
+      { scale: 1 + pulse.value * 0.08 + energy.value * 0.08 },
+    ],
+  }));
+
+  const bottomAuraStyle = useAnimatedStyle(() => ({
+    opacity: 0.18 + pulse.value * 0.1 + energy.value * 0.12,
+    transform: [
+      { translateX: interpolate(orbit.value, [0, 1], [10, -10]) },
+      { translateY: interpolate(orbit.value, [0, 1], [-8, 10]) },
+      { scale: 1.04 + pulse.value * 0.06 + energy.value * 0.06 },
+    ],
+  }));
+
+  const sheenStyle = useAnimatedStyle(() => ({
+    opacity: 0.16 + pulse.value * 0.08,
+    transform: [
+      { translateX: interpolate(orbit.value, [0, 1], [-20, 16]) },
+      { rotate: `${interpolate(orbit.value, [0, 1], [-8, 8])}deg` },
+    ],
+  }));
+
+  const badgeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: interpolate(orbit.value, [0, 1], [0, -2]) }],
+  }));
+
+  const waveformStyle = useAnimatedStyle(() => ({
+    opacity: 0.88 + energy.value * 0.12,
+    transform: [{ translateY: -2 - energy.value * 4 }],
+  }));
+
   return (
     <View style={styles.container}>
-      <View
+      <Animated.View
         style={[
           styles.staticRing,
           styles.staticRingOuter,
           { borderColor: isProcessing ? colors.borderStrong : colors.border },
+          outerRingStyle,
         ]}
       />
-      <View
+      <Animated.View
         style={[
           styles.staticRing,
           styles.staticRingInner,
           { borderColor: isProcessing ? colors.accentSoft : colors.borderStrong },
+          innerRingStyle,
         ]}
       />
       <RippleRing delay={0} color={ringColor} isActive={isActive} intensity={intensity} />
       <RippleRing delay={500} color={ringColor} isActive={isActive} intensity={intensity} />
       <RippleRing delay={1000} color={ringColor} isActive={isActive} intensity={intensity} />
-      <TouchableOpacity
-        activeOpacity={0.88}
-        onPressIn={inputMode === "push-to-talk" ? onPressIn : undefined}
-        onPressOut={inputMode === "push-to-talk" ? onPressOut : undefined}
-        onPress={inputMode === "toggle-to-talk" ? onPress : undefined}
-      >
-        <LinearGradient
-          colors={gradientColors}
-          locations={[0, 0.58, 1]}
-          start={{ x: 0.12, y: 0 }}
-          end={{ x: 0.88, y: 1 }}
-          style={[
-            styles.circle,
-            {
-              shadowColor: colors.glowStrong,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: isActive ? 1 : 0.55,
-              shadowRadius: isActive ? 28 : 18,
-              elevation: isActive ? 14 : 8,
-            },
-          ]}
+      <Animated.View style={circleShellStyle}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPressIn={inputMode === "push-to-talk" ? onPressIn : undefined}
+          onPressOut={inputMode === "push-to-talk" ? onPressOut : undefined}
+          onPress={inputMode === "toggle-to-talk" ? onPress : undefined}
         >
-          <View
+          <LinearGradient
+            colors={gradientColors}
+            locations={[0, 0.58, 1]}
+            start={{ x: 0.12, y: 0 }}
+            end={{ x: 0.88, y: 1 }}
             style={[
-              styles.innerFrame,
-              { borderColor: "rgba(255, 255, 255, 0.22)" },
-            ]}
-          />
-          <View
-            style={[
-              styles.innerBadge,
-              { backgroundColor: "rgba(7, 17, 31, 0.16)" },
+              styles.circle,
+              {
+                shadowColor: colors.glowStrong,
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: isActive ? 1 : 0.55,
+                shadowRadius: isActive ? 28 : 18,
+                elevation: isActive ? 14 : 8,
+              },
             ]}
           >
-            <Text style={styles.innerBadgeText}>{interactionHint}</Text>
-          </View>
-          {isProcessing ? (
-            <ProcessingIndicator phase={phase} providerLabel={providerLabel} />
-          ) : (
-            <Waveform
-              metering={metering}
-              maxHeight={isSpeaking ? 58 : 62}
-              barCount={18}
-              barWidth={4}
-              barGap={2}
-              barColor="rgba(255, 255, 255, 0.95)"
-              barColorInactive="rgba(255, 255, 255, 0.55)"
-              isActive={isActive}
+            <Animated.View style={[styles.coreAura, styles.coreAuraTop, topAuraStyle]}>
+              <LinearGradient
+                colors={["rgba(255,255,255,0.34)", "rgba(255,255,255,0)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.auraFill}
+              />
+            </Animated.View>
+            <Animated.View style={[styles.coreAura, styles.coreAuraBottom, bottomAuraStyle]}>
+              <LinearGradient
+                colors={["rgba(255,255,255,0.18)", "rgba(255,255,255,0)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.auraFill}
+              />
+            </Animated.View>
+            <Animated.View style={[styles.sheen, sheenStyle]}>
+              <LinearGradient
+                colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.24)", "rgba(255,255,255,0)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.auraFill}
+              />
+            </Animated.View>
+            <View
+              style={[
+                styles.innerFrame,
+                { borderColor: "rgba(255, 255, 255, 0.22)" },
+              ]}
             />
-          )}
-        </LinearGradient>
-      </TouchableOpacity>
+            <Animated.View
+              style={[
+                styles.innerBadge,
+                { backgroundColor: "rgba(7, 17, 31, 0.18)" },
+                badgeStyle,
+              ]}
+            >
+              <Text style={styles.innerBadgeText}>{interactionHint}</Text>
+            </Animated.View>
+            {isProcessing ? (
+              <ProcessingIndicator phase={phase} providerLabel={providerLabel} />
+            ) : (
+              <Animated.View style={[styles.waveformWrap, waveformStyle]}>
+                <Waveform
+                  metering={metering}
+                  levels={levels}
+                  maxHeight={isSpeaking ? 60 : 66}
+                  barCount={19}
+                  barWidth={4}
+                  barGap={2}
+                  barColor="rgba(255, 255, 255, 0.96)"
+                  barColorInactive="rgba(255, 255, 255, 0.46)"
+                  isActive={isActive}
+                />
+              </Animated.View>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 }
@@ -297,6 +434,38 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 8,
+  },
+  waveformWrap: {
+    marginTop: 18,
+  },
+  coreAura: {
+    position: "absolute",
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  coreAuraTop: {
+    top: -18,
+    left: -6,
+    width: 126,
+    height: 126,
+  },
+  coreAuraBottom: {
+    right: -18,
+    bottom: -16,
+    width: 138,
+    height: 138,
+  },
+  auraFill: {
+    flex: 1,
+  },
+  sheen: {
+    position: "absolute",
+    top: 24,
+    left: 26,
+    width: 136,
+    height: 136,
+    borderRadius: 32,
+    overflow: "hidden",
   },
   processingDots: {
     flexDirection: "row",
