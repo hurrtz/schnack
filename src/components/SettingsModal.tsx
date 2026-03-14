@@ -48,11 +48,12 @@ function RadioGroup<T extends string>({
   onChange,
 }: {
   label: string;
-  options: { value: T; label: string }[];
+  options: { value: T; label: string; description?: string }[];
   value: T;
   onChange: (v: T) => void;
 }) {
   const { colors } = useTheme();
+  const activeOption = options.find((opt) => opt.value === value);
 
   return (
     <View
@@ -114,6 +115,16 @@ function RadioGroup<T extends string>({
           );
         })}
       </View>
+      {activeOption?.description ? (
+        <Text
+          style={[
+            styles.sectionHint,
+            { color: colors.textMuted },
+          ]}
+        >
+          {activeOption.description}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -382,8 +393,16 @@ export function SettingsModal({
             <RadioGroup<InputMode>
               label="Input Mode"
               options={[
-                { value: "push-to-talk", label: "Push to Talk" },
-                { value: "toggle-to-talk", label: "Toggle to Talk" },
+                {
+                  value: "push-to-talk",
+                  label: "Push to Talk",
+                  description: "Hold the main button while speaking, then release to send.",
+                },
+                {
+                  value: "toggle-to-talk",
+                  label: "Toggle to Talk",
+                  description: "Tap once to start recording and tap again when you are done.",
+                },
               ]}
               value={settings.inputMode}
               onChange={(v) => onUpdate({ inputMode: v })}
@@ -392,8 +411,16 @@ export function SettingsModal({
             <RadioGroup<TtsPlayback>
               label="TTS Playback"
               options={[
-                { value: "stream", label: "Stream" },
-                { value: "wait", label: "Wait" },
+                {
+                  value: "stream",
+                  label: "Stream",
+                  description: "Replies start speaking as soon as complete sentences are ready.",
+                },
+                {
+                  value: "wait",
+                  label: "Wait",
+                  description: "The full reply is generated first, then played back in one pass.",
+                },
               ]}
               value={settings.ttsPlayback}
               onChange={(v) => onUpdate({ ttsPlayback: v })}
@@ -577,6 +604,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: -2,
     marginBottom: 14,
+    fontFamily: fonts.body,
+  },
+  sectionHint: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 10,
     fontFamily: fonts.body,
   },
   providerButtonGrid: {
