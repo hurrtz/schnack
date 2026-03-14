@@ -21,9 +21,12 @@ describe("useConversations", () => {
 
   it("creates a new conversation", async () => {
     const { result } = renderHook(() => useConversations());
-    await act(async () => { result.current.createConversation("Hello, how are you?"); });
+    await act(async () => {
+      result.current.createConversation("Hello, how are you?", "gpt-5.4");
+    });
     expect(result.current.conversations).toHaveLength(1);
     expect(result.current.conversations[0].title).toBe("Hello, how are you?");
+    expect(result.current.conversations[0].lastModel).toBe("gpt-5.4");
     expect(result.current.activeConversation).not.toBeNull();
   });
 
@@ -44,6 +47,85 @@ describe("useConversations", () => {
       result.current.addMessage({ role: "user", content: "Test message", model: null, provider: null });
     });
     expect(result.current.activeConversation!.messages).toHaveLength(1);
+  });
+
+  it("appends messages even when using a stale callback from before conversation creation", async () => {
+    const { result } = renderHook(() => useConversations());
+    const staleAddMessage = result.current.addMessage;
+
+    await act(async () => {
+      result.current.createConversation("Test", "gpt-5.4");
+    });
+
+    await act(async () => {
+      staleAddMessage({
+        role: "assistant",
+        content: "Reply",
+        model: "gpt-5.4",
+        provider: "openai",
+      });
+    });
+
+    expect(result.current.activeConversation?.messages).toHaveLength(1);
+    expect(result.current.conversations[0].lastModel).toBe("gpt-5.4");
+  });
+
+  it("backfills missing model metadata from stored conversation messages", async () => {
+    (AsyncStorage.getItem as jest.Mock).mockImplementation((key: string) => {
+      if (key === "@voxai/conversations") {
+        return Promise.resolve(
+          JSON.stringify([
+            {
+              id: "conv-1",
+              title: "Existing session",
+              updatedAt: "2026-03-14T10:00:00.000Z",
+              lastModel: null,
+            },
+          ])
+        );
+      }
+
+      if (key === "@voxai/conversation/conv-1") {
+        return Promise.resolve(
+          JSON.stringify({
+            id: "conv-1",
+            title: "Existing session",
+            createdAt: "2026-03-14T09:00:00.000Z",
+            updatedAt: "2026-03-14T10:00:00.000Z",
+            messages: [
+              {
+                id: "m1",
+                role: "user",
+                content: "Hello",
+                model: null,
+                provider: null,
+                timestamp: "2026-03-14T09:59:00.000Z",
+              },
+              {
+                id: "m2",
+                role: "assistant",
+                content: "Hi",
+                model: "claude-sonnet-4-20250514",
+                provider: "anthropic",
+                timestamp: "2026-03-14T10:00:00.000Z",
+              },
+            ],
+          })
+        );
+      }
+
+      return Promise.resolve(null);
+    });
+
+    const { result } = renderHook(() => useConversations());
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(result.current.conversations[0]?.lastModel).toBe(
+      "claude-sonnet-4-20250514"
+    );
   });
 
   it("deletes a conversation", async () => {

@@ -159,7 +159,7 @@ export function MainScreen() {
             onTranscription: (text) => {
               setPipelinePhase("thinking");
               if (!activeConversation) {
-                createConversation(text);
+                createConversation(text, model);
               }
               setTimeout(() => {
                 addMessage({
