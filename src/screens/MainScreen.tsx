@@ -15,6 +15,7 @@ import { ConversationDrawer } from "../components/ConversationDrawer";
 import { ProviderToggle } from "../components/ProviderToggle";
 import { SettingsModal } from "../components/SettingsModal";
 import { Toast } from "../components/Toast";
+import { ProviderIcon } from "../components/ProviderIcon";
 import { WaveformBar } from "../components/WaveformBar";
 import { WaveformCircle } from "../components/WaveformCircle";
 import { PROVIDER_LABELS, PROVIDER_ORDER } from "../constants/models";
@@ -54,6 +55,7 @@ export function MainScreen() {
 
   const [viewMode, setViewMode] = useState<ViewMode>("default");
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [settingsFocusProvider, setSettingsFocusProvider] = useState<Provider | undefined>();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [pipelinePhase, setPipelinePhase] = useState<
     "idle" | "transcribing" | "thinking"
@@ -98,6 +100,16 @@ export function MainScreen() {
     },
     []
   );
+
+  const openSettings = useCallback((focusProvider?: Provider) => {
+    setSettingsFocusProvider(focusProvider);
+    setSettingsVisible(true);
+  }, []);
+
+  const closeSettings = useCallback(() => {
+    setSettingsVisible(false);
+    setSettingsFocusProvider(undefined);
+  }, []);
 
   useEffect(() => {
     if (!loaded || providerApiKey) {
@@ -392,7 +404,7 @@ export function MainScreen() {
             shadowColor: colors.glow,
           },
         ]}
-        onPress={() => setSettingsVisible(true)}
+        onPress={() => openSettings()}
       >
         <Feather name="settings" size={18} color={colors.textSecondary} />
       </TouchableOpacity>
@@ -478,11 +490,40 @@ export function MainScreen() {
                       borderColor: colors.border,
                     },
                   ]}
-                  onPress={() => setSettingsVisible(true)}
+                  onPress={() => openSettings("groq")}
                   activeOpacity={0.9}
                 >
+                  <View style={styles.providerEmptyHeader}>
+                    <View
+                      style={[
+                        styles.providerEmptyBadge,
+                        {
+                          backgroundColor: colors.backgroundSecondary,
+                          borderColor: colors.border,
+                        },
+                      ]}
+                    >
+                      <ProviderIcon
+                        provider="groq"
+                        color={colors.text}
+                      />
+                      <Text
+                        style={[
+                          styles.providerEmptyBadgeText,
+                          { color: colors.text },
+                        ]}
+                      >
+                        Groq
+                      </Text>
+                    </View>
+                    <Feather
+                      name="arrow-up-right"
+                      size={16}
+                      color={colors.accent}
+                    />
+                  </View>
                   <Text style={[styles.providerEmptyTitle, { color: colors.text }]}>
-                    No providers enabled
+                    Start with Groq
                   </Text>
                   <Text
                     style={[
@@ -490,7 +531,9 @@ export function MainScreen() {
                       { color: colors.textSecondary },
                     ]}
                   >
-                    Add an API key in Settings to make a provider appear here.
+                    Groq offers a free tier, so it is the fastest way to unlock
+                    the app. Add its API key in Settings and the provider
+                    switcher will appear here right away.
                   </Text>
                 </TouchableOpacity>
               )}
@@ -724,11 +767,12 @@ export function MainScreen() {
       <SettingsModal
         visible={settingsVisible}
         settings={settings}
+        focusProvider={settingsFocusProvider}
         onUpdate={updateSettings}
         onUpdateProviderModel={updateProviderModel}
         onUpdateApiKey={updateApiKey}
         onPreviewVoice={handlePreviewVoice}
-        onClose={() => setSettingsVisible(false)}
+        onClose={closeSettings}
       />
       <ConversationDrawer
         visible={drawerVisible}
@@ -842,11 +886,33 @@ const styles = StyleSheet.create({
   providerEmptyState: {
     borderRadius: 22,
     borderWidth: 1,
-    minHeight: 84,
+    minHeight: 96,
     paddingHorizontal: 16,
     paddingVertical: 14,
     justifyContent: "center",
     gap: 6,
+  },
+  providerEmptyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  providerEmptyBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  providerEmptyBadgeText: {
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    fontFamily: fonts.mono,
   },
   providerEmptyTitle: {
     fontSize: 14,

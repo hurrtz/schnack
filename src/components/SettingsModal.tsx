@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import {
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -20,6 +21,7 @@ import Animated, {
 import {
   PROVIDER_API_KEY_HINTS,
   PROVIDER_API_KEY_PLACEHOLDERS,
+  PROVIDER_API_KEY_URLS,
   PROVIDER_LABELS,
   PROVIDER_MODELS,
   PROVIDER_ORDER,
@@ -34,6 +36,7 @@ import { Picker } from "./Picker";
 interface SettingsModalProps {
   visible: boolean;
   settings: Settings;
+  focusProvider?: Provider;
   onUpdate: (partial: Partial<Omit<Settings, "apiKeys" | "providerModels">>) => void;
   onUpdateProviderModel: (provider: Provider, model: string) => void;
   onUpdateApiKey: (provider: Provider, apiKey: string) => void;
@@ -150,21 +153,27 @@ function PickerSection({
 
 function ProviderSection({
   settings,
+  focusProvider,
   onUpdateProviderModel,
   onUpdateApiKey,
 }: {
   settings: Settings;
+  focusProvider?: Provider;
   onUpdateProviderModel: (provider: Provider, model: string) => void;
   onUpdateApiKey: (provider: Provider, apiKey: string) => void;
 }) {
   const { colors } = useTheme();
   const [selectedProvider, setSelectedProvider] = React.useState<Provider>(
-    settings.lastProvider
+    focusProvider ?? settings.lastProvider
   );
 
   useEffect(() => {
-    setSelectedProvider(settings.lastProvider);
-  }, [settings.lastProvider]);
+    setSelectedProvider(focusProvider ?? settings.lastProvider);
+  }, [focusProvider, settings.lastProvider]);
+
+  const handleOpenProviderPortal = React.useCallback(() => {
+    void Linking.openURL(PROVIDER_API_KEY_URLS[selectedProvider]);
+  }, [selectedProvider]);
 
   return (
     <View
@@ -232,6 +241,24 @@ function ProviderSection({
         >
           {PROVIDER_API_KEY_HINTS[selectedProvider]}
         </Text>
+        <TouchableOpacity
+          style={[
+            styles.apiKeyLinkButton,
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.border,
+            },
+          ]}
+          onPress={handleOpenProviderPortal}
+          accessibilityRole="link"
+          accessibilityLabel={`Create ${PROVIDER_LABELS[selectedProvider]} API key`}
+          activeOpacity={0.85}
+        >
+          <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
+            Create API key
+          </Text>
+          <Feather name="external-link" size={14} color={colors.accent} />
+        </TouchableOpacity>
         <TextInput
           value={settings.apiKeys[selectedProvider]}
           onChangeText={(value) => onUpdateApiKey(selectedProvider, value)}
@@ -267,6 +294,7 @@ function ProviderSection({
 export function SettingsModal({
   visible,
   settings,
+  focusProvider,
   onUpdate,
   onUpdateProviderModel,
   onUpdateApiKey,
@@ -427,6 +455,7 @@ export function SettingsModal({
 
             <ProviderSection
               settings={settings}
+              focusProvider={focusProvider}
               onUpdateProviderModel={onUpdateProviderModel}
               onUpdateApiKey={onUpdateApiKey}
             />
@@ -653,6 +682,21 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 14,
     fontFamily: fonts.body,
+  },
+  apiKeyLinkButton: {
+    minHeight: 42,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  apiKeyLinkText: {
+    fontSize: 13,
+    fontFamily: fonts.display,
   },
   previewCard: {
     borderRadius: 20,
