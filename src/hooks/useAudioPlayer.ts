@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback } from "react";
 import { Audio } from "expo-av";
-import * as FileSystem from "expo-file-system/legacy";
 
 export interface PlayerState {
   isPlaying: boolean;
@@ -10,7 +9,7 @@ export interface PlayerState {
 export function useAudioPlayer() {
   const [state, setState] = useState<PlayerState>({ isPlaying: false, meteringData: -160 });
   const soundRef = useRef<Audio.Sound | null>(null);
-  const queueRef = useRef<ArrayBuffer[]>([]);
+  const queueRef = useRef<string[]>([]);
   const playingRef = useRef(false);
   const cancelledRef = useRef(false);
   const meteringIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -21,12 +20,10 @@ export function useAudioPlayer() {
 
     playingRef.current = true;
     setState((prev) => ({ ...prev, isPlaying: true }));
-    const audioData = queueRef.current.shift()!;
+    const audioUri = queueRef.current.shift()!;
 
-    const path = `${FileSystem.cacheDirectory}tts-${Date.now()}.aac`;
-    await FileSystem.writeAsStringAsync(path, arrayBufferToBase64(audioData), { encoding: FileSystem.EncodingType.Base64 });
-
-    const { sound } = await Audio.Sound.createAsync({ uri: path });
+    await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+    const { sound } = await Audio.Sound.createAsync({ uri: audioUri });
     soundRef.current = sound;
 
     sound.setOnPlaybackStatusUpdate((status) => {
@@ -46,9 +43,9 @@ export function useAudioPlayer() {
     }, 100);
   }, []);
 
-  const enqueueAudio = useCallback((audioData: ArrayBuffer) => {
+  const enqueueAudio = useCallback((audioUri: string) => {
     if (cancelledRef.current) return;
-    queueRef.current.push(audioData);
+    queueRef.current.push(audioUri);
     if (!playingRef.current) playNext();
   }, [playNext]);
 
@@ -64,11 +61,4 @@ export function useAudioPlayer() {
   const resetCancellation = useCallback(() => { cancelledRef.current = false; }, []);
 
   return { ...state, enqueueAudio, stopPlayback, resetCancellation };
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary);
 }

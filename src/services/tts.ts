@@ -1,14 +1,35 @@
 import { OPENAI_API_KEY } from "../config";
+import * as FileSystem from "expo-file-system/legacy";
 
-export async function synthesizeSpeech(text: string, voice: string): Promise<ArrayBuffer> {
+let ttsCounter = 0;
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      // Strip the "data:...;base64," prefix
+      resolve(dataUrl.split(",")[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+export async function synthesizeSpeech(text: string, voice: string): Promise<string> {
   const response = await fetch("https://api.openai.com/v1/audio/speech", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_API_KEY}` },
-    body: JSON.stringify({ model: "tts-1", voice, input: text, response_format: "aac" }),
+    body: JSON.stringify({ model: "tts-1", voice, input: text, response_format: "mp3" }),
   });
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`TTS API error (${response.status}): ${errorText}`);
   }
-  return response.arrayBuffer();
+
+  const blob = await response.blob();
+  const base64 = await blobToBase64(blob);
+  const path = `${FileSystem.cacheDirectory}tts-${Date.now()}-${ttsCounter++}.mp3`;
+  await FileSystem.writeAsStringAsync(path, base64, { encoding: "base64" });
+  return path;
 }

@@ -1,33 +1,25 @@
 {
   "expo": {
-    "name": "voxai-scaffold",
-    "slug": "voxai-scaffold",
+    "name": "VoxAI",
+    "slug": "voxai",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
+    "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.tobiaswinkler.voxai",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "VoxAI needs microphone access to record your voice for conversations."
       },
-      "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
+      "appleTeamId": "X7H939KJR7"
     },
     "plugins": [
       "expo-router"
-    ]
+    ],
+    "scheme": "voxai",
+    "icon": "./appicon.png",
+    "android": {
+      "package": "com.tobiaswinkler.voxai"
+    }
   }
 }

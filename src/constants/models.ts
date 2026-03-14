@@ -5,14 +5,13 @@ export interface ModelInfo {
 }
 
 export const OPENAI_MODELS: ModelInfo[] = [
+  { id: "gpt-5.4", name: "GPT-5.4", releaseDate: "2026-03-01" },
+  { id: "gpt-5-mini-2025-08-07", name: "GPT-5 Mini", releaseDate: "2025-08-07" },
+  { id: "o3", name: "o3", releaseDate: "2025-04-16" },
+  { id: "o4-mini", name: "o4 Mini", releaseDate: "2025-04-16" },
   { id: "gpt-4.1", name: "GPT-4.1", releaseDate: "2025-04-14" },
   { id: "gpt-4.1-mini", name: "GPT-4.1 Mini", releaseDate: "2025-04-14" },
   { id: "gpt-4.1-nano", name: "GPT-4.1 Nano", releaseDate: "2025-04-14" },
-  { id: "gpt-4o", name: "GPT-4o", releaseDate: "2025-03-25" },
-  { id: "gpt-4o-mini", name: "GPT-4o Mini", releaseDate: "2024-07-18" },
-  { id: "o3", name: "o3", releaseDate: "2025-04-16" },
-  { id: "o3-mini", name: "o3 Mini", releaseDate: "2025-01-31" },
-  { id: "o4-mini", name: "o4 Mini", releaseDate: "2025-04-16" },
 ];
 
 export const ANTHROPIC_MODELS: ModelInfo[] = [

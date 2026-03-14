@@ -21,7 +21,7 @@ interface PipelineCallbacks {
   onTranscription: (text: string) => void;
   onChunk: (text: string) => void;
   onResponseDone: (fullText: string) => void;
-  onAudioReady: (audioData: ArrayBuffer) => void;
+  onAudioReady: (audioUri: string) => void;
   onError: (error: Error) => void;
 }
 

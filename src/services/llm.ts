@@ -1,5 +1,5 @@
-import { OPENAI_API_KEY, ANTHROPIC_API_KEY, Provider } from "../config";
-import { Message } from "../types";
+import { OPENAI_API_KEY, ANTHROPIC_API_KEY } from "../config";
+import { Message, Provider } from "../types";
 
 interface StreamChatParams {
   messages: Message[];
@@ -11,32 +11,10 @@ interface StreamChatParams {
   abortSignal?: AbortSignal;
 }
 
+const SYSTEM_PROMPT = "You are a voice assistant. The user is speaking to you and will hear your response read aloud. Respond naturally and conversationally as if talking. Never use markdown, bullet points, numbered lists, headers, or any formatting. Keep responses concise and spoken-friendly.";
+
 function toAPIMessages(messages: Message[]) {
   return messages.map((m) => ({ role: m.role, content: m.content }));
-}
-
-async function readSSEStream(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  parseLine: (line: string) => string | null,
-  isDone: (line: string) => boolean,
-  onChunk: (text: string) => void
-): Promise<string> {
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let fullText = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-    for (const line of lines) {
-      if (isDone(line)) return fullText;
-      const text = parseLine(line);
-      if (text) { fullText += text; onChunk(text); }
-    }
-  }
-  return fullText;
 }
 
 export async function streamChat({
@@ -50,28 +28,20 @@ export async function streamChat({
 }: StreamChatParams): Promise<void> {
   try {
     if (provider === "openai") {
+      // React Native fetch doesn't support ReadableStream, so use non-streaming
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_API_KEY}` },
-        body: JSON.stringify({ model, messages: toAPIMessages(messages), stream: true }),
+        body: JSON.stringify({ model, messages: [{ role: "system", content: SYSTEM_PROMPT }, ...toAPIMessages(messages)] }),
         signal: abortSignal,
       });
       if (!response.ok) {
         const errText = await response.text();
         throw new Error(`OpenAI API error (${response.status}): ${errText}`);
       }
-      const reader = response.body!.getReader();
-      const fullText = await readSSEStream(
-        reader,
-        (line) => {
-          if (!line.startsWith("data: ")) return null;
-          const json = line.slice(6);
-          if (json === "[DONE]") return null;
-          return JSON.parse(json).choices?.[0]?.delta?.content || null;
-        },
-        (line) => line === "data: [DONE]",
-        onChunk
-      );
+      const data = await response.json();
+      const fullText = data.choices?.[0]?.message?.content || "";
+      onChunk(fullText);
       onDone(fullText);
     } else {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -81,30 +51,20 @@ export async function streamChat({
           "x-api-key": ANTHROPIC_API_KEY,
           "anthropic-version": "2023-06-01",
         },
-        body: JSON.stringify({ model, max_tokens: 4096, messages: toAPIMessages(messages), stream: true }),
+        body: JSON.stringify({ model, max_tokens: 4096, system: SYSTEM_PROMPT, messages: toAPIMessages(messages) }),
         signal: abortSignal,
       });
       if (!response.ok) {
         const errText = await response.text();
         throw new Error(`Anthropic API error (${response.status}): ${errText}`);
       }
-      const reader = response.body!.getReader();
-      const fullText = await readSSEStream(
-        reader,
-        (line) => {
-          if (!line.startsWith("data: ")) return null;
-          const parsed = JSON.parse(line.slice(6));
-          return parsed.type === "content_block_delta" ? parsed.delta?.text || null : null;
-        },
-        (line) => {
-          if (!line.startsWith("data: ")) return false;
-          try { return JSON.parse(line.slice(6)).type === "message_stop"; } catch { return false; }
-        },
-        onChunk
-      );
+      const data = await response.json();
+      const fullText = data.content?.[0]?.text || "";
+      onChunk(fullText);
       onDone(fullText);
     }
   } catch (error) {
+    if (abortSignal?.aborted) return;
     onError(error instanceof Error ? error : new Error(String(error)));
   }
 }

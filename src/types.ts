@@ -16,7 +16,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   inputMode: "push-to-talk",
   ttsPlayback: "stream",
-  openaiModel: "gpt-4o",
+  openaiModel: "gpt-5.4",
   anthropicModel: "claude-sonnet-4-6",
   ttsVoice: "alloy",
   theme: "system",
