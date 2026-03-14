@@ -13,6 +13,9 @@ interface WaveformProps {
   barGap?: number;
   maxHeight: number;
   horizontal?: boolean;
+  barColor?: string;
+  barColorInactive?: string;
+  isActive?: boolean;
 }
 
 export function Waveform({
@@ -22,6 +25,9 @@ export function Waveform({
   barGap = 2,
   maxHeight,
   horizontal = false,
+  barColor,
+  barColorInactive,
+  isActive = true,
 }: WaveformProps) {
   const { colors } = useTheme();
   // Normalize metering from [-160, 0] to [0, 1]
@@ -49,7 +55,7 @@ export function Waveform({
           key={i}
           height={height}
           width={barWidth}
-          color={colors.accent}
+          color={barColor ? (isActive ? barColor : (barColorInactive || barColor)) : colors.accent}
           gap={barGap}
         />
       ))}
