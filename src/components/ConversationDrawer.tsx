@@ -71,7 +71,14 @@ export function ConversationDrawer({
           <TouchableOpacity
             style={[
               styles.newSession,
-              { borderColor: colors.accent },
+              {
+                borderColor: colors.accent,
+                shadowColor: colors.glow,
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.5,
+                shadowRadius: 4,
+                elevation: 2,
+              },
             ]}
             onPress={() => {
               onNewSession();
@@ -92,10 +99,13 @@ export function ConversationDrawer({
                   style={[
                     styles.item,
                     {
-                      borderLeftColor:
-                        item.id === activeId ? colors.accent : "transparent",
-                      backgroundColor:
-                        item.id === activeId ? colors.accentSoft : "transparent",
+                      borderLeftColor: item.id === activeId ? colors.accent : "transparent",
+                      backgroundColor: item.id === activeId ? colors.accentSoft : "transparent",
+                      shadowColor: item.id === activeId ? colors.glow : "transparent",
+                      shadowOffset: { width: 0, height: 0 },
+                      shadowOpacity: item.id === activeId ? 1 : 0,
+                      shadowRadius: item.id === activeId ? 4 : 0,
+                      elevation: item.id === activeId ? 3 : 0,
                     },
                   ]}
                   onPress={() => {
@@ -157,8 +167,7 @@ const styles = StyleSheet.create({
     margin: 12,
     marginHorizontal: 16,
     padding: 12,
-    borderWidth: 2,
-    borderStyle: "dashed",
+    borderWidth: 1.5,
     borderRadius: 10,
     alignItems: "center",
   },
