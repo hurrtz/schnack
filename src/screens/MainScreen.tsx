@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from "react";
 import {
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -341,116 +342,14 @@ export function MainScreen() {
         <View style={styles.defaultLayout}>
           {renderTopBar(false)}
 
-          <View
-            style={[
-              styles.heroCard,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                shadowColor: colors.glow,
-              },
-            ]}
+          <ScrollView
+            style={styles.defaultScroll}
+            contentContainerStyle={styles.defaultLayoutContent}
+            showsVerticalScrollIndicator={false}
           >
-            <LinearGradient
-              colors={[colors.accentSoft, "rgba(255,255,255,0)"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.heroCardGlow}
-            />
-            <View style={styles.heroHeader}>
-              <View style={styles.heroCopy}>
-                <Text style={[styles.eyebrow, { color: colors.accent }]}>
-                  Voice-first model studio
-                </Text>
-                <Text style={[styles.heroTitle, { color: colors.text }]}>
-                  Beautiful conversations, built for speaking.
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.livePill,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.liveDot,
-                    { backgroundColor: isActive ? colors.success : colors.accentWarm },
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.livePillText,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  {isActive ? "Live" : "Idle"}
-                </Text>
-              </View>
-            </View>
-
-            <Text
-              style={[styles.heroDescription, { color: colors.textSecondary }]}
-            >
-              A cinematic control surface for talking to the latest models without
-              falling back into chat-window blandness.
-            </Text>
-
-            <ProviderToggle selected={provider} onSelect={handleProviderChange} />
-
-            <View style={styles.metaRow}>
-              <View
-                style={[
-                  styles.metaChip,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Feather name="mic" size={15} color={colors.accent} />
-                <Text style={[styles.metaChipText, { color: colors.textSecondary }]}>
-                  {controlSummary}
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.metaChip,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Feather name="volume-2" size={15} color={colors.accentWarm} />
-                <Text style={[styles.metaChipText, { color: colors.textSecondary }]}>
-                  {playbackSummary}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.stageBlock}>
             <View
               style={[
-                styles.stageHalo,
-                { backgroundColor: colors.glowStrong },
-              ]}
-            />
-            <WaveformCircle
-              metering={metering}
-              isActive={isActive}
-              inputMode={settings.inputMode}
-              onPressIn={handlePressIn}
-              onPressOut={handlePressOut}
-              onPress={handleTogglePress}
-            />
-            <View
-              style={[
-                styles.statusCard,
+                styles.heroCard,
                 {
                   backgroundColor: colors.surface,
                   borderColor: colors.border,
@@ -458,101 +357,231 @@ export function MainScreen() {
                 },
               ]}
             >
-              <View style={styles.statusCardHeader}>
-                <View>
+              <LinearGradient
+                colors={[colors.accentSoft, "rgba(255,255,255,0)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.heroCardGlow}
+              />
+              <View style={styles.heroHeader}>
+                <View style={styles.heroCopy}>
                   <Text style={[styles.eyebrow, { color: colors.accent }]}>
-                    {statusEyebrow}
-                  </Text>
-                  <Text style={[styles.statusTitle, { color: colors.text }]}>
-                    {statusTitle}
+                    Voice-first model studio
                   </Text>
                 </View>
                 <View
                   style={[
-                    styles.sessionBadge,
+                    styles.livePill,
                     {
                       backgroundColor: colors.surfaceElevated,
                       borderColor: colors.border,
                     },
                   ]}
                 >
+                  <View
+                    style={[
+                      styles.liveDot,
+                      {
+                        backgroundColor: isActive
+                          ? colors.success
+                          : colors.accentWarm,
+                      },
+                    ]}
+                  />
                   <Text
                     style={[
-                      styles.sessionBadgeText,
+                      styles.livePillText,
                       { color: colors.textSecondary },
                     ]}
                   >
-                    {providerLabel}
+                  {isActive ? "Live" : "Idle"}
                   </Text>
                 </View>
               </View>
-              <Text
-                style={[styles.statusDescription, { color: colors.textSecondary }]}
-              >
-                {statusDescription}
-              </Text>
-              <View style={styles.statusMetaRow}>
-                <Text style={[styles.statusMeta, { color: colors.textMuted }]}>
-                  {sessionMeta}
-                </Text>
-                <Text style={[styles.statusMeta, { color: colors.textMuted }]}>
-                  {settings.ttsVoice}
-                </Text>
+
+              <ProviderToggle
+                selected={provider}
+                onSelect={handleProviderChange}
+              />
+
+              <View style={styles.metaRow}>
+                <View
+                  style={[
+                    styles.metaChip,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Feather name="mic" size={15} color={colors.accent} />
+                  <Text
+                    style={[
+                      styles.metaChipText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {controlSummary}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.metaChip,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Feather
+                    name="volume-2"
+                    size={15}
+                    color={colors.accentWarm}
+                  />
+                  <Text
+                    style={[
+                      styles.metaChipText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {playbackSummary}
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
 
-          <View
-            style={[
-              styles.transcriptShell,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                shadowColor: colors.glow,
-              },
-            ]}
-          >
-            <View style={styles.transcriptHeader}>
-              <View style={styles.transcriptHeaderCopy}>
-                <Text style={[styles.eyebrow, { color: colors.textSecondary }]}>
-                  Conversation
-                </Text>
-                <Text style={[styles.transcriptTitle, { color: colors.text }]}>
-                  {sessionTitle}
-                </Text>
-              </View>
-              <TouchableOpacity
+            <View style={styles.stageBlock}>
+              <View
                 style={[
-                  styles.expandButton,
+                  styles.stageHalo,
+                  { backgroundColor: colors.glowStrong },
+                ]}
+              />
+              <WaveformCircle
+                metering={metering}
+                isActive={isActive}
+                inputMode={settings.inputMode}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                onPress={handleTogglePress}
+              />
+              <View
+                style={[
+                  styles.statusCard,
                   {
-                    backgroundColor: colors.surfaceElevated,
+                    backgroundColor: colors.surface,
                     borderColor: colors.border,
+                    shadowColor: colors.glow,
                   },
                 ]}
-                onPress={() => setViewMode("expanded")}
               >
-                <Text style={[styles.expandButtonText, { color: colors.text }]}>
-                  Open
+                <View style={styles.statusCardHeader}>
+                  <View>
+                    <Text style={[styles.eyebrow, { color: colors.accent }]}>
+                      {statusEyebrow}
+                    </Text>
+                    <Text style={[styles.statusTitle, { color: colors.text }]}>
+                      {statusTitle}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.sessionBadge,
+                      {
+                        backgroundColor: colors.surfaceElevated,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.sessionBadgeText,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {providerLabel}
+                    </Text>
+                  </View>
+                </View>
+                <Text
+                  style={[
+                    styles.statusDescription,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {statusDescription}
                 </Text>
-                <Feather name="arrow-up-right" size={15} color={colors.accent} />
-              </TouchableOpacity>
+                <View style={styles.statusMetaRow}>
+                  <Text style={[styles.statusMeta, { color: colors.textMuted }]}>
+                    {sessionMeta}
+                  </Text>
+                  <Text style={[styles.statusMeta, { color: colors.textMuted }]}>
+                    {settings.ttsVoice}
+                  </Text>
+                </View>
+              </View>
             </View>
 
             <View
               style={[
-                styles.dragHandle,
-                { backgroundColor: colors.borderStrong },
+                styles.transcriptShell,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  shadowColor: colors.glow,
+                },
               ]}
-            />
+            >
+              <View style={styles.transcriptHeader}>
+                <View style={styles.transcriptHeaderCopy}>
+                  <Text
+                    style={[styles.eyebrow, { color: colors.textSecondary }]}
+                  >
+                    Conversation
+                  </Text>
+                  <Text style={[styles.transcriptTitle, { color: colors.text }]}>
+                    {sessionTitle}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.expandButton,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => setViewMode("expanded")}
+                >
+                  <Text
+                    style={[styles.expandButtonText, { color: colors.text }]}
+                  >
+                    Open
+                  </Text>
+                  <Feather
+                    name="arrow-up-right"
+                    size={15}
+                    color={colors.accent}
+                  />
+                </TouchableOpacity>
+              </View>
 
-            <ChatTranscript
-              messages={messages}
-              onTap={() => setViewMode("expanded")}
-              emptyTitle="No transcript yet"
-              emptyDescription="Start with the voice stage above. Your messages and the model reply will land here instantly."
-              contentContainerStyle={styles.previewTranscriptContent}
-            />
-          </View>
+              <View
+                style={[
+                  styles.dragHandle,
+                  { backgroundColor: colors.borderStrong },
+                ]}
+              />
+
+              <ChatTranscript
+                messages={messages}
+                emptyTitle="No transcript yet"
+                emptyDescription="Start with the voice stage above. Your messages and the model reply will land here instantly."
+                contentContainerStyle={styles.previewTranscriptContent}
+                scrollEnabled={false}
+              />
+            </View>
+          </ScrollView>
         </View>
       ) : (
         <View style={styles.expandedLayout}>
@@ -683,6 +712,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingBottom: 12,
   },
+  defaultScroll: {
+    flex: 1,
+  },
+  defaultLayoutContent: {
+    paddingBottom: 28,
+  },
   expandedLayout: {
     flex: 1,
     paddingHorizontal: 18,
@@ -734,7 +769,8 @@ const styles = StyleSheet.create({
   heroCard: {
     borderRadius: 32,
     borderWidth: 1,
-    padding: 20,
+    padding: 16,
+    marginBottom: 12,
     overflow: "hidden",
     shadowOffset: { width: 0, height: 22 },
     shadowOpacity: 0.12,
@@ -755,24 +791,13 @@ const styles = StyleSheet.create({
   },
   heroCopy: {
     flex: 1,
-    gap: 8,
+    justifyContent: "center",
   },
   eyebrow: {
     fontSize: 11,
     letterSpacing: 1.2,
     textTransform: "uppercase",
     fontFamily: fonts.mono,
-  },
-  heroTitle: {
-    fontSize: 30,
-    lineHeight: 36,
-    fontFamily: fonts.displayHeavy,
-  },
-  heroDescription: {
-    marginTop: 12,
-    fontSize: 15,
-    lineHeight: 23,
-    fontFamily: fonts.body,
   },
   livePill: {
     flexDirection: "row",
@@ -799,7 +824,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    marginTop: 16,
+    marginTop: 12,
   },
   metaChip: {
     flexDirection: "row",
@@ -815,10 +840,9 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
   },
   stageBlock: {
-    flex: 1,
+    width: "100%",
     alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 12,
+    paddingTop: 0,
     paddingBottom: 18,
   },
   stageHalo: {
@@ -831,7 +855,7 @@ const styles = StyleSheet.create({
   statusCard: {
     width: "100%",
     maxWidth: 360,
-    marginTop: -16,
+    marginTop: 18,
     borderRadius: 28,
     borderWidth: 1,
     padding: 18,
@@ -883,12 +907,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.mono,
   },
   transcriptShell: {
-    minHeight: 240,
-    maxHeight: 320,
+    height: 288,
     borderRadius: 32,
     borderWidth: 1,
     paddingTop: 18,
     paddingHorizontal: 16,
+    overflow: "hidden",
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.12,
     shadowRadius: 30,
@@ -900,6 +924,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingTop: 18,
     paddingHorizontal: 16,
+    overflow: "hidden",
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.12,
     shadowRadius: 30,

@@ -19,6 +19,7 @@ interface ChatTranscriptProps {
   emptyTitle?: string;
   emptyDescription?: string;
   contentContainerStyle?: StyleProp<ViewStyle>;
+  scrollEnabled?: boolean;
 }
 
 export function ChatTranscript({
@@ -27,6 +28,7 @@ export function ChatTranscript({
   emptyTitle = "Your conversation appears here",
   emptyDescription = "Press and hold the voice control, then speak naturally. VoxAI will keep the thread and speak back.",
   contentContainerStyle,
+  scrollEnabled = true,
 }: ChatTranscriptProps) {
   const { colors } = useTheme();
   const listRef = useRef<FlatList>(null);
@@ -79,6 +81,7 @@ export function ChatTranscript({
         </View>
       }
       showsVerticalScrollIndicator={false}
+      scrollEnabled={scrollEnabled}
       onTouchStart={onTap}
     />
   );
