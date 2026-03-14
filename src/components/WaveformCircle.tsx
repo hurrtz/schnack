@@ -1,6 +1,7 @@
 import React from "react";
 import { View, TouchableOpacity, StyleSheet, GestureResponderEvent } from "react-native";
-import Animated, { useAnimatedStyle, withRepeat, withTiming, withDelay, withSequence, Easing } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, useDerivedValue, withRepeat, withTiming, withDelay, withSequence, Easing } from "react-native-reanimated";
+import { useEffect } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../theme/ThemeContext";
 import { Waveform } from "./Waveform";
@@ -16,13 +17,19 @@ interface WaveformCircleProps {
 }
 
 function RippleRing({ delay, color, isActive, intensity }: { delay: number; color: string; isActive: boolean; intensity: number }) {
-  const duration = 2500 - intensity * 1300;
-  const peakOpacity = 0.1 + intensity * 0.25;
+  const isActiveSV = useSharedValue(isActive);
+  const intensitySV = useSharedValue(intensity);
+  useEffect(() => { isActiveSV.value = isActive; }, [isActive]);
+  useEffect(() => { intensitySV.value = intensity; }, [intensity]);
+
+  const duration = useDerivedValue(() => 2500 - intensitySV.value * 1300);
+  const peakOpacity = useDerivedValue(() => 0.1 + intensitySV.value * 0.25);
+
   const animatedStyle = useAnimatedStyle(() => {
-    if (!isActive) return { opacity: 0, transform: [{ scale: 0.8 }] };
+    if (!isActiveSV.value) return { opacity: 0, transform: [{ scale: 0.8 }] };
     return {
-      opacity: withDelay(delay, withRepeat(withSequence(withTiming(peakOpacity, { duration: 0, easing: Easing.linear }), withTiming(0, { duration, easing: Easing.out(Easing.ease) })), -1)),
-      transform: [{ scale: withDelay(delay, withRepeat(withSequence(withTiming(0.7, { duration: 0, easing: Easing.linear }), withTiming(1.4, { duration, easing: Easing.out(Easing.ease) })), -1)) }],
+      opacity: withDelay(delay, withRepeat(withSequence(withTiming(peakOpacity.value, { duration: 0, easing: Easing.linear }), withTiming(0, { duration: duration.value, easing: Easing.out(Easing.ease) })), -1)),
+      transform: [{ scale: withDelay(delay, withRepeat(withSequence(withTiming(0.7, { duration: 0, easing: Easing.linear }), withTiming(1.4, { duration: duration.value, easing: Easing.out(Easing.ease) })), -1)) }],
     };
   });
   return <Animated.View style={[{ position: "absolute", width: 190, height: 190, borderRadius: 95, borderWidth: 1.5, borderColor: color }, animatedStyle]} />;
@@ -51,5 +58,5 @@ export function WaveformCircle({ metering, isActive, inputMode, onPressIn, onPre
 
 const styles = StyleSheet.create({
   container: { width: 220, height: 220, alignItems: "center", justifyContent: "center" },
-  circle: { width: 170, height: 170, borderRadius: 85, alignItems: "center", justifyContent: "center" },
+  circle: { width: 170, height: 170, borderRadius: 85, alignItems: "center", justifyContent: "center", overflow: "hidden" },
 });
