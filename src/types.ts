@@ -1,4 +1,4 @@
-export type Provider = "openai" | "anthropic";
+export type Provider = "openai" | "anthropic" | "gemini" | "nvidia";
 export type InputMode = "push-to-talk" | "toggle-to-talk";
 export type TtsPlayback = "stream" | "wait";
 export type ThemeMode = "light" | "dark" | "system";
@@ -14,6 +14,8 @@ export interface Settings {
   ttsPlayback: TtsPlayback;
   openaiModel: string;
   anthropicModel: string;
+  geminiModel: string;
+  nvidiaModel: string;
   ttsVoice: string;
   theme: ThemeMode;
   lastProvider: Provider;
@@ -24,6 +26,8 @@ export const DEFAULT_SETTINGS: Settings = {
   ttsPlayback: "stream",
   openaiModel: "gpt-5.4",
   anthropicModel: "claude-sonnet-4-6",
+  geminiModel: "gemini-2.5-flash",
+  nvidiaModel: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
   ttsVoice: "alloy",
   theme: "system",
   lastProvider: "openai",

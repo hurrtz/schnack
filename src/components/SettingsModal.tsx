@@ -16,7 +16,13 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { OPENAI_MODELS, ANTHROPIC_MODELS, TTS_VOICES } from "../constants/models";
+import {
+  ANTHROPIC_MODELS,
+  GEMINI_MODELS,
+  NVIDIA_MODELS,
+  OPENAI_MODELS,
+  TTS_VOICES,
+} from "../constants/models";
 import { Settings, InputMode, TtsPlayback, ThemeMode } from "../types";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
@@ -287,6 +293,30 @@ export function SettingsModal({
                   label: m.name,
                 }))}
                 onChange={(v) => onUpdate({ anthropicModel: v })}
+              />
+            </PickerSection>
+
+            <PickerSection>
+              <Picker
+                label="Gemini Model"
+                value={settings.geminiModel}
+                options={GEMINI_MODELS.map((model) => ({
+                  value: model.id,
+                  label: model.name,
+                }))}
+                onChange={(value) => onUpdate({ geminiModel: value })}
+              />
+            </PickerSection>
+
+            <PickerSection>
+              <Picker
+                label="NVIDIA Model"
+                value={settings.nvidiaModel}
+                options={NVIDIA_MODELS.map((model) => ({
+                  value: model.id,
+                  label: model.name,
+                }))}
+                onChange={(value) => onUpdate({ nvidiaModel: value })}
               />
             </PickerSection>
 

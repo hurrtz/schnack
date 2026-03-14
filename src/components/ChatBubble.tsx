@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { PROVIDER_LABELS } from "../constants/models";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Message } from "../types";
@@ -12,8 +13,9 @@ interface ChatBubbleProps {
 export function ChatBubble({ message }: ChatBubbleProps) {
   const { colors, isDark } = useTheme();
   const isUser = message.role === "user";
-  const providerLabel =
-    message.provider === "anthropic" ? "Anthropic" : "OpenAI";
+  const providerLabel = message.provider
+    ? PROVIDER_LABELS[message.provider]
+    : null;
 
   const bubbleContent = (
     <>

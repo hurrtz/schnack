@@ -17,7 +17,7 @@
       "expo-router"
     ],
     "scheme": "voxai",
-    "icon": "./appicon.png",
+    "icon": "./assets/branding/appIcon.png",
     "android": {
       "package": "com.tobiaswinkler.voxai"
     }

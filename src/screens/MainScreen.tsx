@@ -17,6 +17,7 @@ import { SettingsModal } from "../components/SettingsModal";
 import { Toast } from "../components/Toast";
 import { WaveformBar } from "../components/WaveformBar";
 import { WaveformCircle } from "../components/WaveformCircle";
+import { PROVIDER_LABELS } from "../constants/models";
 import { useSharedSettings } from "../context/SettingsContext";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
@@ -61,9 +62,13 @@ export function MainScreen() {
   const recordingStartedRef = useRef<Promise<void> | null>(null);
 
   const provider = settings.lastProvider;
-  const model =
-    provider === "openai" ? settings.openaiModel : settings.anthropicModel;
-  const providerLabel = provider === "openai" ? "OpenAI" : "Anthropic";
+  const model = {
+    openai: settings.openaiModel,
+    anthropic: settings.anthropicModel,
+    gemini: settings.geminiModel,
+    nvidia: settings.nvidiaModel,
+  }[provider];
+  const providerLabel = PROVIDER_LABELS[provider];
   const isBusy = pipelinePhase !== "idle";
   const visualPhase: VoiceVisualPhase = recorder.isRecording
     ? "recording"
@@ -404,42 +409,6 @@ export function MainScreen() {
                 end={{ x: 1, y: 1 }}
                 style={styles.heroCardGlow}
               />
-              <View style={styles.heroHeader}>
-                <View style={styles.heroCopy}>
-                  <Text style={[styles.eyebrow, { color: colors.accent }]}>
-                    Voice-first model studio
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.livePill,
-                    {
-                      backgroundColor: colors.surfaceElevated,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.liveDot,
-                      {
-                        backgroundColor: isActive
-                          ? colors.success
-                          : colors.accentWarm,
-                      },
-                    ]}
-                  />
-                  <Text
-                    style={[
-                      styles.livePillText,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    {isActive ? "Live" : "Idle"}
-                  </Text>
-                </View>
-              </View>
-
               <ProviderToggle
                 selected={provider}
                 onSelect={handleProviderChange}
@@ -480,6 +449,35 @@ export function MainScreen() {
                     </Text>
                     <Text style={[styles.statusTitle, { color: colors.text }]}>
                       {statusTitle}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.livePill,
+                      styles.controlRoomPill,
+                      {
+                        backgroundColor: colors.surfaceElevated,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.liveDot,
+                        {
+                          backgroundColor: isActive
+                            ? colors.success
+                            : colors.accentWarm,
+                        },
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.livePillText,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {isActive ? "Live" : "Idle"}
                     </Text>
                   </View>
                 </View>
@@ -741,10 +739,10 @@ const styles = StyleSheet.create({
     fontFamily: fonts.displayHeavy,
   },
   heroCard: {
-    borderRadius: 32,
+    borderRadius: 28,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 12,
+    padding: 10,
+    marginBottom: 8,
     overflow: "hidden",
     shadowOffset: { width: 0, height: 22 },
     shadowOpacity: 0.12,
@@ -757,15 +755,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 180,
-  },
-  heroHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  heroCopy: {
-    flex: 1,
-    justifyContent: "center",
   },
   eyebrow: {
     fontSize: 11,
@@ -794,6 +783,9 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     fontFamily: fonts.mono,
   },
+  controlRoomPill: {
+    marginLeft: "auto",
+  },
   stageBlock: {
     width: "100%",
     alignItems: "center",
@@ -821,6 +813,8 @@ const styles = StyleSheet.create({
   },
   statusCardHeader: {
     flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
     marginBottom: 2,
   },
   statusHeaderCopy: {
