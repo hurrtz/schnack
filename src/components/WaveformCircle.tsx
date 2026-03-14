@@ -21,15 +21,94 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Waveform } from "./Waveform";
-import { InputMode } from "../types";
+import { InputMode, VoiceVisualPhase } from "../types";
 
 interface WaveformCircleProps {
   metering: number;
   isActive: boolean;
+  phase: VoiceVisualPhase;
+  providerLabel: string;
   inputMode: InputMode;
   onPressIn?: (e: GestureResponderEvent) => void;
   onPressOut?: (e: GestureResponderEvent) => void;
   onPress?: () => void;
+}
+
+function ProcessingDot({
+  delay,
+  color,
+}: {
+  delay: number;
+  color: string;
+}) {
+  const opacity = useSharedValue(0.32);
+  const scale = useSharedValue(0.76);
+
+  useEffect(() => {
+    opacity.value = withDelay(
+      delay,
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 320, easing: Easing.out(Easing.ease) }),
+          withTiming(0.32, { duration: 560, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        false
+      )
+    );
+    scale.value = withDelay(
+      delay,
+      withRepeat(
+        withSequence(
+          withTiming(1.08, { duration: 320, easing: Easing.out(Easing.ease) }),
+          withTiming(0.76, { duration: 560, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        false
+      )
+    );
+  }, [delay, opacity, scale]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        styles.processingDot,
+        { backgroundColor: color },
+        animatedStyle,
+      ]}
+    />
+  );
+}
+
+function ProcessingIndicator({
+  phase,
+  providerLabel,
+}: {
+  phase: VoiceVisualPhase;
+  providerLabel: string;
+}) {
+  const isThinking = phase === "thinking";
+
+  return (
+    <View style={styles.processingWrap}>
+      <View style={styles.processingDots}>
+        <ProcessingDot delay={0} color="rgba(255, 255, 255, 0.96)" />
+        <ProcessingDot delay={170} color="rgba(255, 255, 255, 0.9)" />
+        <ProcessingDot delay={340} color="rgba(255, 255, 255, 0.84)" />
+      </View>
+      <Text style={styles.processingLabel}>
+        {isThinking ? "Waiting for reply" : "Parsing your voice"}
+      </Text>
+      {isThinking ? (
+        <Text style={styles.processingSubLabel}>{providerLabel}</Text>
+      ) : null}
+    </View>
+  );
 }
 
 function RippleRing({ delay, color, isActive, intensity }: { delay: number; color: string; isActive: boolean; intensity: number }) {
@@ -51,17 +130,40 @@ function RippleRing({ delay, color, isActive, intensity }: { delay: number; colo
   return <Animated.View style={[{ position: "absolute", width: 190, height: 190, borderRadius: 95, borderWidth: 1.5, borderColor: color }, animatedStyle]} />;
 }
 
-export function WaveformCircle({ metering, isActive, inputMode, onPressIn, onPressOut, onPress }: WaveformCircleProps) {
+export function WaveformCircle({
+  metering,
+  isActive,
+  phase,
+  providerLabel,
+  inputMode,
+  onPressIn,
+  onPressOut,
+  onPress,
+}: WaveformCircleProps) {
   const { colors } = useTheme();
   const intensity = Math.max(0, (metering + 160) / 160);
+  const isProcessing = phase === "transcribing" || phase === "thinking";
+  const isSpeaking = phase === "speaking";
   const interactionHint =
-    inputMode === "push-to-talk"
-      ? isActive
-        ? "Listening"
-        : "Hold to speak"
-      : isActive
-        ? "Tap to stop"
-        : "Tap to speak";
+    phase === "recording"
+      ? "Listening"
+      : phase === "transcribing"
+        ? "Parsing"
+        : phase === "thinking"
+          ? "Thinking"
+          : phase === "speaking"
+            ? "Speaking"
+            : inputMode === "push-to-talk"
+              ? "Hold to speak"
+              : "Tap to speak";
+  const ringColor = isProcessing ? colors.accentWarm : colors.accent;
+  const gradientColors: [string, string, string] = isProcessing
+    ? [colors.accentWarm, colors.accentGradientStart, colors.accentGradientEnd]
+    : [
+        colors.accentGradientStart,
+        colors.accentGradientEnd,
+        colors.accentGradientEnd,
+      ];
 
   return (
     <View style={styles.container}>
@@ -69,19 +171,19 @@ export function WaveformCircle({ metering, isActive, inputMode, onPressIn, onPre
         style={[
           styles.staticRing,
           styles.staticRingOuter,
-          { borderColor: colors.border },
+          { borderColor: isProcessing ? colors.borderStrong : colors.border },
         ]}
       />
       <View
         style={[
           styles.staticRing,
           styles.staticRingInner,
-          { borderColor: colors.borderStrong },
+          { borderColor: isProcessing ? colors.accentSoft : colors.borderStrong },
         ]}
       />
-      <RippleRing delay={0} color={colors.accent} isActive={isActive} intensity={intensity} />
-      <RippleRing delay={500} color={colors.accent} isActive={isActive} intensity={intensity} />
-      <RippleRing delay={1000} color={colors.accent} isActive={isActive} intensity={intensity} />
+      <RippleRing delay={0} color={ringColor} isActive={isActive} intensity={intensity} />
+      <RippleRing delay={500} color={ringColor} isActive={isActive} intensity={intensity} />
+      <RippleRing delay={1000} color={ringColor} isActive={isActive} intensity={intensity} />
       <TouchableOpacity
         activeOpacity={0.88}
         onPressIn={inputMode === "push-to-talk" ? onPressIn : undefined}
@@ -89,11 +191,7 @@ export function WaveformCircle({ metering, isActive, inputMode, onPressIn, onPre
         onPress={inputMode === "toggle-to-talk" ? onPress : undefined}
       >
         <LinearGradient
-          colors={[
-            colors.accentGradientStart,
-            colors.accentGradientEnd,
-            colors.accentGradientEnd,
-          ]}
+          colors={gradientColors}
           locations={[0, 0.58, 1]}
           start={{ x: 0.12, y: 0 }}
           end={{ x: 0.88, y: 1 }}
@@ -122,16 +220,20 @@ export function WaveformCircle({ metering, isActive, inputMode, onPressIn, onPre
           >
             <Text style={styles.innerBadgeText}>{interactionHint}</Text>
           </View>
-          <Waveform
-            metering={metering}
-            maxHeight={62}
-            barCount={18}
-            barWidth={4}
-            barGap={2}
-            barColor="rgba(255, 255, 255, 0.95)"
-            barColorInactive="rgba(255, 255, 255, 0.55)"
-            isActive={isActive}
-          />
+          {isProcessing ? (
+            <ProcessingIndicator phase={phase} providerLabel={providerLabel} />
+          ) : (
+            <Waveform
+              metering={metering}
+              maxHeight={isSpeaking ? 58 : 62}
+              barCount={18}
+              barWidth={4}
+              barGap={2}
+              barColor="rgba(255, 255, 255, 0.95)"
+              barColorInactive="rgba(255, 255, 255, 0.55)"
+              isActive={isActive}
+            />
+          )}
         </LinearGradient>
       </TouchableOpacity>
     </View>
@@ -186,6 +288,37 @@ const styles = StyleSheet.create({
   },
   innerBadgeText: {
     color: "#F6FBFF",
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    fontFamily: fonts.mono,
+  },
+  processingWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  processingDots: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginBottom: 16,
+  },
+  processingDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+  },
+  processingLabel: {
+    color: "#F6FBFF",
+    fontSize: 16,
+    textAlign: "center",
+    fontFamily: fonts.display,
+  },
+  processingSubLabel: {
+    marginTop: 6,
+    color: "rgba(246, 251, 255, 0.82)",
     fontSize: 11,
     letterSpacing: 1.2,
     textTransform: "uppercase",

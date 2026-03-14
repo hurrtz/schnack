@@ -10,27 +10,41 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Waveform } from "./Waveform";
-import { InputMode } from "../types";
+import { InputMode, VoiceVisualPhase } from "../types";
 
 interface WaveformBarProps {
   metering: number;
   isActive: boolean;
+  phase: VoiceVisualPhase;
   inputMode: InputMode;
   onPressIn?: (e: GestureResponderEvent) => void;
   onPressOut?: (e: GestureResponderEvent) => void;
   onPress?: () => void;
 }
 
-export function WaveformBar({ metering, isActive, inputMode, onPressIn, onPressOut, onPress }: WaveformBarProps) {
+export function WaveformBar({
+  metering,
+  isActive,
+  phase,
+  inputMode,
+  onPressIn,
+  onPressOut,
+  onPress,
+}: WaveformBarProps) {
   const { colors } = useTheme();
+  const isProcessing = phase === "transcribing" || phase === "thinking";
   const hint =
-    inputMode === "push-to-talk"
-      ? isActive
-        ? "Listening"
-        : "Hold"
-      : isActive
-        ? "Stop"
-        : "Tap";
+    phase === "recording"
+      ? "Listening"
+      : phase === "transcribing"
+        ? "Parsing"
+        : phase === "thinking"
+          ? "Thinking"
+          : phase === "speaking"
+            ? "Speaking"
+            : inputMode === "push-to-talk"
+              ? "Hold"
+              : "Tap";
 
   const content = (
     <View style={styles.contentRow}>
@@ -54,16 +68,29 @@ export function WaveformBar({ metering, isActive, inputMode, onPressIn, onPressO
           {hint}
         </Text>
       </View>
-      <Waveform
-        metering={metering}
-        maxHeight={26}
-        barCount={28}
-        barWidth={2}
-        barGap={1}
-        barColor={isActive ? "rgba(255, 255, 255, 0.95)" : colors.accent}
-        barColorInactive={isActive ? "rgba(255, 255, 255, 0.55)" : colors.textMuted}
-        isActive={isActive}
-      />
+      {isProcessing ? (
+        <Text
+          style={[
+            styles.processingText,
+            { color: isActive ? "#F6FBFF" : colors.textSecondary },
+          ]}
+        >
+          {phase === "thinking" ? "Waiting on model" : "Converting speech"}
+        </Text>
+      ) : (
+        <Waveform
+          metering={metering}
+          maxHeight={26}
+          barCount={28}
+          barWidth={2}
+          barGap={1}
+          barColor={isActive ? "rgba(255, 255, 255, 0.95)" : colors.accent}
+          barColorInactive={
+            isActive ? "rgba(255, 255, 255, 0.55)" : colors.textMuted
+          }
+          isActive={isActive}
+        />
+      )}
     </View>
   );
 
@@ -85,11 +112,15 @@ export function WaveformBar({ metering, isActive, inputMode, onPressIn, onPressO
     >
       {isActive ? (
         <LinearGradient
-          colors={[
-            colors.accentGradientStart,
-            colors.accentGradientEnd,
-            colors.accentGradientEnd,
-          ]}
+          colors={
+            isProcessing
+              ? [colors.accentWarm, colors.accentGradientStart, colors.accentGradientEnd]
+              : [
+                  colors.accentGradientStart,
+                  colors.accentGradientEnd,
+                  colors.accentGradientEnd,
+                ]
+          }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={[styles.bar, glowShadow]}
@@ -143,5 +174,11 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: "uppercase",
     fontFamily: fonts.mono,
+  },
+  processingText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fonts.body,
   },
 });

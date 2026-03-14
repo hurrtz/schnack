@@ -2,6 +2,12 @@ export type Provider = "openai" | "anthropic";
 export type InputMode = "push-to-talk" | "toggle-to-talk";
 export type TtsPlayback = "stream" | "wait";
 export type ThemeMode = "light" | "dark" | "system";
+export type VoiceVisualPhase =
+  | "idle"
+  | "recording"
+  | "transcribing"
+  | "thinking"
+  | "speaking";
 
 export interface Settings {
   inputMode: InputMode;

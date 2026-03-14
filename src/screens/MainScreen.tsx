@@ -25,7 +25,7 @@ import { runVoicePipeline } from "../services/voicePipeline";
 import { synthesizeSpeech } from "../services/tts";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
-import { Provider } from "../types";
+import { Provider, VoiceVisualPhase } from "../types";
 
 type ViewMode = "default" | "expanded";
 
@@ -48,7 +48,9 @@ export function MainScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>("default");
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const [processing, setProcessing] = useState(false);
+  const [pipelinePhase, setPipelinePhase] = useState<
+    "idle" | "transcribing" | "thinking"
+  >("idle");
   const [streamingText, setStreamingText] = useState("");
   const [toast, setToast] = useState<{
     message: string;
@@ -62,8 +64,17 @@ export function MainScreen() {
   const model =
     provider === "openai" ? settings.openaiModel : settings.anthropicModel;
   const providerLabel = provider === "openai" ? "OpenAI" : "Anthropic";
-
-  const isActive = recorder.isRecording || player.isPlaying || processing;
+  const isBusy = pipelinePhase !== "idle";
+  const visualPhase: VoiceVisualPhase = recorder.isRecording
+    ? "recording"
+    : pipelinePhase === "transcribing"
+      ? "transcribing"
+      : player.isPlaying
+        ? "speaking"
+        : pipelinePhase === "thinking"
+          ? "thinking"
+          : "idle";
+  const isActive = visualPhase !== "idle";
   const metering = recorder.isRecording
     ? recorder.meteringData
     : player.isPlaying
@@ -79,59 +90,57 @@ export function MainScreen() {
 
   const handleRecordingDone = useCallback(
     async (audioUri: string) => {
-      setProcessing(true);
+      setPipelinePhase("transcribing");
+      setStreamingText("");
       abortRef.current = new AbortController();
       player.resetCancellation();
 
       try {
-        const transcription = await new Promise<string | null>(
-          (resolve, reject) => {
-            runVoicePipeline({
-              audioUri,
-              messages: activeConversation?.messages || [],
-              model,
-              provider,
-              ttsVoice: settings.ttsVoice,
-              ttsPlayback: settings.ttsPlayback,
-              abortSignal: abortRef.current!.signal,
-              callbacks: {
-                onTranscription: (text) => {
-                  if (!activeConversation) {
-                    createConversation(text);
-                  }
-                  setTimeout(() => {
-                    addMessage({
-                      role: "user",
-                      content: text,
-                      model: null,
-                      provider: null,
-                    });
-                  }, 0);
-                  resolve(text);
-                },
-                onChunk: (text) => {
-                  setStreamingText((prev) => prev + text);
-                },
-                onResponseDone: (fullText) => {
-                  setStreamingText("");
-                  addMessage({
-                    role: "assistant",
-                    content: fullText,
-                    model,
-                    provider,
-                  });
-                },
-                onAudioReady: (audioData) => {
-                  player.enqueueAudio(audioData);
-                },
-                onError: (error) => {
-                  showToast(error.message, () => handleRecordingDone(audioUri));
-                  reject(error);
-                },
-              },
-            });
-          }
-        );
+        const transcription = await runVoicePipeline({
+          audioUri,
+          messages: activeConversation?.messages || [],
+          model,
+          provider,
+          ttsVoice: settings.ttsVoice,
+          ttsPlayback: settings.ttsPlayback,
+          abortSignal: abortRef.current!.signal,
+          callbacks: {
+            onTranscription: (text) => {
+              setPipelinePhase("thinking");
+              if (!activeConversation) {
+                createConversation(text);
+              }
+              setTimeout(() => {
+                addMessage({
+                  role: "user",
+                  content: text,
+                  model: null,
+                  provider: null,
+                });
+              }, 0);
+            },
+            onChunk: (text) => {
+              setPipelinePhase("thinking");
+              setStreamingText((prev) => prev + text);
+            },
+            onResponseDone: (fullText) => {
+              setStreamingText("");
+              addMessage({
+                role: "assistant",
+                content: fullText,
+                model,
+                provider,
+              });
+            },
+            onAudioReady: (audioData) => {
+              player.enqueueAudio(audioData);
+            },
+            onError: (error) => {
+              setPipelinePhase("idle");
+              showToast(error.message, () => handleRecordingDone(audioUri));
+            },
+          },
+        });
 
         if (!transcription) {
           showToast("Couldn't catch that, try again.");
@@ -139,7 +148,7 @@ export function MainScreen() {
       } catch {
         // Errors are surfaced through the toast callback above.
       } finally {
-        setProcessing(false);
+        setPipelinePhase("idle");
       }
     },
     [
@@ -159,11 +168,18 @@ export function MainScreen() {
     if (player.isPlaying) {
       await player.stopPlayback();
       abortRef.current?.abort();
+      setPipelinePhase("idle");
+      setStreamingText("");
+    }
+    if (isBusy) {
+      abortRef.current?.abort();
+      setPipelinePhase("idle");
+      setStreamingText("");
     }
     const startPromise = recorder.startRecording();
     recordingStartedRef.current = startPromise;
     await startPromise;
-  }, [player, recorder]);
+  }, [isBusy, player, recorder]);
 
   const handlePressOut = useCallback(async () => {
     if (recordingStartedRef.current) {
@@ -180,6 +196,14 @@ export function MainScreen() {
     if (player.isPlaying) {
       await player.stopPlayback();
       abortRef.current?.abort();
+      setPipelinePhase("idle");
+      setStreamingText("");
+      return;
+    }
+    if (isBusy) {
+      abortRef.current?.abort();
+      setPipelinePhase("idle");
+      setStreamingText("");
       return;
     }
     if (recorder.isRecording) {
@@ -190,7 +214,7 @@ export function MainScreen() {
       return;
     }
     await recorder.startRecording();
-  }, [handleRecordingDone, player, recorder]);
+  }, [handleRecordingDone, isBusy, player, recorder]);
 
   const handleProviderChange = useCallback(
     (nextProvider: Provider) => {
@@ -201,7 +225,7 @@ export function MainScreen() {
 
   const handlePreviewVoice = useCallback(
     async (text: string, voice: string) => {
-      if (recorder.isRecording || processing) {
+      if (recorder.isRecording || isBusy) {
         showToast("Stop the active voice session before previewing a voice.");
         return;
       }
@@ -219,7 +243,7 @@ export function MainScreen() {
         showToast(message);
       }
     },
-    [player, processing, recorder.isRecording, showToast]
+    [isBusy, player, recorder.isRecording, showToast]
   );
 
   const baseMessages = activeConversation?.messages || [];
@@ -237,31 +261,24 @@ export function MainScreen() {
       ]
     : baseMessages;
 
-  const statusEyebrow = processing
-    ? "Pipeline"
-    : recorder.isRecording
+  const statusEyebrow = recorder.isRecording
       ? "Live Input"
+      : pipelinePhase === "transcribing"
+        ? "Parsing Input"
+        : pipelinePhase === "thinking"
+          ? "Awaiting Model"
       : player.isPlaying
         ? "Voice Output"
         : "Control Room";
-  const statusTitle = processing
-    ? "Composing your reply"
-    : recorder.isRecording
+  const statusTitle = recorder.isRecording
       ? "Listening to your voice"
+      : pipelinePhase === "transcribing"
+        ? "Parsing your voice input"
+        : pipelinePhase === "thinking"
+          ? `Waiting for ${providerLabel}`
       : player.isPlaying
         ? "Speaking back to you"
         : "Ready for the next thought";
-  const statusDescription = processing
-    ? `${providerLabel} is shaping the response with ${model}.`
-    : recorder.isRecording
-      ? "Keep speaking naturally. Release when you want VoxAI to respond."
-      : player.isPlaying
-        ? "Tap the control to interrupt playback and jump back into the conversation."
-        : "A voice-first space for speaking with frontier models without breaking flow.";
-  const controlSummary =
-    settings.inputMode === "push-to-talk" ? "Hold to speak" : "Tap to speak";
-  const playbackSummary =
-    settings.ttsPlayback === "stream" ? "Replies stream aloud" : "Replies play after completion";
   const sessionTitle = activeConversation?.title || "Fresh session";
   const sessionMeta = activeConversation
     ? `${messages.length} messages in progress`
@@ -418,7 +435,7 @@ export function MainScreen() {
                       { color: colors.textSecondary },
                     ]}
                   >
-                  {isActive ? "Live" : "Idle"}
+                    {isActive ? "Live" : "Idle"}
                   </Text>
                 </View>
               </View>
@@ -427,51 +444,6 @@ export function MainScreen() {
                 selected={provider}
                 onSelect={handleProviderChange}
               />
-
-              <View style={styles.metaRow}>
-                <View
-                  style={[
-                    styles.metaChip,
-                    {
-                      backgroundColor: colors.surfaceElevated,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <Feather name="mic" size={15} color={colors.accent} />
-                  <Text
-                    style={[
-                      styles.metaChipText,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    {controlSummary}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.metaChip,
-                    {
-                      backgroundColor: colors.surfaceElevated,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <Feather
-                    name="volume-2"
-                    size={15}
-                    color={colors.accentWarm}
-                  />
-                  <Text
-                    style={[
-                      styles.metaChipText,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    {playbackSummary}
-                  </Text>
-                </View>
-              </View>
             </View>
 
             <View style={styles.stageBlock}>
@@ -484,6 +456,8 @@ export function MainScreen() {
               <WaveformCircle
                 metering={metering}
                 isActive={isActive}
+                phase={visualPhase}
+                providerLabel={providerLabel}
                 inputMode={settings.inputMode}
                 onPressIn={handlePressIn}
                 onPressOut={handlePressOut}
@@ -500,7 +474,7 @@ export function MainScreen() {
                 ]}
               >
                 <View style={styles.statusCardHeader}>
-                  <View>
+                  <View style={styles.statusHeaderCopy}>
                     <Text style={[styles.eyebrow, { color: colors.accent }]}>
                       {statusEyebrow}
                     </Text>
@@ -508,33 +482,7 @@ export function MainScreen() {
                       {statusTitle}
                     </Text>
                   </View>
-                  <View
-                    style={[
-                      styles.sessionBadge,
-                      {
-                        backgroundColor: colors.surfaceElevated,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.sessionBadgeText,
-                        { color: colors.textSecondary },
-                      ]}
-                    >
-                      {providerLabel}
-                    </Text>
-                  </View>
                 </View>
-                <Text
-                  style={[
-                    styles.statusDescription,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  {statusDescription}
-                </Text>
                 <View style={styles.statusMetaRow}>
                   <Text style={[styles.statusMeta, { color: colors.textMuted }]}>
                     {sessionMeta}
@@ -640,6 +588,7 @@ export function MainScreen() {
             <WaveformBar
               metering={metering}
               isActive={isActive}
+              phase={visualPhase}
               inputMode={settings.inputMode}
               onPressIn={handlePressIn}
               onPressOut={handlePressOut}
@@ -845,25 +794,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     fontFamily: fonts.mono,
   },
-  metaRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 12,
-  },
-  metaChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  metaChipText: {
-    fontSize: 13,
-    fontFamily: fonts.body,
-  },
   stageBlock: {
     width: "100%",
     alignItems: "center",
@@ -891,33 +821,17 @@ const styles = StyleSheet.create({
   },
   statusCardHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 10,
+    marginBottom: 2,
+  },
+  statusHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
   },
   statusTitle: {
     marginTop: 4,
     fontSize: 24,
     lineHeight: 28,
     fontFamily: fonts.display,
-  },
-  sessionBadge: {
-    alignSelf: "flex-start",
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  sessionBadgeText: {
-    fontSize: 11,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    fontFamily: fonts.mono,
-  },
-  statusDescription: {
-    fontSize: 14,
-    lineHeight: 21,
-    fontFamily: fonts.body,
   },
   statusMetaRow: {
     flexDirection: "row",
