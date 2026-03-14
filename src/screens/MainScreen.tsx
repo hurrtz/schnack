@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../theme/ThemeContext";
 import { useSettings } from "../hooks/useSettings";
@@ -149,15 +150,24 @@ export function MainScreen() {
     ]
   );
 
+  const recordingStartedRef = useRef<Promise<void> | null>(null);
+
   const handlePressIn = useCallback(async () => {
     if (player.isPlaying) {
       await player.stopPlayback();
       abortRef.current?.abort();
     }
-    await recorder.startRecording();
+    const startPromise = recorder.startRecording();
+    recordingStartedRef.current = startPromise;
+    await startPromise;
   }, [player, recorder]);
 
   const handlePressOut = useCallback(async () => {
+    // Wait for startRecording to finish before stopping
+    if (recordingStartedRef.current) {
+      await recordingStartedRef.current;
+      recordingStartedRef.current = null;
+    }
     const uri = await recorder.stopRecording();
     if (uri) handleRecordingDone(uri);
   }, [recorder, handleRecordingDone]);
@@ -221,14 +231,14 @@ export function MainScreen() {
               style={[styles.iconButton, { backgroundColor: colors.surface }]}
               onPress={() => setDrawerVisible(true)}
             >
-              <Text style={{ color: colors.text }}>☰</Text>
+              <Feather name="menu" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
-            <Text style={[styles.title, { color: colors.text }]}>VoxAI</Text>
+            <Text style={[styles.title, { color: colors.text }]}>VOX<Text style={{ color: colors.accent }}>AI</Text></Text>
             <TouchableOpacity
               style={[styles.iconButton, { backgroundColor: colors.surface }]}
               onPress={() => setSettingsVisible(true)}
             >
-              <Text style={{ color: colors.text }}>⚙</Text>
+              <Feather name="settings" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -254,6 +264,7 @@ export function MainScreen() {
           <View
             style={[styles.chatPreview, { backgroundColor: colors.surface }]}
           >
+            <View style={styles.dragHandle} />
             <ChatTranscript
               messages={messages}
               onTap={handleExpandChat}
@@ -268,7 +279,7 @@ export function MainScreen() {
               style={[styles.iconButton, { backgroundColor: colors.surface }]}
               onPress={() => setDrawerVisible(true)}
             >
-              <Text style={{ color: colors.text }}>☰</Text>
+              <Feather name="menu" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
             <WaveformBar
               metering={metering}
@@ -282,7 +293,7 @@ export function MainScreen() {
               style={[styles.iconButton, { backgroundColor: colors.surface }]}
               onPress={() => setSettingsVisible(true)}
             >
-              <Text style={{ color: colors.text }}>⚙</Text>
+              <Feather name="settings" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -333,11 +344,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 10,
   },
-  title: { fontSize: 18, fontWeight: "700", letterSpacing: 1 },
+  title: { fontSize: 18, fontWeight: "700", letterSpacing: 2 },
   iconButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -348,10 +359,24 @@ const styles = StyleSheet.create({
   },
   chatPreview: {
     maxHeight: 160,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: "rgba(0, 0, 0, 0.4)",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 8,
   },
   expandedChat: { flex: 1 },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderRadius: 2,
+    alignSelf: "center",
+    marginTop: 8,
+    marginBottom: 4,
+  },
   collapseHint: {
     alignItems: "center",
     paddingVertical: 8,
