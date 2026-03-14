@@ -15,7 +15,9 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-audio",
+      "./plugins/withBuildReactNativeFromSource"
     ],
     "scheme": "voxai",
     "icon": "./assets/branding/appIcon.png",

@@ -66,7 +66,7 @@ describe("useSettings", () => {
     });
 
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
-      "@voxai/provider-key/gemini",
+      "voxai.provider_key.gemini",
       "AIza-live-key"
     );
     expect(result.current.settings.apiKeys.gemini).toBe("AIza-live-key");
@@ -81,7 +81,7 @@ describe("useSettings", () => {
     });
 
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(
-      "@voxai/provider-key/nvidia"
+      "voxai.provider_key.nvidia"
     );
   });
 });

@@ -1,5 +1,9 @@
-import { useState, useRef, useCallback } from "react";
-import { Audio } from "expo-av";
+import { useEffect, useState, useRef, useCallback } from "react";
+import {
+  setAudioModeAsync,
+  useAudioPlayer as useExpoAudioPlayer,
+  useAudioPlayerStatus,
+} from "expo-audio";
 
 export interface PlayerState {
   isPlaying: boolean;
@@ -7,58 +11,87 @@ export interface PlayerState {
 }
 
 export function useAudioPlayer() {
-  const [state, setState] = useState<PlayerState>({ isPlaying: false, meteringData: -160 });
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const player = useExpoAudioPlayer(null, {
+    updateInterval: 100,
+    keepAudioSessionActive: true,
+  });
+  const status = useAudioPlayerStatus(player);
+  const [meteringData, setMeteringData] = useState(-160);
   const queueRef = useRef<string[]>([]);
   const playingRef = useRef(false);
   const cancelledRef = useRef(false);
-  const meteringIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const didFinishRef = useRef(false);
 
   const playNext = useCallback(async () => {
     if (playingRef.current || cancelledRef.current) return;
-    if (queueRef.current.length === 0) { setState({ isPlaying: false, meteringData: -160 }); return; }
+    const audioUri = queueRef.current.shift();
+
+    if (!audioUri) {
+      setMeteringData(-160);
+      return;
+    }
 
     playingRef.current = true;
-    setState((prev) => ({ ...prev, isPlaying: true }));
-    const audioUri = queueRef.current.shift()!;
-
-    await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
-    const { sound } = await Audio.Sound.createAsync({ uri: audioUri });
-    soundRef.current = sound;
-
-    sound.setOnPlaybackStatusUpdate((status) => {
-      if (!status.isLoaded) return;
-      if (status.didJustFinish) {
-        if (meteringIntervalRef.current) { clearInterval(meteringIntervalRef.current); meteringIntervalRef.current = null; }
-        sound.unloadAsync();
-        soundRef.current = null;
-        playingRef.current = false;
-        playNext();
-      }
+    await setAudioModeAsync({
+      allowsRecording: false,
+      playsInSilentMode: true,
     });
+    player.replace(audioUri);
+    player.play();
+  }, [player]);
 
-    await sound.playAsync();
-    meteringIntervalRef.current = setInterval(() => {
-      setState((prev) => ({ ...prev, meteringData: -20 + Math.random() * 20 }));
+  useEffect(() => {
+    playingRef.current = status.playing;
+  }, [status.playing]);
+
+  useEffect(() => {
+    if (status.didJustFinish && !didFinishRef.current) {
+      playingRef.current = false;
+      void playNext();
+    }
+
+    didFinishRef.current = status.didJustFinish;
+  }, [playNext, status.didJustFinish]);
+
+  useEffect(() => {
+    if (!status.playing) {
+      setMeteringData(-160);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setMeteringData(-20 + Math.random() * 20);
     }, 100);
-  }, []);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [status.playing]);
 
   const enqueueAudio = useCallback((audioUri: string) => {
     if (cancelledRef.current) return;
     queueRef.current.push(audioUri);
-    if (!playingRef.current) playNext();
+    if (!playingRef.current) {
+      void playNext();
+    }
   }, [playNext]);
 
   const stopPlayback = useCallback(async () => {
     cancelledRef.current = true;
     queueRef.current = [];
-    if (meteringIntervalRef.current) { clearInterval(meteringIntervalRef.current); meteringIntervalRef.current = null; }
-    if (soundRef.current) { await soundRef.current.stopAsync(); await soundRef.current.unloadAsync(); soundRef.current = null; }
+    player.pause();
+    player.replace(null);
     playingRef.current = false;
-    setState({ isPlaying: false, meteringData: -160 });
-  }, []);
+    setMeteringData(-160);
+  }, [player]);
 
   const resetCancellation = useCallback(() => { cancelledRef.current = false; }, []);
 
-  return { ...state, enqueueAudio, stopPlayback, resetCancellation };
+  return {
+    isPlaying: status.playing,
+    meteringData,
+    enqueueAudio,
+    stopPlayback,
+    resetCancellation,
+  };
 }

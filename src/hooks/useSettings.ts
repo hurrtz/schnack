@@ -5,13 +5,14 @@ import { PROVIDER_ORDER } from "../constants/models";
 import { Provider, ProviderApiKeys, Settings, DEFAULT_SETTINGS } from "../types";
 
 const STORAGE_KEY = "@voxai/settings";
-const API_KEY_STORAGE_PREFIX = "@voxai/provider-key";
+const API_KEY_STORAGE_PREFIX = "voxai.provider_key";
 
 type PublicSettings = Omit<Settings, "apiKeys">;
 type SettingsUpdate = Partial<PublicSettings>;
 
 function getApiKeyStorageKey(provider: Provider) {
-  return `${API_KEY_STORAGE_PREFIX}/${provider}`;
+  const safeProvider = provider.replace(/[^0-9A-Za-z._-]/g, "_");
+  return `${API_KEY_STORAGE_PREFIX}.${safeProvider}`;
 }
 
 function mergeSettings(
