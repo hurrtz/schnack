@@ -108,7 +108,7 @@ export function WaveformBar({
       onPressIn={inputMode === "push-to-talk" ? onPressIn : undefined}
       onPressOut={inputMode === "push-to-talk" ? onPressOut : undefined}
       onPress={inputMode === "toggle-to-talk" ? onPress : undefined}
-      style={{ flex: 1 }}
+      style={styles.touchable}
     >
       {isActive ? (
         <LinearGradient
@@ -147,8 +147,10 @@ export function WaveformBar({
 }
 
 const styles = StyleSheet.create({
+  touchable: {
+    width: "100%",
+  },
   bar: {
-    flex: 1,
     minHeight: 58,
     borderRadius: 20,
     justifyContent: "center",

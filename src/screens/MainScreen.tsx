@@ -1,5 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
+  Animated,
+  PanResponder,
   ScrollView,
   StyleSheet,
   Text,
@@ -68,6 +70,7 @@ export function MainScreen() {
 
   const abortRef = useRef<AbortController | null>(null);
   const recordingStartedRef = useRef<Promise<void> | null>(null);
+  const expandedDrawerTranslateY = useRef(new Animated.Value(0)).current;
 
   const provider = settings.lastProvider;
   const providerApiKey = settings.apiKeys[provider].trim();
@@ -101,6 +104,47 @@ export function MainScreen() {
     []
   );
 
+  const resetExpandedDrawer = useCallback(() => {
+    Animated.spring(expandedDrawerTranslateY, {
+      toValue: 0,
+      useNativeDriver: true,
+      bounciness: 0,
+      speed: 18,
+    }).start();
+  }, [expandedDrawerTranslateY]);
+
+  const collapseExpandedDrawer = useCallback(() => {
+    Animated.timing(expandedDrawerTranslateY, {
+      toValue: 220,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished) {
+        return;
+      }
+
+      expandedDrawerTranslateY.setValue(0);
+      setViewMode("default");
+    });
+  }, [expandedDrawerTranslateY]);
+
+  const expandedDrawerPanResponder = PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gestureState) =>
+      gestureState.dy > 6 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+    onPanResponderMove: (_, gestureState) => {
+      expandedDrawerTranslateY.setValue(Math.max(0, gestureState.dy));
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      if (gestureState.dy > 86 || gestureState.vy > 1.1) {
+        collapseExpandedDrawer();
+        return;
+      }
+
+      resetExpandedDrawer();
+    },
+    onPanResponderTerminate: resetExpandedDrawer,
+  });
+
   const openSettings = useCallback((focusProvider?: Provider) => {
     setSettingsFocusProvider(focusProvider);
     setSettingsVisible(true);
@@ -122,6 +166,12 @@ export function MainScreen() {
       updateSettings({ lastProvider: fallbackProvider });
     }
   }, [availableProviders, loaded, provider, providerApiKey, updateSettings]);
+
+  useEffect(() => {
+    if (viewMode === "expanded") {
+      expandedDrawerTranslateY.setValue(0);
+    }
+  }, [expandedDrawerTranslateY, viewMode]);
 
   const ensureVoiceSessionReady = useCallback(() => {
     if (!openAIApiKey) {
@@ -681,32 +731,7 @@ export function MainScreen() {
         <View style={styles.expandedLayout}>
           {renderTopBar(true)}
 
-          <View
-            style={[
-              styles.expandedControlCard,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                shadowColor: colors.glow,
-              },
-            ]}
-          >
-            <View style={styles.expandedControlCopy}>
-              <Text style={[styles.eyebrow, { color: colors.accent }]}>
-                Live session
-              </Text>
-              <Text style={[styles.expandedControlTitle, { color: colors.text }]}>
-                {statusTitle}
-              </Text>
-              <Text
-                style={[
-                  styles.expandedControlDescription,
-                  { color: colors.textSecondary },
-                ]}
-              >
-                {providerLabel} · {model}
-              </Text>
-            </View>
+          <View style={styles.expandedStageBar}>
             <WaveformBar
               metering={metering}
               isActive={isActive}
@@ -718,17 +743,32 @@ export function MainScreen() {
             />
           </View>
 
-          <View
+          <Animated.View
             style={[
-              styles.expandedTranscriptShell,
+              styles.expandedTranscriptDrawer,
               {
                 backgroundColor: colors.surface,
                 borderColor: colors.border,
                 shadowColor: colors.glow,
               },
+              {
+                transform: [{ translateY: expandedDrawerTranslateY }],
+              },
             ]}
           >
-            <View style={styles.transcriptHeader}>
+            <View
+              style={styles.expandedDrawerHandleZone}
+              {...expandedDrawerPanResponder.panHandlers}
+            >
+              <View
+                style={[
+                  styles.dragHandle,
+                  { backgroundColor: colors.borderStrong },
+                ]}
+              />
+            </View>
+
+            <View style={styles.expandedTranscriptHeader}>
               <View style={styles.transcriptHeaderCopy}>
                 <Text style={[styles.eyebrow, { color: colors.textSecondary }]}>
                   Transcript
@@ -736,31 +776,24 @@ export function MainScreen() {
                 <Text style={[styles.transcriptTitle, { color: colors.text }]}>
                   {sessionTitle}
                 </Text>
-              </View>
-              <TouchableOpacity
-                style={[
-                  styles.expandButton,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-                onPress={() => setViewMode("default")}
-              >
-                <Feather name="chevron-down" size={15} color={colors.accent} />
-                <Text style={[styles.expandButtonText, { color: colors.text }]}>
-                  Stage
+                <Text
+                  style={[
+                    styles.expandedTranscriptMeta,
+                    { color: colors.textMuted },
+                  ]}
+                >
+                  {providerLabel} · {model}
                 </Text>
-              </TouchableOpacity>
+              </View>
             </View>
 
             <ChatTranscript
               messages={messages}
               emptyTitle="No conversation yet"
-              emptyDescription="Return to the stage view when you want the large live control back."
+              emptyDescription="Speak with the control above. Pull the drawer handle down when you want to return to the main stage."
               contentContainerStyle={styles.expandedTranscriptContent}
             />
-          </View>
+          </Animated.View>
         </View>
       )}
 
@@ -820,7 +853,7 @@ const styles = StyleSheet.create({
   expandedLayout: {
     flex: 1,
     paddingHorizontal: 18,
-    paddingBottom: 18,
+    paddingBottom: 12,
   },
   topBar: {
     flexDirection: "row",
@@ -1018,17 +1051,27 @@ const styles = StyleSheet.create({
     shadowRadius: 30,
     elevation: 8,
   },
-  expandedTranscriptShell: {
+  expandedTranscriptDrawer: {
     flex: 1,
     borderRadius: 32,
     borderWidth: 1,
-    paddingTop: 18,
+    paddingTop: 10,
     paddingHorizontal: 16,
     overflow: "hidden",
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.12,
     shadowRadius: 30,
     elevation: 8,
+  },
+  expandedDrawerHandleZone: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 2,
+    paddingBottom: 8,
+  },
+  expandedTranscriptHeader: {
+    gap: 4,
+    marginBottom: 10,
   },
   transcriptHeader: {
     flexDirection: "row",
@@ -1070,30 +1113,17 @@ const styles = StyleSheet.create({
     paddingBottom: 26,
   },
   expandedTranscriptContent: {
-    paddingBottom: 32,
+    paddingBottom: 38,
   },
-  expandedControlCard: {
-    borderRadius: 28,
-    borderWidth: 1,
-    padding: 18,
-    marginBottom: 16,
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.12,
-    shadowRadius: 30,
-    elevation: 8,
+  expandedStageBar: {
+    width: "100%",
+    marginBottom: 12,
+    zIndex: 1,
   },
-  expandedControlCopy: {
-    marginBottom: 14,
-    gap: 4,
-  },
-  expandedControlTitle: {
-    fontSize: 24,
-    lineHeight: 28,
-    fontFamily: fonts.display,
-  },
-  expandedControlDescription: {
-    fontSize: 14,
-    lineHeight: 21,
-    fontFamily: fonts.body,
+  expandedTranscriptMeta: {
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    fontFamily: fonts.mono,
   },
 });
