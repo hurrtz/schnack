@@ -7,7 +7,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.tobiaswinkler.voxai",
+      "bundleIdentifier": "com.tobiaswinkler.app.voxai",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "VoxAI needs microphone access to record your voice for conversations."
       },
