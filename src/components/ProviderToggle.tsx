@@ -24,8 +24,9 @@ export function ProviderToggle({
 }: ProviderToggleProps) {
   const { colors } = useTheme();
   const providers = visibleProviders;
-  const columnCount = providers.length <= 1
-    ? 1
+  const isSingleProvider = providers.length === 1;
+  const columnCount = isSingleProvider
+    ? 2
     : providers.length <= 3
       ? providers.length
       : 4;
@@ -80,6 +81,7 @@ export function ProviderToggle({
             key={provider}
             style={[
               styles.optionWrap,
+              isSingleProvider ? styles.optionWrapSingle : null,
               { width: `${100 / columnCount}%` },
             ]}
           >
@@ -103,12 +105,12 @@ export function ProviderToggle({
                   colors={[colors.accentGradientStart, colors.accentGradientEnd]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={[styles.option, styles.optionActive]}
+                  style={styles.optionInner}
                 >
                   {content}
                 </LinearGradient>
               ) : (
-                content
+                <View style={styles.optionInner}>{content}</View>
               )}
             </Pressable>
           </View>
@@ -122,6 +124,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     flexWrap: "wrap",
+    alignItems: "flex-start",
     borderRadius: 26,
     padding: 6,
     position: "relative",
@@ -134,22 +137,25 @@ const styles = StyleSheet.create({
   optionWrap: {
     padding: 4,
   },
+  optionWrapSingle: {
+    alignSelf: "center",
+  },
   option: {
-    minHeight: 72,
     borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
     borderWidth: 1,
     overflow: "hidden",
   },
+  optionInner: {
+    minHeight: 72,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+  },
   optionActiveShell: {
     borderColor: "rgba(255,255,255,0.18)",
-  },
-  optionActive: {
-    borderWidth: 0,
-    width: "100%",
-    height: "100%",
   },
   iconWrap: {
     minHeight: 30,

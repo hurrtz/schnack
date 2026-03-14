@@ -10,6 +10,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Swipeable } from "react-native-gesture-handler";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConversationMeta } from "../types";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
@@ -34,6 +35,7 @@ export function ConversationDrawer({
   onClose,
 }: ConversationDrawerProps) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const renderRightActions = (id: string) => (
     <TouchableOpacity
@@ -74,6 +76,7 @@ export function ConversationDrawer({
             {
               backgroundColor: colors.surface,
               borderRightColor: colors.border,
+              paddingTop: Math.max(insets.top, 12) + 8,
             },
           ]}
         >
@@ -259,7 +262,6 @@ const styles = StyleSheet.create({
     width: "84%",
     maxWidth: 380,
     borderRightWidth: 1,
-    paddingTop: 12,
   },
   drawerGlow: {
     position: "absolute",
