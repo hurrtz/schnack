@@ -338,7 +338,6 @@ export function SettingsModal({
             },
             modalAnimStyle,
           ]}
-          onStartShouldSetResponder={() => true}
         >
           <LinearGradient
             colors={[
