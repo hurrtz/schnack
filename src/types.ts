@@ -2,6 +2,7 @@ export type Provider = "openai" | "anthropic" | "gemini" | "nvidia";
 export type InputMode = "push-to-talk" | "toggle-to-talk";
 export type TtsPlayback = "stream" | "wait";
 export type ThemeMode = "light" | "dark" | "system";
+export type ProviderApiKeys = Record<Provider, string>;
 export type VoiceVisualPhase =
   | "idle"
   | "recording"
@@ -19,6 +20,7 @@ export interface Settings {
   ttsVoice: string;
   theme: ThemeMode;
   lastProvider: Provider;
+  apiKeys: ProviderApiKeys;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -31,6 +33,12 @@ export const DEFAULT_SETTINGS: Settings = {
   ttsVoice: "alloy",
   theme: "system",
   lastProvider: "openai",
+  apiKeys: {
+    openai: "",
+    anthropic: "",
+    gemini: "",
+    nvidia: "",
+  },
 };
 
 export interface Message {

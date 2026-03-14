@@ -1,17 +1,11 @@
 import { PROVIDER_LABELS } from "../constants/models";
 import { Message, Provider } from "../types";
 
-const config = require("../config") as {
-  OPENAI_API_KEY?: string;
-  ANTHROPIC_API_KEY?: string;
-  GEMINI_API_KEY?: string;
-  NVIDIA_API_KEY?: string;
-};
-
 interface StreamChatParams {
   messages: Message[];
   model: string;
   provider: Provider;
+  apiKey: string;
   onChunk: (text: string) => void;
   onDone: (fullText: string) => void;
   onError: (error: Error) => void;
@@ -28,41 +22,9 @@ function toAPIMessages(messages: Message[]) {
   }));
 }
 
-function getProviderKey(provider: Provider): string | undefined {
-  switch (provider) {
-    case "openai":
-      return config.OPENAI_API_KEY;
-    case "anthropic":
-      return config.ANTHROPIC_API_KEY;
-    case "gemini":
-      return config.GEMINI_API_KEY;
-    case "nvidia":
-      return config.NVIDIA_API_KEY;
-  }
-}
-
-function getProviderKeyName(provider: Provider): string {
-  switch (provider) {
-    case "openai":
-      return "OPENAI_API_KEY";
-    case "anthropic":
-      return "ANTHROPIC_API_KEY";
-    case "gemini":
-      return "GEMINI_API_KEY";
-    case "nvidia":
-      return "NVIDIA_API_KEY";
-  }
-}
-
-function requireProviderKey(provider: Provider) {
-  const apiKey = getProviderKey(provider);
-
+function requireProviderKey(provider: Provider, apiKey: string) {
   if (!apiKey) {
-    throw new Error(
-      `${PROVIDER_LABELS[provider]} is not configured. Add ${getProviderKeyName(
-        provider
-      )} to src/config.ts.`
-    );
+    throw new Error(`${PROVIDER_LABELS[provider]} is not configured in Settings.`);
   }
 
   return apiKey;
@@ -102,14 +64,15 @@ async function requestOpenAICompatibleChat(params: {
   provider: Provider;
   model: string;
   messages: Message[];
+  apiKey: string;
   abortSignal?: AbortSignal;
 }) {
-  const { endpoint, provider, model, messages, abortSignal } = params;
+  const { endpoint, provider, model, messages, apiKey, abortSignal } = params;
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${requireProviderKey(provider)}`,
+      Authorization: `Bearer ${requireProviderKey(provider, apiKey)}`,
     },
     body: JSON.stringify({
       model,
@@ -135,14 +98,15 @@ async function requestOpenAICompatibleChat(params: {
 async function requestAnthropicChat(params: {
   model: string;
   messages: Message[];
+  apiKey: string;
   abortSignal?: AbortSignal;
 }) {
-  const { model, messages, abortSignal } = params;
+  const { model, messages, apiKey, abortSignal } = params;
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": requireProviderKey("anthropic"),
+      "x-api-key": requireProviderKey("anthropic", apiKey),
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
@@ -169,6 +133,7 @@ export async function streamChat({
   messages,
   model,
   provider,
+  apiKey,
   onChunk,
   onDone,
   onError,
@@ -184,6 +149,7 @@ export async function streamChat({
           provider,
           model,
           messages,
+          apiKey,
           abortSignal,
         });
         break;
@@ -194,6 +160,7 @@ export async function streamChat({
           provider,
           model,
           messages,
+          apiKey,
           abortSignal,
         });
         break;
@@ -203,6 +170,7 @@ export async function streamChat({
           provider,
           model,
           messages,
+          apiKey,
           abortSignal,
         });
         break;
@@ -210,6 +178,7 @@ export async function streamChat({
         fullText = await requestAnthropicChat({
           model,
           messages,
+          apiKey,
           abortSignal,
         });
         break;

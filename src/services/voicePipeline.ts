@@ -30,14 +30,27 @@ export async function runVoicePipeline(params: {
   messages: Message[];
   model: string;
   provider: Provider;
+  providerApiKey: string;
+  openAIApiKey: string;
   ttsVoice: string;
   ttsPlayback: "stream" | "wait";
   callbacks: PipelineCallbacks;
   abortSignal?: AbortSignal;
 }): Promise<string | null> {
-  const { audioUri, messages, model, provider, ttsVoice, ttsPlayback, callbacks, abortSignal } = params;
+  const {
+    audioUri,
+    messages,
+    model,
+    provider,
+    providerApiKey,
+    openAIApiKey,
+    ttsVoice,
+    ttsPlayback,
+    callbacks,
+    abortSignal,
+  } = params;
 
-  const transcription = await transcribeAudio(audioUri);
+  const transcription = await transcribeAudio(audioUri, openAIApiKey);
   if (!transcription) return null;
   callbacks.onTranscription(transcription);
   if (abortSignal?.aborted) return transcription;
@@ -48,14 +61,14 @@ export async function runVoicePipeline(params: {
   const ttsQueue: Promise<void>[] = [];
 
   const enqueueTts = (sentence: string) => {
-    const promise = synthesizeSpeech(sentence, ttsVoice)
+    const promise = synthesizeSpeech(sentence, ttsVoice, openAIApiKey)
       .then((audio) => { if (!abortSignal?.aborted) callbacks.onAudioReady(audio); })
       .catch(callbacks.onError);
     ttsQueue.push(promise);
   };
 
   await streamChat({
-    messages: allMessages, model, provider, abortSignal,
+    messages: allMessages, model, provider, apiKey: providerApiKey, abortSignal,
     onChunk: (text) => {
       if (abortSignal?.aborted) return;
       callbacks.onChunk(text);

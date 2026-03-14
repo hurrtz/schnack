@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -17,7 +17,7 @@ import { SettingsModal } from "../components/SettingsModal";
 import { Toast } from "../components/Toast";
 import { WaveformBar } from "../components/WaveformBar";
 import { WaveformCircle } from "../components/WaveformCircle";
-import { PROVIDER_LABELS } from "../constants/models";
+import { PROVIDER_LABELS, PROVIDER_ORDER } from "../constants/models";
 import { useSharedSettings } from "../context/SettingsContext";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
@@ -32,7 +32,7 @@ type ViewMode = "default" | "expanded";
 
 export function MainScreen() {
   const { colors, isDark } = useTheme();
-  const { settings, updateSettings } = useSharedSettings();
+  const { settings, updateSettings, updateApiKey, loaded } = useSharedSettings();
   const {
     conversations,
     activeConversation,
@@ -62,12 +62,20 @@ export function MainScreen() {
   const recordingStartedRef = useRef<Promise<void> | null>(null);
 
   const provider = settings.lastProvider;
+  const providerApiKey = settings.apiKeys[provider].trim();
+  const openAIApiKey = settings.apiKeys.openai.trim();
   const model = {
     openai: settings.openaiModel,
     anthropic: settings.anthropicModel,
     gemini: settings.geminiModel,
     nvidia: settings.nvidiaModel,
   }[provider];
+  const availableProviders = PROVIDER_ORDER.filter(
+    (candidate) => !!settings.apiKeys[candidate].trim()
+  );
+  const disabledProviders = loaded
+    ? PROVIDER_ORDER.filter((candidate) => !settings.apiKeys[candidate].trim())
+    : PROVIDER_ORDER;
   const providerLabel = PROVIDER_LABELS[provider];
   const isBusy = pipelinePhase !== "idle";
   const visualPhase: VoiceVisualPhase = recorder.isRecording
@@ -93,6 +101,32 @@ export function MainScreen() {
     []
   );
 
+  useEffect(() => {
+    if (!loaded || providerApiKey) {
+      return;
+    }
+
+    const fallbackProvider = availableProviders[0];
+
+    if (fallbackProvider && fallbackProvider !== provider) {
+      updateSettings({ lastProvider: fallbackProvider });
+    }
+  }, [availableProviders, loaded, provider, providerApiKey, updateSettings]);
+
+  const ensureVoiceSessionReady = useCallback(() => {
+    if (!openAIApiKey) {
+      showToast("Add your OpenAI API key in Settings to use voice input and playback.");
+      return false;
+    }
+
+    if (!providerApiKey) {
+      showToast(`Add your ${providerLabel} API key in Settings to use this provider.`);
+      return false;
+    }
+
+    return true;
+  }, [openAIApiKey, providerApiKey, providerLabel, showToast]);
+
   const handleRecordingDone = useCallback(
     async (audioUri: string) => {
       setPipelinePhase("transcribing");
@@ -106,6 +140,8 @@ export function MainScreen() {
           messages: activeConversation?.messages || [],
           model,
           provider,
+          providerApiKey,
+          openAIApiKey,
           ttsVoice: settings.ttsVoice,
           ttsPlayback: settings.ttsPlayback,
           abortSignal: abortRef.current!.signal,
@@ -161,8 +197,10 @@ export function MainScreen() {
       addMessage,
       createConversation,
       model,
+      openAIApiKey,
       player,
       provider,
+      providerApiKey,
       settings.ttsPlayback,
       settings.ttsVoice,
       showToast,
@@ -170,6 +208,10 @@ export function MainScreen() {
   );
 
   const handlePressIn = useCallback(async () => {
+    if (!ensureVoiceSessionReady()) {
+      return;
+    }
+
     if (player.isPlaying) {
       await player.stopPlayback();
       abortRef.current?.abort();
@@ -184,7 +226,7 @@ export function MainScreen() {
     const startPromise = recorder.startRecording();
     recordingStartedRef.current = startPromise;
     await startPromise;
-  }, [isBusy, player, recorder]);
+  }, [ensureVoiceSessionReady, isBusy, player, recorder]);
 
   const handlePressOut = useCallback(async () => {
     if (recordingStartedRef.current) {
@@ -198,6 +240,10 @@ export function MainScreen() {
   }, [handleRecordingDone, recorder]);
 
   const handleTogglePress = useCallback(async () => {
+    if (!recorder.isRecording && !player.isPlaying && !isBusy && !ensureVoiceSessionReady()) {
+      return;
+    }
+
     if (player.isPlaying) {
       await player.stopPlayback();
       abortRef.current?.abort();
@@ -219,17 +265,27 @@ export function MainScreen() {
       return;
     }
     await recorder.startRecording();
-  }, [handleRecordingDone, isBusy, player, recorder]);
+  }, [ensureVoiceSessionReady, handleRecordingDone, isBusy, player, recorder]);
 
   const handleProviderChange = useCallback(
     (nextProvider: Provider) => {
+      if (!settings.apiKeys[nextProvider].trim()) {
+        showToast(`Add your ${PROVIDER_LABELS[nextProvider]} API key in Settings to enable it.`);
+        return;
+      }
+
       updateSettings({ lastProvider: nextProvider });
     },
-    [updateSettings]
+    [settings.apiKeys, showToast, updateSettings]
   );
 
   const handlePreviewVoice = useCallback(
     async (text: string, voice: string) => {
+      if (!openAIApiKey) {
+        showToast("Add your OpenAI API key in Settings to preview voices.");
+        return;
+      }
+
       if (recorder.isRecording || isBusy) {
         showToast("Stop the active voice session before previewing a voice.");
         return;
@@ -240,7 +296,7 @@ export function MainScreen() {
           await player.stopPlayback();
         }
         player.resetCancellation();
-        const audioUri = await synthesizeSpeech(text, voice);
+        const audioUri = await synthesizeSpeech(text, voice, openAIApiKey);
         player.enqueueAudio(audioUri);
       } catch (error) {
         const message =
@@ -248,7 +304,7 @@ export function MainScreen() {
         showToast(message);
       }
     },
-    [isBusy, player, recorder.isRecording, showToast]
+    [isBusy, openAIApiKey, player, recorder.isRecording, showToast]
   );
 
   const baseMessages = activeConversation?.messages || [];
@@ -412,6 +468,7 @@ export function MainScreen() {
               <ProviderToggle
                 selected={provider}
                 onSelect={handleProviderChange}
+                disabledProviders={disabledProviders}
               />
             </View>
 
@@ -644,6 +701,7 @@ export function MainScreen() {
         visible={settingsVisible}
         settings={settings}
         onUpdate={updateSettings}
+        onUpdateApiKey={updateApiKey}
         onPreviewVoice={handlePreviewVoice}
         onClose={() => setSettingsVisible(false)}
       />

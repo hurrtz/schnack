@@ -21,9 +21,11 @@ import {
   GEMINI_MODELS,
   NVIDIA_MODELS,
   OPENAI_MODELS,
+  PROVIDER_LABELS,
+  PROVIDER_ORDER,
   TTS_VOICES,
 } from "../constants/models";
-import { Settings, InputMode, TtsPlayback, ThemeMode } from "../types";
+import { Settings, InputMode, Provider, TtsPlayback, ThemeMode } from "../types";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Picker } from "./Picker";
@@ -31,7 +33,8 @@ import { Picker } from "./Picker";
 interface SettingsModalProps {
   visible: boolean;
   settings: Settings;
-  onUpdate: (partial: Partial<Settings>) => void;
+  onUpdate: (partial: Partial<Omit<Settings, "apiKeys">>) => void;
+  onUpdateApiKey: (provider: Provider, apiKey: string) => void;
   onPreviewVoice: (text: string, voice: string) => Promise<void>;
   onClose: () => void;
 }
@@ -132,10 +135,93 @@ function PickerSection({
   );
 }
 
+function ApiKeySection({
+  settings,
+  onUpdateApiKey,
+}: {
+  settings: Settings;
+  onUpdateApiKey: (provider: Provider, apiKey: string) => void;
+}) {
+  const { colors } = useTheme();
+
+  return (
+    <View
+      style={[
+        styles.sectionCard,
+        { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+      ]}
+    >
+      <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+        API Keys
+      </Text>
+      <Text style={[styles.sectionIntro, { color: colors.textMuted }]}>
+        Keys are stored securely on this device. Providers stay disabled until
+        their key is entered here.
+      </Text>
+
+      <View style={styles.apiKeyList}>
+        {PROVIDER_ORDER.map((provider) => (
+          <View
+            key={provider}
+            style={[
+              styles.apiKeyCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Text style={[styles.apiKeyTitle, { color: colors.text }]}>
+              {PROVIDER_LABELS[provider]}
+            </Text>
+            <Text
+              style={[
+                styles.apiKeyHint,
+                { color: colors.textMuted },
+              ]}
+            >
+              {provider === "openai"
+                ? "Required for voice transcription, voice previews, and spoken replies."
+                : "Unlocks this provider in the main stage."}
+            </Text>
+            <TextInput
+              value={settings.apiKeys[provider]}
+              onChangeText={(value) => onUpdateApiKey(provider, value)}
+              placeholder={
+                provider === "openai"
+                  ? "sk-..."
+                  : provider === "anthropic"
+                    ? "sk-ant-..."
+                    : provider === "gemini"
+                      ? "AIza..."
+                      : "nvapi-..."
+              }
+              placeholderTextColor={colors.textMuted}
+              selectionColor={colors.accent}
+              autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
+              style={[
+                styles.apiKeyInput,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
+              ]}
+            />
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export function SettingsModal({
   visible,
   settings,
   onUpdate,
+  onUpdateApiKey,
   onPreviewVoice,
   onClose,
 }: SettingsModalProps) {
@@ -270,6 +356,11 @@ export function SettingsModal({
               ]}
               value={settings.ttsPlayback}
               onChange={(v) => onUpdate({ ttsPlayback: v })}
+            />
+
+            <ApiKeySection
+              settings={settings}
+              onUpdateApiKey={onUpdateApiKey}
             />
 
             <PickerSection>
@@ -483,6 +574,41 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     padding: 16,
+  },
+  sectionIntro: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: -2,
+    marginBottom: 14,
+    fontFamily: fonts.body,
+  },
+  apiKeyList: {
+    gap: 10,
+  },
+  apiKeyCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+  },
+  apiKeyTitle: {
+    fontSize: 14,
+    fontFamily: fonts.display,
+  },
+  apiKeyHint: {
+    marginTop: 6,
+    marginBottom: 10,
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: fonts.body,
+  },
+  apiKeyInput: {
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontFamily: fonts.body,
   },
   previewCard: {
     borderRadius: 20,

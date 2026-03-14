@@ -24,6 +24,7 @@ import { Provider } from "../types";
 interface ProviderToggleProps {
   selected: Provider;
   onSelect: (provider: Provider) => void;
+  disabledProviders?: Provider[];
 }
 
 const TOGGLE_PADDING = 5;
@@ -56,15 +57,20 @@ const PROVIDER_ICON_SIZES: Record<
 
 const PROVIDER_SHORT_LABELS: Record<Provider, string> = {
   openai: "OPENAI",
-  anthropic: "CLAUDE",
+  anthropic: "ANTHROPIC",
   gemini: "GEMINI",
   nvidia: "NVIDIA",
 };
 
-export function ProviderToggle({ selected, onSelect }: ProviderToggleProps) {
+export function ProviderToggle({
+  selected,
+  onSelect,
+  disabledProviders = [],
+}: ProviderToggleProps) {
   const { colors } = useTheme();
   const optionWidth = useSharedValue(0);
   const selectedIndex = PROVIDER_ORDER.indexOf(selected);
+  const selectedDisabled = disabledProviders.includes(selected);
 
   const highlightStyle = useAnimatedStyle(() => ({
     width: optionWidth.value,
@@ -102,6 +108,7 @@ export function ProviderToggle({ selected, onSelect }: ProviderToggleProps) {
             shadowColor: colors.glow,
             backgroundColor: colors.surfaceElevated,
             borderColor: colors.borderStrong,
+            opacity: selectedDisabled ? 0.35 : 1,
           },
         ]}
       >
@@ -114,28 +121,51 @@ export function ProviderToggle({ selected, onSelect }: ProviderToggleProps) {
       </Animated.View>
       {PROVIDER_ORDER.map((provider) => {
         const active = provider === selected;
+        const disabled = disabledProviders.includes(provider);
         const Icon = PROVIDER_ICONS[provider];
         const iconSize = PROVIDER_ICON_SIZES[provider];
 
         return (
           <Pressable
             key={provider}
-            style={styles.option}
+            style={[
+              styles.option,
+              disabled ? styles.optionDisabled : null,
+            ]}
             onPress={() => onSelect(provider)}
+            disabled={disabled}
             accessibilityRole="button"
             accessibilityLabel={`Use ${PROVIDER_LABELS[provider]}`}
+            accessibilityState={{ selected: active, disabled }}
           >
-            <View style={[styles.iconWrap, !active ? styles.iconWrapDim : null]}>
+            <View
+              style={[
+                styles.iconWrap,
+                !active || disabled ? styles.iconWrapDim : null,
+              ]}
+            >
               <Icon
                 width={iconSize.width}
                 height={iconSize.height}
-                color={active ? colors.text : colors.textSecondary}
+                color={
+                  disabled
+                    ? colors.textMuted
+                    : active
+                      ? colors.text
+                      : colors.textSecondary
+                }
               />
             </View>
             <Text
               style={[
                 styles.optionLabel,
-                { color: active ? colors.text : colors.textMuted },
+                {
+                  color: disabled
+                    ? colors.textMuted
+                    : active
+                      ? colors.text
+                      : colors.textMuted,
+                },
               ]}
               numberOfLines={1}
             >
@@ -184,6 +214,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 4,
     zIndex: 1,
+  },
+  optionDisabled: {
+    opacity: 0.48,
   },
   iconWrap: {
     minHeight: 30,

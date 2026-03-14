@@ -1,13 +1,22 @@
-import { OPENAI_API_KEY } from "../config";
+function requireOpenAIKey(apiKey: string) {
+  if (!apiKey) {
+    throw new Error("OpenAI is not configured in Settings.");
+  }
 
-export async function transcribeAudio(fileUri: string): Promise<string | null> {
+  return apiKey;
+}
+
+export async function transcribeAudio(
+  fileUri: string,
+  apiKey: string
+): Promise<string | null> {
   const formData = new FormData();
   formData.append("file", { uri: fileUri, type: "audio/m4a", name: "recording.m4a" } as any);
   formData.append("model", "whisper-1");
 
   const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
     method: "POST",
-    headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
+    headers: { Authorization: `Bearer ${requireOpenAIKey(apiKey)}` },
     body: formData,
   });
 

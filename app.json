@@ -14,7 +14,8 @@
       "appleTeamId": "X7H939KJR7"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-secure-store"
     ],
     "scheme": "voxai",
     "icon": "./assets/branding/appIcon.png",
