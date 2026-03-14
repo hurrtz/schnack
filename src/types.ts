@@ -1,8 +1,19 @@
-export type Provider = "openai" | "anthropic" | "gemini" | "nvidia";
+export type Provider =
+  | "openai"
+  | "anthropic"
+  | "gemini"
+  | "cohere"
+  | "deepseek"
+  | "groq"
+  | "mistral"
+  | "nvidia"
+  | "together"
+  | "xai";
 export type InputMode = "push-to-talk" | "toggle-to-talk";
 export type TtsPlayback = "stream" | "wait";
 export type ThemeMode = "light" | "dark" | "system";
 export type ProviderApiKeys = Record<Provider, string>;
+export type ProviderModelSelections = Record<Provider, string>;
 export type VoiceVisualPhase =
   | "idle"
   | "recording"
@@ -13,10 +24,7 @@ export type VoiceVisualPhase =
 export interface Settings {
   inputMode: InputMode;
   ttsPlayback: TtsPlayback;
-  openaiModel: string;
-  anthropicModel: string;
-  geminiModel: string;
-  nvidiaModel: string;
+  providerModels: ProviderModelSelections;
   ttsVoice: string;
   theme: ThemeMode;
   lastProvider: Provider;
@@ -26,10 +34,18 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   inputMode: "push-to-talk",
   ttsPlayback: "stream",
-  openaiModel: "gpt-5.4",
-  anthropicModel: "claude-sonnet-4-6",
-  geminiModel: "gemini-2.5-flash",
-  nvidiaModel: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+  providerModels: {
+    openai: "gpt-5.4",
+    anthropic: "claude-sonnet-4-20250514",
+    gemini: "gemini-2.5-flash",
+    cohere: "command-a-03-2025",
+    deepseek: "deepseek-chat",
+    groq: "llama-3.3-70b-versatile",
+    mistral: "mistral-medium-latest",
+    nvidia: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+    together: "openai/gpt-oss-20b",
+    xai: "grok-4",
+  },
   ttsVoice: "alloy",
   theme: "system",
   lastProvider: "openai",
@@ -37,7 +53,13 @@ export const DEFAULT_SETTINGS: Settings = {
     openai: "",
     anthropic: "",
     gemini: "",
+    cohere: "",
+    deepseek: "",
+    groq: "",
+    mistral: "",
     nvidia: "",
+    together: "",
+    xai: "",
   },
 };
 

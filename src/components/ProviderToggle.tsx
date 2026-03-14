@@ -1,22 +1,12 @@
 import React from "react";
-import { View, Pressable, StyleSheet, Text } from "react-native";
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { SvgUri } from "react-native-svg";
 import {
   PROVIDER_LABELS,
   PROVIDER_ORDER,
+  PROVIDER_SHORT_LABELS,
 } from "../constants/models";
-import {
-  AnthropicMark,
-  GeminiMark,
-  NvidiaMark,
-  OpenAIMark,
-} from "./ProviderMarks";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Provider } from "../types";
@@ -24,65 +14,72 @@ import { Provider } from "../types";
 interface ProviderToggleProps {
   selected: Provider;
   onSelect: (provider: Provider) => void;
-  disabledProviders?: Provider[];
+  visibleProviders?: Provider[];
 }
 
-const TOGGLE_PADDING = 5;
+const PROVIDER_ICON_ASSETS: Record<Provider, number> = {
+  openai: require("../../assets/branding/openai.svg"),
+  anthropic: require("../../assets/branding/anthropic.svg"),
+  gemini: require("../../assets/branding/google.svg"),
+  cohere: require("../../assets/branding/cohere.svg"),
+  deepseek: require("../../assets/branding/deepseek.svg"),
+  groq: require("../../assets/branding/groq.svg"),
+  mistral: require("../../assets/branding/mistral.svg"),
+  nvidia: require("../../assets/branding/nvidia.svg"),
+  together: require("../../assets/branding/together.svg"),
+  xai: require("../../assets/branding/xai.svg"),
+};
 
-interface ProviderIconProps {
+const PROVIDER_ICON_SIZES: Record<Provider, { width: number; height: number }> = {
+  openai: { width: 24, height: 24 },
+  anthropic: { width: 24, height: 24 },
+  gemini: { width: 24, height: 24 },
+  cohere: { width: 24, height: 24 },
+  deepseek: { width: 24, height: 24 },
+  groq: { width: 24, height: 24 },
+  mistral: { width: 24, height: 24 },
+  nvidia: { width: 28, height: 28 },
+  together: { width: 24, height: 24 },
+  xai: { width: 24, height: 24 },
+};
+
+function ProviderIcon({
+  provider,
+  color,
+}: {
+  provider: Provider;
   color: string;
-  width: number;
-  height: number;
+}) {
+  const asset = PROVIDER_ICON_ASSETS[provider];
+  const uri = Image.resolveAssetSource(asset).uri;
+  const size = PROVIDER_ICON_SIZES[provider];
+
+  return (
+    <SvgUri
+      width={size.width}
+      height={size.height}
+      uri={uri}
+      color={color}
+    />
+  );
 }
-
-const PROVIDER_ICONS: Record<
-  Provider,
-  React.ComponentType<ProviderIconProps>
-> = {
-  openai: OpenAIMark,
-  anthropic: AnthropicMark,
-  gemini: GeminiMark,
-  nvidia: NvidiaMark,
-};
-
-const PROVIDER_ICON_SIZES: Record<
-  Provider,
-  { width: number; height: number }
-> = {
-  openai: { width: 25, height: 25 },
-  anthropic: { width: 25, height: 25 },
-  gemini: { width: 25, height: 25 },
-  nvidia: { width: 29, height: 29 },
-};
-
-const PROVIDER_SHORT_LABELS: Record<Provider, string> = {
-  openai: "OPENAI",
-  anthropic: "ANTHROPIC",
-  gemini: "GEMINI",
-  nvidia: "NVIDIA",
-};
 
 export function ProviderToggle({
   selected,
   onSelect,
-  disabledProviders = [],
+  visibleProviders = PROVIDER_ORDER,
 }: ProviderToggleProps) {
   const { colors } = useTheme();
-  const optionWidth = useSharedValue(0);
-  const selectedIndex = PROVIDER_ORDER.indexOf(selected);
-  const selectedDisabled = disabledProviders.includes(selected);
+  const providers = visibleProviders;
+  const columnCount = providers.length <= 1
+    ? 1
+    : providers.length <= 3
+      ? providers.length
+      : 4;
 
-  const highlightStyle = useAnimatedStyle(() => ({
-    width: optionWidth.value,
-    transform: [
-      {
-        translateX: withTiming(selectedIndex * optionWidth.value, {
-          duration: 260,
-          easing: Easing.out(Easing.ease),
-        }),
-      },
-    ],
-  }));
+  if (providers.length === 0) {
+    return null;
+  }
 
   return (
     <View
@@ -94,65 +91,18 @@ export function ProviderToggle({
           shadowColor: colors.glow,
         },
       ]}
-      onLayout={(event) => {
-        optionWidth.value =
-          (event.nativeEvent.layout.width - TOGGLE_PADDING * 2) /
-          PROVIDER_ORDER.length;
-      }}
     >
-      <Animated.View
-        style={[
-          styles.highlight,
-          highlightStyle,
-          {
-            shadowColor: colors.glow,
-            backgroundColor: colors.surfaceElevated,
-            borderColor: colors.borderStrong,
-            opacity: selectedDisabled ? 0.35 : 1,
-          },
-        ]}
-      >
-        <LinearGradient
-          colors={[colors.accentSoft, "rgba(255,255,255,0)"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.highlightGradient}
-        />
-      </Animated.View>
-      {PROVIDER_ORDER.map((provider) => {
+      {providers.map((provider) => {
         const active = provider === selected;
-        const disabled = disabledProviders.includes(provider);
-        const Icon = PROVIDER_ICONS[provider];
-        const iconSize = PROVIDER_ICON_SIZES[provider];
-
-        return (
-          <Pressable
-            key={provider}
-            style={[
-              styles.option,
-              disabled ? styles.optionDisabled : null,
-            ]}
-            onPress={() => onSelect(provider)}
-            disabled={disabled}
-            accessibilityRole="button"
-            accessibilityLabel={`Use ${PROVIDER_LABELS[provider]}`}
-            accessibilityState={{ selected: active, disabled }}
-          >
-            <View
-              style={[
-                styles.iconWrap,
-                !active || disabled ? styles.iconWrapDim : null,
-              ]}
-            >
-              <Icon
-                width={iconSize.width}
-                height={iconSize.height}
+        const content = (
+          <>
+            <View style={[styles.iconWrap, !active ? styles.iconWrapDim : null]}>
+              <ProviderIcon
+                provider={provider}
                 color={
-                  disabled
-                    ? colors.textMuted
-                    : active
-                      ? colors.text
-                      : colors.textSecondary
+                  active
+                    ? colors.text
+                    : colors.textSecondary
                 }
               />
             </View>
@@ -160,18 +110,55 @@ export function ProviderToggle({
               style={[
                 styles.optionLabel,
                 {
-                  color: disabled
-                    ? colors.textMuted
-                    : active
-                      ? colors.text
-                      : colors.textMuted,
+                  color: active
+                    ? colors.text
+                    : colors.textMuted,
                 },
               ]}
               numberOfLines={1}
             >
               {PROVIDER_SHORT_LABELS[provider]}
             </Text>
-          </Pressable>
+          </>
+        );
+
+        return (
+          <View
+            key={provider}
+            style={[
+              styles.optionWrap,
+              { width: `${100 / columnCount}%` },
+            ]}
+          >
+            <Pressable
+              style={[
+                styles.option,
+                active
+                  ? styles.optionActiveShell
+                  : {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+              ]}
+              onPress={() => onSelect(provider)}
+              accessibilityRole="button"
+              accessibilityLabel={`Use ${PROVIDER_LABELS[provider]}`}
+              accessibilityState={{ selected: active }}
+            >
+              {active ? (
+                <LinearGradient
+                  colors={[colors.accentGradientStart, colors.accentGradientEnd]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.option, styles.optionActive]}
+                >
+                  {content}
+                </LinearGradient>
+              ) : (
+                content
+              )}
+            </Pressable>
+          </View>
         );
       })}
     </View>
@@ -181,8 +168,9 @@ export function ProviderToggle({
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    borderRadius: 24,
-    padding: TOGGLE_PADDING,
+    flexWrap: "wrap",
+    borderRadius: 26,
+    padding: 6,
     position: "relative",
     borderWidth: 1,
     shadowOffset: { width: 0, height: 12 },
@@ -190,33 +178,25 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 8,
   },
-  highlight: {
-    position: "absolute",
-    top: 5,
-    left: 5,
-    bottom: 5,
-    borderRadius: 19,
-    overflow: "hidden",
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-    elevation: 5,
-  },
-  highlightGradient: {
-    flex: 1,
-    borderRadius: 19,
+  optionWrap: {
+    padding: 4,
   },
   option: {
-    flex: 1,
-    height: 64,
+    minHeight: 72,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    zIndex: 1,
+    gap: 6,
+    borderWidth: 1,
+    overflow: "hidden",
   },
-  optionDisabled: {
-    opacity: 0.48,
+  optionActiveShell: {
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  optionActive: {
+    borderWidth: 0,
+    width: "100%",
+    height: "100%",
   },
   iconWrap: {
     minHeight: 30,
@@ -227,8 +207,8 @@ const styles = StyleSheet.create({
     opacity: 0.76,
   },
   optionLabel: {
-    fontSize: 9,
-    letterSpacing: 0.7,
+    fontSize: 8,
+    letterSpacing: 0.65,
     fontFamily: fonts.mono,
   },
 });

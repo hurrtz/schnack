@@ -32,7 +32,13 @@ type ViewMode = "default" | "expanded";
 
 export function MainScreen() {
   const { colors, isDark } = useTheme();
-  const { settings, updateSettings, updateApiKey, loaded } = useSharedSettings();
+  const {
+    settings,
+    updateSettings,
+    updateProviderModel,
+    updateApiKey,
+    loaded,
+  } = useSharedSettings();
   const {
     conversations,
     activeConversation,
@@ -64,18 +70,10 @@ export function MainScreen() {
   const provider = settings.lastProvider;
   const providerApiKey = settings.apiKeys[provider].trim();
   const openAIApiKey = settings.apiKeys.openai.trim();
-  const model = {
-    openai: settings.openaiModel,
-    anthropic: settings.anthropicModel,
-    gemini: settings.geminiModel,
-    nvidia: settings.nvidiaModel,
-  }[provider];
+  const model = settings.providerModels[provider];
   const availableProviders = PROVIDER_ORDER.filter(
     (candidate) => !!settings.apiKeys[candidate].trim()
   );
-  const disabledProviders = loaded
-    ? PROVIDER_ORDER.filter((candidate) => !settings.apiKeys[candidate].trim())
-    : PROVIDER_ORDER;
   const providerLabel = PROVIDER_LABELS[provider];
   const isBusy = pipelinePhase !== "idle";
   const visualPhase: VoiceVisualPhase = recorder.isRecording
@@ -465,11 +463,37 @@ export function MainScreen() {
                 end={{ x: 1, y: 1 }}
                 style={styles.heroCardGlow}
               />
-              <ProviderToggle
-                selected={provider}
-                onSelect={handleProviderChange}
-                disabledProviders={disabledProviders}
-              />
+              {loaded && availableProviders.length > 0 ? (
+                <ProviderToggle
+                  selected={provider}
+                  onSelect={handleProviderChange}
+                  visibleProviders={availableProviders}
+                />
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.providerEmptyState,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => setSettingsVisible(true)}
+                  activeOpacity={0.9}
+                >
+                  <Text style={[styles.providerEmptyTitle, { color: colors.text }]}>
+                    No providers enabled
+                  </Text>
+                  <Text
+                    style={[
+                      styles.providerEmptyText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    Add an API key in Settings to make a provider appear here.
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             <View style={styles.stageBlock}>
@@ -701,6 +725,7 @@ export function MainScreen() {
         visible={settingsVisible}
         settings={settings}
         onUpdate={updateSettings}
+        onUpdateProviderModel={updateProviderModel}
         onUpdateApiKey={updateApiKey}
         onPreviewVoice={handlePreviewVoice}
         onClose={() => setSettingsVisible(false)}
@@ -813,6 +838,24 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 180,
+  },
+  providerEmptyState: {
+    borderRadius: 22,
+    borderWidth: 1,
+    minHeight: 84,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    justifyContent: "center",
+    gap: 6,
+  },
+  providerEmptyTitle: {
+    fontSize: 14,
+    fontFamily: fonts.display,
+  },
+  providerEmptyText: {
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: fonts.body,
   },
   eyebrow: {
     fontSize: 11,

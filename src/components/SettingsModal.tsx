@@ -17,11 +17,10 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import {
-  ANTHROPIC_MODELS,
-  GEMINI_MODELS,
-  NVIDIA_MODELS,
-  OPENAI_MODELS,
+  PROVIDER_API_KEY_HINTS,
+  PROVIDER_API_KEY_PLACEHOLDERS,
   PROVIDER_LABELS,
+  PROVIDER_MODELS,
   PROVIDER_ORDER,
   TTS_VOICES,
 } from "../constants/models";
@@ -33,7 +32,8 @@ import { Picker } from "./Picker";
 interface SettingsModalProps {
   visible: boolean;
   settings: Settings;
-  onUpdate: (partial: Partial<Omit<Settings, "apiKeys">>) => void;
+  onUpdate: (partial: Partial<Omit<Settings, "apiKeys" | "providerModels">>) => void;
+  onUpdateProviderModel: (provider: Provider, model: string) => void;
   onUpdateApiKey: (provider: Provider, apiKey: string) => void;
   onPreviewVoice: (text: string, voice: string) => Promise<void>;
   onClose: () => void;
@@ -135,11 +135,13 @@ function PickerSection({
   );
 }
 
-function ApiKeySection({
+function ProviderSection({
   settings,
+  onUpdateProviderModel,
   onUpdateApiKey,
 }: {
   settings: Settings;
+  onUpdateProviderModel: (provider: Provider, model: string) => void;
   onUpdateApiKey: (provider: Provider, apiKey: string) => void;
 }) {
   const { colors } = useTheme();
@@ -152,7 +154,7 @@ function ApiKeySection({
       ]}
     >
       <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-        API Keys
+        Providers
       </Text>
       <Text style={[styles.sectionIntro, { color: colors.textMuted }]}>
         Keys are stored securely on this device. Providers stay disabled until
@@ -180,22 +182,12 @@ function ApiKeySection({
                 { color: colors.textMuted },
               ]}
             >
-              {provider === "openai"
-                ? "Required for voice transcription, voice previews, and spoken replies."
-                : "Unlocks this provider in the main stage."}
+              {PROVIDER_API_KEY_HINTS[provider]}
             </Text>
             <TextInput
               value={settings.apiKeys[provider]}
               onChangeText={(value) => onUpdateApiKey(provider, value)}
-              placeholder={
-                provider === "openai"
-                  ? "sk-..."
-                  : provider === "anthropic"
-                    ? "sk-ant-..."
-                    : provider === "gemini"
-                      ? "AIza..."
-                      : "nvapi-..."
-              }
+              placeholder={PROVIDER_API_KEY_PLACEHOLDERS[provider]}
               placeholderTextColor={colors.textMuted}
               selectionColor={colors.accent}
               autoCapitalize="none"
@@ -210,6 +202,15 @@ function ApiKeySection({
                 },
               ]}
             />
+            <Picker
+              label={`${PROVIDER_LABELS[provider]} Model`}
+              value={settings.providerModels[provider]}
+              options={PROVIDER_MODELS[provider].map((model) => ({
+                value: model.id,
+                label: model.name,
+              }))}
+              onChange={(value) => onUpdateProviderModel(provider, value)}
+            />
           </View>
         ))}
       </View>
@@ -221,6 +222,7 @@ export function SettingsModal({
   visible,
   settings,
   onUpdate,
+  onUpdateProviderModel,
   onUpdateApiKey,
   onPreviewVoice,
   onClose,
@@ -358,58 +360,11 @@ export function SettingsModal({
               onChange={(v) => onUpdate({ ttsPlayback: v })}
             />
 
-            <ApiKeySection
+            <ProviderSection
               settings={settings}
+              onUpdateProviderModel={onUpdateProviderModel}
               onUpdateApiKey={onUpdateApiKey}
             />
-
-            <PickerSection>
-              <Picker
-                label="OpenAI Model"
-                value={settings.openaiModel}
-                options={OPENAI_MODELS.map((m) => ({
-                  value: m.id,
-                  label: m.name,
-                }))}
-                onChange={(v) => onUpdate({ openaiModel: v })}
-              />
-            </PickerSection>
-
-            <PickerSection>
-              <Picker
-                label="Anthropic Model"
-                value={settings.anthropicModel}
-                options={ANTHROPIC_MODELS.map((m) => ({
-                  value: m.id,
-                  label: m.name,
-                }))}
-                onChange={(v) => onUpdate({ anthropicModel: v })}
-              />
-            </PickerSection>
-
-            <PickerSection>
-              <Picker
-                label="Gemini Model"
-                value={settings.geminiModel}
-                options={GEMINI_MODELS.map((model) => ({
-                  value: model.id,
-                  label: model.name,
-                }))}
-                onChange={(value) => onUpdate({ geminiModel: value })}
-              />
-            </PickerSection>
-
-            <PickerSection>
-              <Picker
-                label="NVIDIA Model"
-                value={settings.nvidiaModel}
-                options={NVIDIA_MODELS.map((model) => ({
-                  value: model.id,
-                  label: model.name,
-                }))}
-                onChange={(value) => onUpdate({ nvidiaModel: value })}
-              />
-            </PickerSection>
 
             <PickerSection>
               <Picker

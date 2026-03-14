@@ -2,26 +2,87 @@ import { useState, useEffect, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { PROVIDER_ORDER } from "../constants/models";
-import { Provider, ProviderApiKeys, Settings, DEFAULT_SETTINGS } from "../types";
+import {
+  Provider,
+  ProviderApiKeys,
+  ProviderModelSelections,
+  Settings,
+  DEFAULT_SETTINGS,
+} from "../types";
 
 const STORAGE_KEY = "@voxai/settings";
 const API_KEY_STORAGE_PREFIX = "voxai.provider_key";
 
 type PublicSettings = Omit<Settings, "apiKeys">;
-type SettingsUpdate = Partial<PublicSettings>;
+type SettingsUpdate = Partial<Omit<Settings, "apiKeys" | "providerModels">>;
+
+type LegacyStoredSettings = Partial<Settings> & {
+  openaiModel?: string;
+  anthropicModel?: string;
+  geminiModel?: string;
+  cohereModel?: string;
+  deepseekModel?: string;
+  groqModel?: string;
+  mistralModel?: string;
+  nvidiaModel?: string;
+  togetherModel?: string;
+  xaiModel?: string;
+};
+
+const LEGACY_MODEL_FIELD_KEYS: Record<Provider, keyof LegacyStoredSettings> = {
+  openai: "openaiModel",
+  anthropic: "anthropicModel",
+  gemini: "geminiModel",
+  cohere: "cohereModel",
+  deepseek: "deepseekModel",
+  groq: "groqModel",
+  mistral: "mistralModel",
+  nvidia: "nvidiaModel",
+  together: "togetherModel",
+  xai: "xaiModel",
+};
 
 function getApiKeyStorageKey(provider: Provider) {
   const safeProvider = provider.replace(/[^0-9A-Za-z._-]/g, "_");
   return `${API_KEY_STORAGE_PREFIX}.${safeProvider}`;
 }
 
+function extractStoredProviderModels(
+  storedSettings?: LegacyStoredSettings
+): Partial<ProviderModelSelections> {
+  if (!storedSettings) {
+    return {};
+  }
+
+  return PROVIDER_ORDER.reduce((accumulator, provider) => {
+    const providerModels = storedSettings.providerModels?.[provider];
+    const legacyValue = storedSettings[LEGACY_MODEL_FIELD_KEYS[provider]];
+    const value =
+      typeof providerModels === "string" && providerModels
+        ? providerModels
+        : typeof legacyValue === "string" && legacyValue
+          ? legacyValue
+          : undefined;
+
+    if (value) {
+      accumulator[provider] = value;
+    }
+
+    return accumulator;
+  }, {} as Partial<ProviderModelSelections>);
+}
+
 function mergeSettings(
-  storedSettings?: Partial<Settings>,
+  storedSettings?: LegacyStoredSettings,
   storedApiKeys?: Partial<ProviderApiKeys>
 ): Settings {
   return {
     ...DEFAULT_SETTINGS,
     ...storedSettings,
+    providerModels: {
+      ...DEFAULT_SETTINGS.providerModels,
+      ...extractStoredProviderModels(storedSettings),
+    },
     apiKeys: {
       ...DEFAULT_SETTINGS.apiKeys,
       ...(storedSettings?.apiKeys ?? {}),
@@ -68,7 +129,9 @@ export function useSettings() {
           return;
         }
 
-        const storedSettings = raw ? (JSON.parse(raw) as Partial<Settings>) : undefined;
+        const storedSettings = raw
+          ? (JSON.parse(raw) as LegacyStoredSettings)
+          : undefined;
         setSettings(mergeSettings(storedSettings, apiKeys));
       })
       .finally(() => {
@@ -84,7 +147,26 @@ export function useSettings() {
 
   const updateSettings = useCallback((partial: SettingsUpdate) => {
     setSettings((prev) => {
-      const next = mergeSettings({ ...prev, ...partial, apiKeys: prev.apiKeys });
+      const next = mergeSettings({
+        ...prev,
+        ...partial,
+        apiKeys: prev.apiKeys,
+        providerModels: prev.providerModels,
+      });
+      void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toPublicSettings(next)));
+      return next;
+    });
+  }, []);
+
+  const updateProviderModel = useCallback((provider: Provider, value: string) => {
+    setSettings((prev) => {
+      const next = {
+        ...prev,
+        providerModels: {
+          ...prev.providerModels,
+          [provider]: value,
+        },
+      };
       void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toPublicSettings(next)));
       return next;
     });
@@ -104,5 +186,5 @@ export function useSettings() {
     void persistApiKey(provider, nextValue);
   }, []);
 
-  return { settings, updateSettings, updateApiKey, loaded };
+  return { settings, updateSettings, updateProviderModel, updateApiKey, loaded };
 }

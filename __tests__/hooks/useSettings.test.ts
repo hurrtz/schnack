@@ -31,11 +31,16 @@ describe("useSettings", () => {
   it("loads saved settings from AsyncStorage", async () => {
     const saved = { ...DEFAULT_SETTINGS, lastProvider: "anthropic" as const };
     (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify(saved));
-    (SecureStore.getItemAsync as jest.Mock)
-      .mockResolvedValueOnce("sk-openai")
-      .mockResolvedValueOnce("sk-anthropic")
-      .mockResolvedValueOnce("AIza-test")
-      .mockResolvedValueOnce("nvapi-test");
+    (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) => {
+      const values: Record<string, string | null> = {
+        "voxai.provider_key.openai": "sk-openai",
+        "voxai.provider_key.anthropic": "sk-anthropic",
+        "voxai.provider_key.gemini": "AIza-test",
+        "voxai.provider_key.nvidia": "nvapi-test",
+      };
+
+      return Promise.resolve(values[key] ?? null);
+    });
     const { result } = renderHook(() => useSettings());
     await flushSettingsLoad();
     expect(result.current.settings.lastProvider).toBe("anthropic");
@@ -43,7 +48,13 @@ describe("useSettings", () => {
       openai: "sk-openai",
       anthropic: "sk-anthropic",
       gemini: "AIza-test",
+      cohere: "",
+      deepseek: "",
+      groq: "",
+      mistral: "",
       nvidia: "nvapi-test",
+      together: "",
+      xai: "",
     });
   });
 
@@ -55,6 +66,21 @@ describe("useSettings", () => {
       "@voxai/settings",
       expect.stringContaining('"lastProvider":"anthropic"')
     );
+  });
+
+  it("persists provider model selections", async () => {
+    const { result } = renderHook(() => useSettings());
+    await flushSettingsLoad();
+
+    await act(async () => {
+      result.current.updateProviderModel("groq", "openai/gpt-oss-120b");
+    });
+
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      "@voxai/settings",
+      expect.stringContaining('"groq":"openai/gpt-oss-120b"')
+    );
+    expect(result.current.settings.providerModels.groq).toBe("openai/gpt-oss-120b");
   });
 
   it("persists provider api keys in SecureStore", async () => {

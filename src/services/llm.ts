@@ -15,6 +15,18 @@ interface StreamChatParams {
 const SYSTEM_PROMPT =
   "You are a voice assistant. The user is speaking to you and will hear your response read aloud. Respond naturally and conversationally as if talking. Never use markdown, bullet points, numbered lists, headers, or any formatting. Keep responses concise and spoken-friendly.";
 
+const OPENAI_COMPATIBLE_ENDPOINTS: Partial<Record<Provider, string>> = {
+  openai: "https://api.openai.com/v1/chat/completions",
+  gemini:
+    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+  deepseek: "https://api.deepseek.com/chat/completions",
+  groq: "https://api.groq.com/openai/v1/chat/completions",
+  mistral: "https://api.mistral.ai/v1/chat/completions",
+  nvidia: "https://integrate.api.nvidia.com/v1/chat/completions",
+  together: "https://api.together.xyz/v1/chat/completions",
+  xai: "https://api.x.ai/v1/chat/completions",
+};
+
 function toAPIMessages(messages: Message[]) {
   return messages.map((message) => ({
     role: message.role,
@@ -129,6 +141,59 @@ async function requestAnthropicChat(params: {
     .join("") || "";
 }
 
+function extractCohereText(content: unknown): string {
+  if (!Array.isArray(content)) {
+    return "";
+  }
+
+  return content
+    .map((part) => {
+      if (
+        typeof part === "object" &&
+        part !== null &&
+        "text" in part &&
+        typeof part.text === "string"
+      ) {
+        return part.text;
+      }
+
+      return "";
+    })
+    .join("");
+}
+
+async function requestCohereChat(params: {
+  model: string;
+  messages: Message[];
+  apiKey: string;
+  abortSignal?: AbortSignal;
+}) {
+  const { model, messages, apiKey, abortSignal } = params;
+  const response = await fetch("https://api.cohere.com/v2/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${requireProviderKey("cohere", apiKey)}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...toAPIMessages(messages),
+      ],
+    }),
+    signal: abortSignal,
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Cohere API error (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  return extractCohereText(data.message?.content);
+}
+
 export async function streamChat({
   messages,
   model,
@@ -141,47 +206,38 @@ export async function streamChat({
 }: StreamChatParams): Promise<void> {
   try {
     let fullText = "";
+    const openAICompatibleEndpoint = OPENAI_COMPATIBLE_ENDPOINTS[provider];
 
-    switch (provider) {
-      case "openai":
-        fullText = await requestOpenAICompatibleChat({
-          endpoint: "https://api.openai.com/v1/chat/completions",
-          provider,
-          model,
-          messages,
-          apiKey,
-          abortSignal,
-        });
-        break;
-      case "gemini":
-        fullText = await requestOpenAICompatibleChat({
-          endpoint:
-            "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-          provider,
-          model,
-          messages,
-          apiKey,
-          abortSignal,
-        });
-        break;
-      case "nvidia":
-        fullText = await requestOpenAICompatibleChat({
-          endpoint: "https://integrate.api.nvidia.com/v1/chat/completions",
-          provider,
-          model,
-          messages,
-          apiKey,
-          abortSignal,
-        });
-        break;
-      case "anthropic":
-        fullText = await requestAnthropicChat({
-          model,
-          messages,
-          apiKey,
-          abortSignal,
-        });
-        break;
+    if (openAICompatibleEndpoint) {
+      fullText = await requestOpenAICompatibleChat({
+        endpoint: openAICompatibleEndpoint,
+        provider,
+        model,
+        messages,
+        apiKey,
+        abortSignal,
+      });
+    } else {
+      switch (provider) {
+        case "anthropic":
+          fullText = await requestAnthropicChat({
+            model,
+            messages,
+            apiKey,
+            abortSignal,
+          });
+          break;
+        case "cohere":
+          fullText = await requestCohereChat({
+            model,
+            messages,
+            apiKey,
+            abortSignal,
+          });
+          break;
+        default:
+          throw new Error(`${PROVIDER_LABELS[provider]} is not wired up yet.`);
+      }
     }
 
     onChunk(fullText);
