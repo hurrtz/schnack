@@ -4,6 +4,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -25,6 +26,7 @@ interface SettingsModalProps {
   visible: boolean;
   settings: Settings;
   onUpdate: (partial: Partial<Settings>) => void;
+  onPreviewVoice: (text: string, voice: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -128,9 +130,14 @@ export function SettingsModal({
   visible,
   settings,
   onUpdate,
+  onPreviewVoice,
   onClose,
 }: SettingsModalProps) {
   const { colors } = useTheme();
+  const [previewText, setPreviewText] = React.useState(
+    "Hallo, ich bin VoxAI."
+  );
+  const [previewLoading, setPreviewLoading] = React.useState(false);
 
   const scale = useSharedValue(0.96);
   const translateY = useSharedValue(16);
@@ -158,6 +165,20 @@ export function SettingsModal({
     transform: [{ scale: scale.value }, { translateY: translateY.value }],
     opacity: opacity.value,
   }));
+
+  const handlePreviewVoice = async () => {
+    const trimmed = previewText.trim();
+    if (!trimmed || previewLoading) {
+      return;
+    }
+
+    setPreviewLoading(true);
+    try {
+      await onPreviewVoice(trimmed, settings.ttsVoice);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   return (
     <Modal visible={visible} transparent animationType="none">
@@ -279,6 +300,68 @@ export function SettingsModal({
                 }))}
                 onChange={(v) => onUpdate({ ttsVoice: v })}
               />
+              <View
+                style={[
+                  styles.previewCard,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.previewLabel, { color: colors.textSecondary }]}
+                >
+                  Voice Preview Text
+                </Text>
+                <TextInput
+                  value={previewText}
+                  onChangeText={setPreviewText}
+                  multiline
+                  placeholder="Type a phrase to hear this voice."
+                  placeholderTextColor={colors.textMuted}
+                  selectionColor={colors.accent}
+                  style={[
+                    styles.previewInput,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                      color: colors.text,
+                    },
+                  ]}
+                />
+                <Text
+                  style={[styles.previewHint, { color: colors.textMuted }]}
+                >
+                  Uses the selected voice without sending anything to the model.
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={handlePreviewVoice}
+                  disabled={previewLoading || !previewText.trim()}
+                >
+                  <LinearGradient
+                    colors={[colors.accentGradientStart, colors.accentGradientEnd]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[
+                      styles.previewButton,
+                      !previewText.trim() || previewLoading
+                        ? styles.previewButtonDisabled
+                        : null,
+                    ]}
+                  >
+                    <Feather
+                      name={previewLoading ? "loader" : "volume-2"}
+                      size={16}
+                      color="#F4F8FF"
+                    />
+                    <Text style={styles.previewButtonText}>
+                      {previewLoading ? "Generating Preview..." : "Preview Voice"}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </PickerSection>
 
             <RadioGroup<ThemeMode>
@@ -370,6 +453,57 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     padding: 16,
+  },
+  previewCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 14,
+    marginTop: 8,
+  },
+  previewLabel: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 1.1,
+    marginBottom: 10,
+    fontFamily: fonts.mono,
+  },
+  previewInput: {
+    minHeight: 92,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlignVertical: "top",
+    fontFamily: fonts.body,
+  },
+  previewHint: {
+    marginTop: 10,
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: fonts.body,
+  },
+  previewButton: {
+    marginTop: 14,
+    borderRadius: 18,
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    elevation: 7,
+  },
+  previewButtonDisabled: {
+    opacity: 0.55,
+  },
+  previewButtonText: {
+    color: "#F4F8FF",
+    fontSize: 14,
+    fontFamily: fonts.display,
   },
   sectionLabel: {
     fontSize: 11,

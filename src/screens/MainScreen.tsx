@@ -22,6 +22,7 @@ import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useConversations } from "../hooks/useConversations";
 import { runVoicePipeline } from "../services/voicePipeline";
+import { synthesizeSpeech } from "../services/tts";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Provider } from "../types";
@@ -196,6 +197,29 @@ export function MainScreen() {
       updateSettings({ lastProvider: nextProvider });
     },
     [updateSettings]
+  );
+
+  const handlePreviewVoice = useCallback(
+    async (text: string, voice: string) => {
+      if (recorder.isRecording || processing) {
+        showToast("Stop the active voice session before previewing a voice.");
+        return;
+      }
+
+      try {
+        if (player.isPlaying) {
+          await player.stopPlayback();
+        }
+        player.resetCancellation();
+        const audioUri = await synthesizeSpeech(text, voice);
+        player.enqueueAudio(audioUri);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Couldn't preview voice.";
+        showToast(message);
+      }
+    },
+    [player, processing, recorder.isRecording, showToast]
   );
 
   const baseMessages = activeConversation?.messages || [];
@@ -673,6 +697,7 @@ export function MainScreen() {
         visible={settingsVisible}
         settings={settings}
         onUpdate={updateSettings}
+        onPreviewVoice={handlePreviewVoice}
         onClose={() => setSettingsVisible(false)}
       />
       <ConversationDrawer
