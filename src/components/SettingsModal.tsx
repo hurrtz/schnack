@@ -276,11 +276,12 @@ export function SettingsModal({
 
   return (
     <Modal visible={visible} transparent animationType="none">
-      <TouchableOpacity
-        style={[styles.overlay, { backgroundColor: colors.overlay }]}
-        activeOpacity={1}
-        onPress={onClose}
-      >
+      <View style={styles.overlay}>
+        <TouchableOpacity
+          style={[styles.backdrop, { backgroundColor: colors.overlay }]}
+          activeOpacity={1}
+          onPress={onClose}
+        />
         <Animated.View
           style={[
             styles.modal,
@@ -339,6 +340,9 @@ export function SettingsModal({
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            nestedScrollEnabled
           >
             <RadioGroup<InputMode>
               label="Input Mode"
@@ -452,7 +456,7 @@ export function SettingsModal({
             />
           </ScrollView>
         </Animated.View>
-      </TouchableOpacity>
+      </View>
     </Modal>
   );
 }
@@ -463,6 +467,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 16,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
   },
   modal: {
     width: "100%",
