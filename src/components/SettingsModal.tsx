@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import {
   Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -27,6 +28,7 @@ import {
 import { Settings, InputMode, Provider, TtsPlayback, ThemeMode } from "../types";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
+import { ProviderIcon } from "./ProviderIcon";
 import { Picker } from "./Picker";
 
 interface SettingsModalProps {
@@ -145,6 +147,13 @@ function ProviderSection({
   onUpdateApiKey: (provider: Provider, apiKey: string) => void;
 }) {
   const { colors } = useTheme();
+  const [selectedProvider, setSelectedProvider] = React.useState<Provider>(
+    settings.lastProvider
+  );
+
+  useEffect(() => {
+    setSelectedProvider(settings.lastProvider);
+  }, [settings.lastProvider]);
 
   return (
     <View
@@ -161,58 +170,84 @@ function ProviderSection({
         their key is entered here.
       </Text>
 
-      <View style={styles.apiKeyList}>
-        {PROVIDER_ORDER.map((provider) => (
-          <View
-            key={provider}
-            style={[
-              styles.apiKeyCard,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-              },
-            ]}
-          >
-            <Text style={[styles.apiKeyTitle, { color: colors.text }]}>
-              {PROVIDER_LABELS[provider]}
-            </Text>
-            <Text
+      <View style={styles.providerButtonGrid}>
+        {PROVIDER_ORDER.map((provider) => {
+          const active = provider === selectedProvider;
+
+          return (
+            <Pressable
+              key={provider}
               style={[
-                styles.apiKeyHint,
-                { color: colors.textMuted },
-              ]}
-            >
-              {PROVIDER_API_KEY_HINTS[provider]}
-            </Text>
-            <TextInput
-              value={settings.apiKeys[provider]}
-              onChangeText={(value) => onUpdateApiKey(provider, value)}
-              placeholder={PROVIDER_API_KEY_PLACEHOLDERS[provider]}
-              placeholderTextColor={colors.textMuted}
-              selectionColor={colors.accent}
-              autoCapitalize="none"
-              autoCorrect={false}
-              spellCheck={false}
-              style={[
-                styles.apiKeyInput,
+                styles.providerButton,
                 {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.border,
-                  color: colors.text,
+                  backgroundColor: active
+                    ? colors.surface
+                    : colors.surfaceElevated,
+                  borderColor: active ? colors.borderStrong : colors.border,
+                  shadowColor: active ? colors.glow : "transparent",
                 },
               ]}
-            />
-            <Picker
-              label={`${PROVIDER_LABELS[provider]} Model`}
-              value={settings.providerModels[provider]}
-              options={PROVIDER_MODELS[provider].map((model) => ({
-                value: model.id,
-                label: model.name,
-              }))}
-              onChange={(value) => onUpdateProviderModel(provider, value)}
-            />
-          </View>
-        ))}
+              onPress={() => setSelectedProvider(provider)}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${PROVIDER_LABELS[provider]} settings`}
+              accessibilityState={{ selected: active }}
+            >
+              <ProviderIcon
+                provider={provider}
+                color={active ? colors.text : colors.textSecondary}
+              />
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View
+        style={[
+          styles.apiKeyCard,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <Text style={[styles.apiKeyTitle, { color: colors.text }]}>
+          {PROVIDER_LABELS[selectedProvider]}
+        </Text>
+        <Text
+          style={[
+            styles.apiKeyHint,
+            { color: colors.textMuted },
+          ]}
+        >
+          {PROVIDER_API_KEY_HINTS[selectedProvider]}
+        </Text>
+        <TextInput
+          value={settings.apiKeys[selectedProvider]}
+          onChangeText={(value) => onUpdateApiKey(selectedProvider, value)}
+          placeholder={PROVIDER_API_KEY_PLACEHOLDERS[selectedProvider]}
+          placeholderTextColor={colors.textMuted}
+          selectionColor={colors.accent}
+          autoCapitalize="none"
+          autoCorrect={false}
+          spellCheck={false}
+          style={[
+            styles.apiKeyInput,
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.border,
+              color: colors.text,
+            },
+          ]}
+        />
+        <Picker
+          label={`${PROVIDER_LABELS[selectedProvider]} Model`}
+          value={settings.providerModels[selectedProvider]}
+          options={PROVIDER_MODELS[selectedProvider].map((model) => ({
+            value: model.id,
+            label: model.name,
+          }))}
+          onChange={(value) => onUpdateProviderModel(selectedProvider, value)}
+        />
       </View>
     </View>
   );
@@ -544,8 +579,23 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     fontFamily: fonts.body,
   },
-  apiKeyList: {
-    gap: 10,
+  providerButtonGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  providerButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 4,
   },
   apiKeyCard: {
     borderRadius: 18,
