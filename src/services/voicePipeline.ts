@@ -1,7 +1,12 @@
 import { transcribeAudio } from "./whisper";
 import { streamChat } from "./llm";
 import { synthesizeSpeech } from "./tts";
-import { Message, Provider } from "../types";
+import {
+  AssistantResponseLength,
+  AssistantResponseTone,
+  Message,
+  Provider,
+} from "../types";
 
 export function splitIntoSentences(text: string): string[] {
   const result: string[] = [];
@@ -34,6 +39,9 @@ export async function runVoicePipeline(params: {
   openAIApiKey: string;
   ttsVoice: string;
   ttsPlayback: "stream" | "wait";
+  assistantInstructions: string;
+  responseLength: AssistantResponseLength;
+  responseTone: AssistantResponseTone;
   callbacks: PipelineCallbacks;
   abortSignal?: AbortSignal;
 }): Promise<string | null> {
@@ -46,6 +54,9 @@ export async function runVoicePipeline(params: {
     openAIApiKey,
     ttsVoice,
     ttsPlayback,
+    assistantInstructions,
+    responseLength,
+    responseTone,
     callbacks,
     abortSignal,
   } = params;
@@ -68,7 +79,14 @@ export async function runVoicePipeline(params: {
   };
 
   await streamChat({
-    messages: allMessages, model, provider, apiKey: providerApiKey, abortSignal,
+    messages: allMessages,
+    model,
+    provider,
+    apiKey: providerApiKey,
+    assistantInstructions,
+    responseLength,
+    responseTone,
+    abortSignal,
     onChunk: (text) => {
       if (abortSignal?.aborted) return;
       callbacks.onChunk(text);

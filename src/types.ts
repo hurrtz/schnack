@@ -12,6 +12,14 @@ export type Provider =
 export type InputMode = "push-to-talk" | "toggle-to-talk";
 export type TtsPlayback = "stream" | "wait";
 export type ThemeMode = "light" | "dark" | "system";
+export type AssistantResponseLength = "brief" | "normal" | "thorough";
+export type AssistantResponseTone =
+  | "professional"
+  | "casual"
+  | "nerdy"
+  | "concise"
+  | "socratic"
+  | "eli5";
 export type ProviderApiKeys = Record<Provider, string>;
 export type ProviderModelSelections = Record<Provider, string>;
 export type VoiceVisualPhase =
@@ -28,8 +36,14 @@ export interface Settings {
   ttsVoice: string;
   theme: ThemeMode;
   lastProvider: Provider;
+  assistantInstructions: string;
+  responseLength: AssistantResponseLength;
+  responseTone: AssistantResponseTone;
   apiKeys: ProviderApiKeys;
 }
+
+export const DEFAULT_ASSISTANT_INSTRUCTIONS =
+  "You are a voice assistant. The user is speaking to you and will hear your response read aloud. Respond naturally and conversationally as if talking. Never use markdown, bullet points, numbered lists, headers, or any formatting. Keep responses concise and spoken-friendly.";
 
 export const DEFAULT_SETTINGS: Settings = {
   inputMode: "push-to-talk",
@@ -49,6 +63,9 @@ export const DEFAULT_SETTINGS: Settings = {
   ttsVoice: "alloy",
   theme: "system",
   lastProvider: "openai",
+  assistantInstructions: DEFAULT_ASSISTANT_INSTRUCTIONS,
+  responseLength: "normal",
+  responseTone: "professional",
   apiKeys: {
     openai: "",
     anthropic: "",

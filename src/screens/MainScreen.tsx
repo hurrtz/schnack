@@ -209,6 +209,9 @@ export function MainScreen() {
           openAIApiKey,
           ttsVoice: settings.ttsVoice,
           ttsPlayback: settings.ttsPlayback,
+          assistantInstructions: settings.assistantInstructions,
+          responseLength: settings.responseLength,
+          responseTone: settings.responseTone,
           abortSignal: abortRef.current!.signal,
           callbacks: {
             onTranscription: (text) => {
@@ -268,6 +271,9 @@ export function MainScreen() {
       providerApiKey,
       settings.ttsPlayback,
       settings.ttsVoice,
+      settings.assistantInstructions,
+      settings.responseLength,
+      settings.responseTone,
       showToast,
     ]
   );

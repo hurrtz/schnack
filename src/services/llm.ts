@@ -1,19 +1,64 @@
 import { PROVIDER_LABELS } from "../constants/models";
-import { Message, Provider } from "../types";
+import {
+  AssistantResponseLength,
+  AssistantResponseTone,
+  DEFAULT_ASSISTANT_INSTRUCTIONS,
+  Message,
+  Provider,
+} from "../types";
 
 interface StreamChatParams {
   messages: Message[];
   model: string;
   provider: Provider;
   apiKey: string;
+  assistantInstructions: string;
+  responseLength: AssistantResponseLength;
+  responseTone: AssistantResponseTone;
   onChunk: (text: string) => void;
   onDone: (fullText: string) => void;
   onError: (error: Error) => void;
   abortSignal?: AbortSignal;
 }
 
-const SYSTEM_PROMPT =
-  "You are a voice assistant. The user is speaking to you and will hear your response read aloud. Respond naturally and conversationally as if talking. Never use markdown, bullet points, numbered lists, headers, or any formatting. Keep responses concise and spoken-friendly.";
+const RESPONSE_LENGTH_INSTRUCTIONS: Record<AssistantResponseLength, string> = {
+  brief:
+    "Keep the answer tight. Use the minimum number of sentences needed to fully answer the user.",
+  normal:
+    "Aim for a balanced response length. Cover the important points without dragging the answer out.",
+  thorough:
+    "Go deep and be comprehensive. Include nuance, detail, tradeoffs, and the reasoning that matters.",
+};
+
+const RESPONSE_TONE_INSTRUCTIONS: Record<AssistantResponseTone, string> = {
+  professional:
+    "Speak like a senior consultant briefing a client. Precise language, no slang, measured and authoritative.",
+  casual:
+    "Speak like a smart friend at a coffee shop. Relaxed, natural, conversational. Contractions are fine, tangents are fine.",
+  nerdy:
+    "Speak like an enthusiastic expert who loves going deep. Use technical terminology freely, geek out about details, assume the user can keep up.",
+  concise:
+    "Be as brief as possible while still being complete. No preamble, no filler, just the answer. Think telegram style.",
+  socratic:
+    "Challenge the user's thinking. Ask counter-questions, offer alternative perspectives, don't just confirm what they said. Be a sparring partner, not a yes-machine.",
+  eli5:
+    "Explain everything as simply as possible. Use analogies, everyday language, zero jargon. Assume no prior knowledge on any topic.",
+};
+
+export function buildSystemPrompt(params: {
+  assistantInstructions: string;
+  responseLength: AssistantResponseLength;
+  responseTone: AssistantResponseTone;
+}) {
+  const instructions =
+    params.assistantInstructions.trim() || DEFAULT_ASSISTANT_INSTRUCTIONS;
+
+  return [
+    instructions,
+    RESPONSE_LENGTH_INSTRUCTIONS[params.responseLength],
+    RESPONSE_TONE_INSTRUCTIONS[params.responseTone],
+  ].join(" ");
+}
 
 const OPENAI_COMPATIBLE_ENDPOINTS: Partial<Record<Provider, string>> = {
   openai: "https://api.openai.com/v1/chat/completions",
@@ -77,9 +122,10 @@ async function requestOpenAICompatibleChat(params: {
   model: string;
   messages: Message[];
   apiKey: string;
+  systemPrompt: string;
   abortSignal?: AbortSignal;
 }) {
-  const { endpoint, provider, model, messages, apiKey, abortSignal } = params;
+  const { endpoint, provider, model, messages, apiKey, systemPrompt, abortSignal } = params;
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -89,7 +135,7 @@ async function requestOpenAICompatibleChat(params: {
     body: JSON.stringify({
       model,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: systemPrompt },
         ...toAPIMessages(messages),
       ],
     }),
@@ -111,9 +157,10 @@ async function requestAnthropicChat(params: {
   model: string;
   messages: Message[];
   apiKey: string;
+  systemPrompt: string;
   abortSignal?: AbortSignal;
 }) {
-  const { model, messages, apiKey, abortSignal } = params;
+  const { model, messages, apiKey, systemPrompt, abortSignal } = params;
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -124,7 +171,7 @@ async function requestAnthropicChat(params: {
     body: JSON.stringify({
       model,
       max_tokens: 4096,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: toAPIMessages(messages),
     }),
     signal: abortSignal,
@@ -166,9 +213,10 @@ async function requestCohereChat(params: {
   model: string;
   messages: Message[];
   apiKey: string;
+  systemPrompt: string;
   abortSignal?: AbortSignal;
 }) {
-  const { model, messages, apiKey, abortSignal } = params;
+  const { model, messages, apiKey, systemPrompt, abortSignal } = params;
   const response = await fetch("https://api.cohere.com/v2/chat", {
     method: "POST",
     headers: {
@@ -178,7 +226,7 @@ async function requestCohereChat(params: {
     body: JSON.stringify({
       model,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: systemPrompt },
         ...toAPIMessages(messages),
       ],
     }),
@@ -199,6 +247,9 @@ export async function streamChat({
   model,
   provider,
   apiKey,
+  assistantInstructions,
+  responseLength,
+  responseTone,
   onChunk,
   onDone,
   onError,
@@ -206,6 +257,11 @@ export async function streamChat({
 }: StreamChatParams): Promise<void> {
   try {
     let fullText = "";
+    const systemPrompt = buildSystemPrompt({
+      assistantInstructions,
+      responseLength,
+      responseTone,
+    });
     const openAICompatibleEndpoint = OPENAI_COMPATIBLE_ENDPOINTS[provider];
 
     if (openAICompatibleEndpoint) {
@@ -215,6 +271,7 @@ export async function streamChat({
         model,
         messages,
         apiKey,
+        systemPrompt,
         abortSignal,
       });
     } else {
@@ -224,6 +281,7 @@ export async function streamChat({
             model,
             messages,
             apiKey,
+            systemPrompt,
             abortSignal,
           });
           break;
@@ -232,6 +290,7 @@ export async function streamChat({
             model,
             messages,
             apiKey,
+            systemPrompt,
             abortSignal,
           });
           break;

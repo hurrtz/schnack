@@ -27,7 +27,15 @@ import {
   PROVIDER_ORDER,
   TTS_VOICES,
 } from "../constants/models";
-import { Settings, InputMode, Provider, TtsPlayback, ThemeMode } from "../types";
+import {
+  AssistantResponseLength,
+  AssistantResponseTone,
+  InputMode,
+  Provider,
+  Settings,
+  ThemeMode,
+  TtsPlayback,
+} from "../types";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { ProviderIcon } from "./ProviderIcon";
@@ -43,6 +51,74 @@ interface SettingsModalProps {
   onPreviewVoice: (text: string, voice: string) => Promise<void>;
   onClose: () => void;
 }
+
+const RESPONSE_LENGTH_OPTIONS: {
+  value: AssistantResponseLength;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "brief",
+    label: "Brief",
+    description:
+      "Keep the answer tight. Use the minimum number of sentences needed to fully answer the user.",
+  },
+  {
+    value: "normal",
+    label: "Normal",
+    description:
+      "Aim for a balanced response length. Cover the important points without dragging the answer out.",
+  },
+  {
+    value: "thorough",
+    label: "Thorough",
+    description:
+      "Go deep and be comprehensive. Include nuance, detail, tradeoffs, and the reasoning that matters.",
+  },
+];
+
+const RESPONSE_TONE_OPTIONS: {
+  value: AssistantResponseTone;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "professional",
+    label: "Professional",
+    description:
+      "Speak like a senior consultant briefing a client. Precise language, no slang, measured and authoritative.",
+  },
+  {
+    value: "casual",
+    label: "Casual",
+    description:
+      "Speak like a smart friend at a coffee shop. Relaxed, natural, conversational. Contractions are fine, tangents are fine.",
+  },
+  {
+    value: "nerdy",
+    label: "Nerdy",
+    description:
+      "Speak like an enthusiastic expert who loves going deep. Use technical terminology freely, geek out about details, assume the user can keep up.",
+  },
+  {
+    value: "concise",
+    label: "Concise",
+    description:
+      "Be as brief as possible while still being complete. No preamble, no filler, just the answer. Think telegram style.",
+  },
+  {
+    value: "socratic",
+    label: "Socratic",
+    description:
+      "Challenge the user's thinking. Ask counter-questions, offer alternative perspectives, don't just confirm what they said. Be a sparring partner, not a yes-machine.",
+  },
+  {
+    value: "eli5",
+    label: "ELI5",
+    description:
+      "Explain everything as simply as possible. Use analogies, everyday language, zero jargon. Assume no prior knowledge on any topic.",
+  },
+];
 
 function RadioGroup<T extends string>({
   label,
@@ -291,6 +367,102 @@ function ProviderSection({
   );
 }
 
+function AssistantResponseSection({
+  settings,
+  onUpdate,
+}: {
+  settings: Settings;
+  onUpdate: (partial: Partial<Omit<Settings, "apiKeys" | "providerModels">>) => void;
+}) {
+  const { colors } = useTheme();
+  const selectedLength = RESPONSE_LENGTH_OPTIONS.find(
+    (option) => option.value === settings.responseLength
+  );
+  const selectedTone = RESPONSE_TONE_OPTIONS.find(
+    (option) => option.value === settings.responseTone
+  );
+
+  return (
+    <View
+      style={[
+        styles.sectionCard,
+        { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+      ]}
+    >
+      <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+        Assistant Instructions
+      </Text>
+      <Text style={[styles.sectionIntro, { color: colors.textMuted }]}>
+        Shape the hidden guidance the model receives before every reply.
+      </Text>
+
+      <View
+        style={[
+          styles.promptCard,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        <Text style={[styles.promptLabel, { color: colors.textSecondary }]}>
+          Base Instructions
+        </Text>
+        <TextInput
+          value={settings.assistantInstructions}
+          onChangeText={(value) => onUpdate({ assistantInstructions: value })}
+          multiline
+          placeholder="Define how the assistant should behave."
+          placeholderTextColor={colors.textMuted}
+          selectionColor={colors.accent}
+          style={[
+            styles.promptInput,
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.border,
+              color: colors.text,
+            },
+          ]}
+        />
+        <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+          This is always prepended before the selected response length and tone.
+        </Text>
+      </View>
+
+      <Picker
+        label="Adaptive Length"
+        value={settings.responseLength}
+        options={RESPONSE_LENGTH_OPTIONS.map((option) => ({
+          value: option.value,
+          label: option.label,
+        }))}
+        onChange={(value) =>
+          onUpdate({ responseLength: value as AssistantResponseLength })
+        }
+      />
+      {selectedLength ? (
+        <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+          {selectedLength.description}
+        </Text>
+      ) : null}
+
+      <Picker
+        label="Response Tone"
+        value={settings.responseTone}
+        options={RESPONSE_TONE_OPTIONS.map((option) => ({
+          value: option.value,
+          label: option.label,
+        }))}
+        onChange={(value) =>
+          onUpdate({ responseTone: value as AssistantResponseTone })
+        }
+      />
+      {selectedTone ? (
+        <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+          {selectedTone.description}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 export function SettingsModal({
   visible,
   settings,
@@ -458,6 +630,11 @@ export function SettingsModal({
               focusProvider={focusProvider}
               onUpdateProviderModel={onUpdateProviderModel}
               onUpdateApiKey={onUpdateApiKey}
+            />
+
+            <AssistantResponseSection
+              settings={settings}
+              onUpdate={onUpdate}
             />
 
             <PickerSection>
@@ -697,6 +874,30 @@ const styles = StyleSheet.create({
   apiKeyLinkText: {
     fontSize: 13,
     fontFamily: fonts.display,
+  },
+  promptCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 14,
+  },
+  promptLabel: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 1.1,
+    marginBottom: 10,
+    fontFamily: fonts.mono,
+  },
+  promptInput: {
+    minHeight: 132,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlignVertical: "top",
+    fontFamily: fonts.body,
   },
   previewCard: {
     borderRadius: 20,
