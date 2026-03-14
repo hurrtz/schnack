@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
 } from "react-native";
+import Animated, { useAnimatedStyle, withTiming, useSharedValue, Easing } from "react-native-reanimated";
 import { useTheme } from "../theme/ThemeContext";
 import { Settings, InputMode, TtsPlayback, ThemeMode } from "../types";
 import { OPENAI_MODELS, ANTHROPIC_MODELS, TTS_VOICES } from "../constants/models";
@@ -47,6 +48,11 @@ function RadioGroup<T extends string>({
                 {
                   borderColor: active ? colors.accent : colors.border,
                   backgroundColor: active ? colors.accentSoft : colors.background,
+                  shadowColor: active ? colors.glow : "transparent",
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: active ? 1 : 0,
+                  shadowRadius: active ? 6 : 0,
+                  elevation: active ? 4 : 0,
                 },
               ]}
               onPress={() => onChange(opt.value)}
@@ -75,15 +81,33 @@ export function SettingsModal({
 }: SettingsModalProps) {
   const { colors } = useTheme();
 
+  const scale = useSharedValue(0.95);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      scale.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.ease) });
+      opacity.value = withTiming(1, { duration: 200 });
+    } else {
+      scale.value = 0.95;
+      opacity.value = 0;
+    }
+  }, [visible]);
+
+  const modalAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal visible={visible} transparent animationType="none">
       <TouchableOpacity
         style={styles.overlay}
         activeOpacity={1}
         onPress={onClose}
       >
-        <View
-          style={[styles.modal, { backgroundColor: colors.surface }]}
+        <Animated.View
+          style={[styles.modal, { backgroundColor: colors.surface }, modalAnimStyle]}
           onStartShouldSetResponder={() => true}
         >
           <View style={styles.header}>
@@ -158,7 +182,7 @@ export function SettingsModal({
               onChange={(v) => onUpdate({ theme: v })}
             />
           </ScrollView>
-        </View>
+        </Animated.View>
       </TouchableOpacity>
     </Modal>
   );
