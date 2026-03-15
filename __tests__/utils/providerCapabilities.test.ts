@@ -11,14 +11,32 @@ describe("provider capability selectors", () => {
       ...DEFAULT_SETTINGS,
       apiKeys: {
         ...DEFAULT_SETTINGS.apiKeys,
+        gemini: "AIza-test",
         groq: "gsk_test",
+        mistral: "mistral_test",
         together: "together_test",
+        xai: "xai-test",
       },
     };
 
-    expect(getEnabledProviders(settings)).toEqual(["groq", "together"]);
-    expect(getEnabledSttProviders(settings)).toEqual(["groq", "together"]);
-    expect(getEnabledTtsProviders(settings)).toEqual([]);
+    expect(getEnabledProviders(settings)).toEqual([
+      "gemini",
+      "xai",
+      "groq",
+      "mistral",
+      "together",
+    ]);
+    expect(getEnabledSttProviders(settings)).toEqual([
+      "gemini",
+      "groq",
+      "mistral",
+      "together",
+    ]);
+    expect(getEnabledTtsProviders(settings)).toEqual([
+      "gemini",
+      "xai",
+      "together",
+    ]);
   });
 
   it("keeps OpenAI available for both STT and TTS when configured", () => {

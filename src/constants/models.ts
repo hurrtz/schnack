@@ -219,10 +219,14 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     label: "Google",
     shortLabel: "GOOGLE",
     apiKeyPlaceholder: "AIza...",
-    apiKeyHint: "Unlocks Gemini models through the Google API.",
+    apiKeyHint: "Unlocks Gemini models plus Google-hosted speech features through the Gemini API.",
     apiKeyUrl: "https://aistudio.google.com/app/apikey",
-    sttSupport: "none",
-    ttsSupport: "none",
+    sttSupport: "provider",
+    ttsSupport: "provider",
+    sttLanguageNote:
+      "Gemini audio understanding is multilingual, but Google does not publish a compact supported-language table for this transcription path. It is a broad general-purpose transcription route rather than a dedicated telephony STT API.",
+    ttsLanguageNote:
+      "Gemini TTS currently supports Arabic, Bengali, Dutch, English, French, German, Hindi, Indonesian, Italian, Japanese, Korean, Mandarin Chinese, Polish, Portuguese, Romanian, Russian, Spanish, Tamil, Telugu, Thai, Turkish, Ukrainian, Urdu, and Vietnamese.",
     models: GOOGLE_MODELS,
   },
   xai: {
@@ -232,7 +236,9 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyHint: "Unlocks Grok models from xAI.",
     apiKeyUrl: "https://console.x.ai/team/default/api-keys",
     sttSupport: "none",
-    ttsSupport: "none",
+    ttsSupport: "provider",
+    ttsLanguageNote:
+      "xAI TTS currently supports Arabic, Dutch, English, French, German, Hindi, Indonesian, Italian, Japanese, Korean, Polish, Portuguese, Russian, Spanish, Thai, Turkish, Vietnamese, and Chinese.",
     models: XAI_MODELS,
   },
   groq: {
@@ -263,8 +269,10 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyPlaceholder: "Enter API key",
     apiKeyHint: "Unlocks Mistral hosted models.",
     apiKeyUrl: "https://console.mistral.ai/api-keys",
-    sttSupport: "none",
+    sttSupport: "provider",
     ttsSupport: "none",
+    sttLanguageNote:
+      "The current Voxtral transcription route is documented for English, Spanish, French, Portuguese, Hindi, German, Dutch, and Italian.",
     models: MISTRAL_MODELS,
   },
   cohere: {
@@ -284,9 +292,11 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyHint: "Unlocks Together-hosted open models.",
     apiKeyUrl: "https://api.together.ai/settings/api-keys",
     sttSupport: "provider",
-    ttsSupport: "none",
+    ttsSupport: "provider",
     sttLanguageNote:
       `The current integration uses openai/whisper-large-v3. It is multilingual and accepts ISO 639-1 language hints. A published well-supported language set for Whisper is: ${WHISPER_WELL_SUPPORTED_LANGUAGES}`,
+    ttsLanguageNote:
+      "The current Together TTS route is configured for English, Spanish, French, German, Italian, Portuguese, Hindi, Japanese, Korean, and Chinese. Voice availability is model-specific.",
     models: TOGETHER_MODELS,
   },
   nvidia: {
