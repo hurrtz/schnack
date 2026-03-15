@@ -151,30 +151,37 @@ export async function runVoicePipeline(params: {
   ];
 
   let sentenceBuffer = "";
+  let ttsChain = Promise.resolve();
   const ttsQueue: Promise<void>[] = [];
 
   const enqueueTts = (sentence: string) => {
-    const promise =
-      ttsMode === "native"
-        ? Promise.resolve().then(() => {
-            if (!abortSignal?.aborted) {
-              callbacks.onSpeechTextReady(sentence, undefined);
-            }
-          })
-        : synthesizeSpeech({
-            text: sentence,
-            voice: ttsVoice,
-            mode: ttsMode,
-            provider: ttsProvider,
-            apiKey: ttsApiKey,
-          }).then((audio) => {
-            if (!abortSignal?.aborted) {
-              callbacks.onAudioReady(audio);
-            }
-          });
+    const task = ttsChain.then(async () => {
+      if (abortSignal?.aborted) {
+        return;
+      }
 
-    promise.catch(callbacks.onError);
-    ttsQueue.push(promise);
+      if (ttsMode === "native") {
+        callbacks.onSpeechTextReady(sentence, undefined);
+        return;
+      }
+
+      const audio = await synthesizeSpeech({
+        text: sentence,
+        voice: ttsVoice,
+        mode: ttsMode,
+        provider: ttsProvider,
+        apiKey: ttsApiKey,
+      });
+
+      if (!abortSignal?.aborted) {
+        callbacks.onAudioReady(audio);
+      }
+    });
+
+    ttsChain = task.catch((error) => {
+      callbacks.onError(error instanceof Error ? error : new Error(String(error)));
+    });
+    ttsQueue.push(task.catch(() => undefined));
   };
 
   await streamChat({

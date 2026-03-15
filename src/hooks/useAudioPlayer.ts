@@ -216,7 +216,15 @@ export function useAudioPlayer() {
 
   const resetCancellation = useCallback(() => {
     cancelledRef.current = false;
-  }, []);
+    queueRef.current = [];
+    nativeQueueRef.current = [];
+    nativeSpeakingRef.current = false;
+    setNativeSpeaking(false);
+    playingRef.current = false;
+    didFinishRef.current = false;
+    player.replace(null);
+    resetVisualState();
+  }, [player, resetVisualState]);
 
   useEffect(() => {
     return () => {
