@@ -6,6 +6,7 @@ import {
   PROVIDER_ORDER,
   PROVIDER_SHORT_LABELS,
 } from "../constants/models";
+import { useLocalization } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Provider } from "../types";
@@ -23,6 +24,7 @@ export function ProviderToggle({
   visibleProviders = PROVIDER_ORDER,
 }: ProviderToggleProps) {
   const { colors } = useTheme();
+  const { t } = useLocalization();
   const providers = visibleProviders;
   const isSingleProvider = providers.length === 1;
   const columnCount = isSingleProvider
@@ -97,7 +99,9 @@ export function ProviderToggle({
               ]}
               onPress={() => onSelect(provider)}
               accessibilityRole="button"
-              accessibilityLabel={`Use ${PROVIDER_LABELS[provider]}`}
+              accessibilityLabel={t("useProvider", {
+                provider: PROVIDER_LABELS[provider],
+              })}
               accessibilityState={{ selected: active }}
             >
               {active ? (

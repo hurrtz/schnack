@@ -8,6 +8,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { useLocalization } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 
@@ -27,6 +28,7 @@ export function Picker({
   disabled = false,
 }: PickerProps) {
   const { colors } = useTheme();
+  const { t } = useLocalization();
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
 
@@ -54,10 +56,10 @@ export function Picker({
       >
         <View style={styles.dropdownText}>
           <Text style={[styles.dropdownLabel, { color: colors.textSecondary }]}>
-            {disabled ? "Unavailable" : "Selection"}
+            {disabled ? t("unavailable") : t("selection")}
           </Text>
           <Text style={[styles.dropdownValue, { color: colors.text }]}>
-            {disabled ? "Choose a compatible provider first" : selected?.label || value}
+            {disabled ? t("chooseCompatibleProviderFirst") : selected?.label || value}
           </Text>
         </View>
         <View

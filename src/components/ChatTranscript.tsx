@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { ChatBubble } from "./ChatBubble";
+import { useLocalization } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Message } from "../types";
@@ -26,14 +27,18 @@ interface ChatTranscriptProps {
 export function ChatTranscript({
   messages,
   onTap,
-  emptyTitle = "Your conversation appears here",
-  emptyDescription = "Press and hold the voice control, then speak naturally. schnack will keep the thread and speak back.",
+  emptyTitle,
+  emptyDescription,
   contentContainerStyle,
   scrollEnabled = true,
   onCopyMessage,
 }: ChatTranscriptProps) {
   const { colors } = useTheme();
+  const { t } = useLocalization();
   const listRef = useRef<FlatList>(null);
+  const resolvedEmptyTitle = emptyTitle ?? t("yourConversationAppearsHere");
+  const resolvedEmptyDescription =
+    emptyDescription ?? t("defaultTranscriptEmptyDescription");
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -75,12 +80,12 @@ export function ChatTranscript({
             <Feather name="mic" size={18} color={colors.accent} />
           </View>
           <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            {emptyTitle}
+            {resolvedEmptyTitle}
           </Text>
           <Text
             style={[styles.emptyDescription, { color: colors.textSecondary }]}
           >
-            {emptyDescription}
+            {resolvedEmptyDescription}
           </Text>
         </View>
       }

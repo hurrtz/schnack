@@ -10,6 +10,7 @@ import {
   EMPTY_VISUAL_LEVELS,
   appendMeterHistory,
 } from "../utils/audioVisualization";
+import { useLocalization } from "../i18n";
 
 export interface RecorderState {
   isRecording: boolean;
@@ -24,6 +25,7 @@ const RECORDING_OPTIONS = {
 };
 
 export function useAudioRecorder() {
+  const { t } = useLocalization();
   const recorder = useExpoAudioRecorder(RECORDING_OPTIONS);
   const recorderState = useAudioRecorderState(recorder, 100);
   const startTimeRef = useRef<number>(0);
@@ -47,7 +49,7 @@ export function useAudioRecorder() {
 
     const permission = await requestRecordingPermissionsAsync();
     if (!permission.granted) {
-      throw new Error("Microphone permission not granted");
+      throw new Error(t("microphonePermissionNotGranted"));
     }
 
     await setAudioModeAsync({
@@ -58,7 +60,7 @@ export function useAudioRecorder() {
     await recorder.prepareToRecordAsync(RECORDING_OPTIONS);
     recorder.record();
     startTimeRef.current = Date.now();
-  }, [recorder, recorderState.isRecording]);
+  }, [recorder, recorderState.isRecording, t]);
 
   const stopRecording = useCallback(async (): Promise<string | null> => {
     if (!recorderState.isRecording && !recorderState.canRecord) {

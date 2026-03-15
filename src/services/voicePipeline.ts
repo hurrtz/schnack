@@ -3,6 +3,7 @@ import { streamChat, summarizeConversationContext } from "./llm";
 import { synthesizeSpeech } from "./tts";
 import { buildConversationContextPlan } from "./conversationContext";
 import {
+  AppLanguage,
   AssistantResponseLength,
   AssistantResponseTone,
   Message,
@@ -81,6 +82,7 @@ export async function runVoicePipeline(params: {
   assistantInstructions: string;
   responseLength: AssistantResponseLength;
   responseTone: AssistantResponseTone;
+  language: AppLanguage;
   callbacks: PipelineCallbacks;
   abortSignal?: AbortSignal;
 }): Promise<string | null> {
@@ -104,6 +106,7 @@ export async function runVoicePipeline(params: {
     assistantInstructions,
     responseLength,
     responseTone,
+    language,
     callbacks,
     abortSignal,
   } = params;
@@ -116,6 +119,7 @@ export async function runVoicePipeline(params: {
           mode: sttMode,
           provider: sttProvider,
           apiKey: sttApiKey,
+          language,
         })
       : null);
 
@@ -139,6 +143,7 @@ export async function runVoicePipeline(params: {
         model,
         provider,
         apiKey: providerApiKey,
+        language,
         abortSignal,
       });
 
@@ -199,6 +204,7 @@ export async function runVoicePipeline(params: {
         mode: ttsMode,
         provider: ttsProvider,
         apiKey: ttsApiKey,
+        language,
       });
 
       if (!abortSignal?.aborted) {
@@ -253,6 +259,7 @@ export async function runVoicePipeline(params: {
     assistantInstructions,
     responseLength,
     responseTone,
+    language,
     conversationSummary: effectiveSummary || undefined,
     abortSignal,
     onChunk: (text) => {

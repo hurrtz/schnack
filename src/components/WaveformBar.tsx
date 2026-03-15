@@ -7,6 +7,7 @@ import {
   Text,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useLocalization } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Waveform } from "./Waveform";
@@ -34,19 +35,20 @@ export function WaveformBar({
   onPress,
 }: WaveformBarProps) {
   const { colors } = useTheme();
+  const { t } = useLocalization();
   const isProcessing = phase === "transcribing" || phase === "thinking";
   const hint =
     phase === "recording"
-      ? "Listening"
+      ? t("listening")
       : phase === "transcribing"
-        ? "Parsing"
+        ? t("parsing")
         : phase === "thinking"
-          ? "Thinking"
+          ? t("thinking")
           : phase === "speaking"
-            ? "Speaking"
+            ? t("speaking")
             : inputMode === "push-to-talk"
-              ? "Hold"
-              : "Tap";
+              ? t("hold")
+              : t("tap");
 
   const content = (
     <View style={styles.contentRow}>
@@ -77,7 +79,7 @@ export function WaveformBar({
             { color: isActive ? "#F6FBFF" : colors.textSecondary },
           ]}
         >
-          {phase === "thinking" ? "Waiting on model" : "Converting speech"}
+          {phase === "thinking" ? t("waitingOnModel") : t("convertingSpeech")}
         </Text>
       ) : (
         <View style={styles.waveformWrap}>

@@ -1,6 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { PROVIDER_DEFAULT_TTS_VOICES, PROVIDER_LABELS } from "../constants/models";
-import { Provider, VoiceBackendMode } from "../types";
+import { translate } from "../i18n";
+import { AppLanguage, Provider, VoiceBackendMode } from "../types";
 import { getTogetherTtsLanguageCode } from "../utils/speechLanguage";
 
 let ttsCounter = 0;
@@ -47,9 +48,17 @@ const TTS_PROVIDER_CONFIGS: Partial<Record<Provider, BinaryTtsConfig | GeminiTts
   },
 };
 
-function requireProviderKey(provider: Provider, apiKey?: string) {
+function requireProviderKey(
+  provider: Provider,
+  apiKey: string | undefined,
+  language: AppLanguage
+) {
   if (!apiKey?.trim()) {
-    throw new Error(`${PROVIDER_LABELS[provider]} is not configured in Settings.`);
+    throw new Error(
+      translate(language, "providerConfiguredInSettings", {
+        provider: PROVIDER_LABELS[provider],
+      })
+    );
   }
 
   return apiKey.trim();
@@ -67,7 +76,7 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-function bytesToBase64(bytes: Uint8Array) {
+function bytesToBase64(bytes: Uint8Array, language: AppLanguage) {
   const BufferCtor = (globalThis as any).Buffer;
 
   if (BufferCtor) {
@@ -84,10 +93,10 @@ function bytesToBase64(bytes: Uint8Array) {
     return btoa(binary);
   }
 
-  throw new Error("No base64 encoder available.");
+  throw new Error(translate(language, "noBase64EncoderAvailable"));
 }
 
-function base64ToBytes(base64: string) {
+function base64ToBytes(base64: string, language: AppLanguage) {
   const BufferCtor = (globalThis as any).Buffer;
 
   if (BufferCtor) {
@@ -103,7 +112,7 @@ function base64ToBytes(base64: string) {
     return bytes;
   }
 
-  throw new Error("No base64 decoder available.");
+  throw new Error(translate(language, "noBase64DecoderAvailable"));
 }
 
 function buildWavBase64FromPcm(params: {
@@ -111,10 +120,11 @@ function buildWavBase64FromPcm(params: {
   sampleRate: number;
   channels?: number;
   bitsPerSample?: number;
+  language: AppLanguage;
 }) {
   const channels = params.channels ?? 1;
   const bitsPerSample = params.bitsPerSample ?? 16;
-  const pcmBytes = base64ToBytes(params.pcmBase64);
+  const pcmBytes = base64ToBytes(params.pcmBase64, params.language);
   const byteRate = (params.sampleRate * channels * bitsPerSample) / 8;
   const blockAlign = (channels * bitsPerSample) / 8;
   const header = new ArrayBuffer(44);
@@ -143,7 +153,7 @@ function buildWavBase64FromPcm(params: {
   const wavBytes = new Uint8Array(44 + pcmBytes.length);
   wavBytes.set(new Uint8Array(header), 0);
   wavBytes.set(pcmBytes, 44);
-  return bytesToBase64(wavBytes);
+  return bytesToBase64(wavBytes, params.language);
 }
 
 async function writeBase64AudioFile(base64: string, extension: "mp3" | "wav") {
@@ -170,21 +180,26 @@ export async function synthesizeSpeech(params: {
   mode: VoiceBackendMode;
   provider?: Provider | null;
   apiKey?: string;
+  language: AppLanguage;
 }): Promise<string> {
-  const { text, voice, mode, provider, apiKey } = params;
+  const { text, voice, mode, provider, apiKey, language } = params;
 
   if (mode === "native") {
-    throw new Error("Native TTS does not synthesize audio files.");
+    throw new Error(translate(language, "nativeTtsDoesNotSynthesizeAudioFiles"));
   }
 
   if (!provider) {
-    throw new Error("Choose a text-to-speech provider in Settings.");
+    throw new Error(translate(language, "chooseTextToSpeechProviderInSettings"));
   }
 
   const config = TTS_PROVIDER_CONFIGS[provider];
 
   if (!config) {
-    throw new Error(`${PROVIDER_LABELS[provider]} TTS is not supported yet.`);
+    throw new Error(
+      translate(language, "ttsNotSupportedYet", {
+        provider: PROVIDER_LABELS[provider],
+      })
+    );
   }
 
   const selectedVoice =
@@ -195,7 +210,7 @@ export async function synthesizeSpeech(params: {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-goog-api-key": requireProviderKey(provider, apiKey),
+        "x-goog-api-key": requireProviderKey(provider, apiKey, language),
       },
       body: JSON.stringify({
         contents: [
@@ -223,7 +238,11 @@ export async function synthesizeSpeech(params: {
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(
-        `${PROVIDER_LABELS[provider]} TTS error (${response.status}): ${errorText}`
+        translate(language, "ttsError", {
+          provider: PROVIDER_LABELS[provider],
+          status: response.status,
+          errorText,
+        })
       );
     }
 
@@ -232,7 +251,11 @@ export async function synthesizeSpeech(params: {
     const pcmBase64 = audioPart?.data;
 
     if (!pcmBase64) {
-      throw new Error(`${PROVIDER_LABELS[provider]} TTS did not return audio.`);
+      throw new Error(
+        translate(language, "ttsDidNotReturnAudio", {
+          provider: PROVIDER_LABELS[provider],
+        })
+      );
     }
 
     const mimeType = audioPart?.mimeType as string | undefined;
@@ -241,6 +264,7 @@ export async function synthesizeSpeech(params: {
     const wavBase64 = buildWavBase64FromPcm({
       pcmBase64,
       sampleRate,
+      language,
     });
     return writeBase64AudioFile(wavBase64, "wav");
   }
@@ -277,7 +301,7 @@ export async function synthesizeSpeech(params: {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${requireProviderKey(provider, apiKey)}`,
+      Authorization: `Bearer ${requireProviderKey(provider, apiKey, language)}`,
     },
     body: JSON.stringify(requestBody),
   });
@@ -285,7 +309,11 @@ export async function synthesizeSpeech(params: {
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(
-      `${PROVIDER_LABELS[provider]} TTS error (${response.status}): ${errorText}`
+      translate(language, "ttsError", {
+        provider: PROVIDER_LABELS[provider],
+        status: response.status,
+        errorText,
+      })
     );
   }
 

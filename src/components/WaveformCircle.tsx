@@ -18,6 +18,7 @@ import Animated, {
   interpolate,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
+import { useLocalization } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Waveform } from "./Waveform";
@@ -95,6 +96,7 @@ function ProcessingIndicator({
   providerLabel: string;
 }) {
   const isThinking = phase === "thinking";
+  const { t } = useLocalization();
 
   return (
     <View style={styles.processingWrap}>
@@ -104,7 +106,7 @@ function ProcessingIndicator({
         <ProcessingDot delay={340} color="rgba(255, 255, 255, 0.84)" />
       </View>
       <Text style={styles.processingLabel}>
-        {isThinking ? "Waiting for reply" : "Parsing your voice"}
+        {isThinking ? t("waitingForReply") : t("parsingYourVoice")}
       </Text>
       {isThinking ? (
         <Text style={styles.processingSubLabel}>{providerLabel}</Text>
@@ -144,6 +146,7 @@ export function WaveformCircle({
   onPress,
 }: WaveformCircleProps) {
   const { colors } = useTheme();
+  const { t } = useLocalization();
   const intensity = normalizeMetering(metering);
   const isProcessing = phase === "transcribing" || phase === "thinking";
   const isSpeaking = phase === "speaking";
@@ -202,16 +205,16 @@ export function WaveformCircle({
 
   const interactionHint =
     phase === "recording"
-      ? "Listening"
+      ? t("listening")
       : phase === "transcribing"
-        ? "Parsing"
+        ? t("parsing")
         : phase === "thinking"
-          ? "Thinking"
+          ? t("thinking")
           : phase === "speaking"
-            ? "Speaking"
+            ? t("speaking")
             : inputMode === "push-to-talk"
-              ? "Hold to speak"
-              : "Tap to speak";
+              ? t("holdToSpeak")
+              : t("tapToSpeak");
   const ringColor = isProcessing ? colors.accentWarm : colors.accent;
   const gradientColors: [string, string, string] = isProcessing
     ? [colors.accentWarm, colors.accentGradientStart, colors.accentGradientEnd]

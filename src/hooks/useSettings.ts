@@ -10,6 +10,8 @@ import {
   ReplyPlayback,
   Settings,
   DEFAULT_SETTINGS,
+  getDefaultAssistantInstructions,
+  isDefaultAssistantInstructions,
 } from "../types";
 
 const STORAGE_KEY = "@schnack/settings";
@@ -116,11 +118,19 @@ function mergeSettings(
     storedSettings?.replyPlayback ??
     storedSettings?.ttsPlayback ??
     DEFAULT_SETTINGS.replyPlayback;
+  const language = storedSettings?.language ?? DEFAULT_SETTINGS.language;
+  const assistantInstructions =
+    typeof storedSettings?.assistantInstructions === "string" &&
+    storedSettings.assistantInstructions.trim()
+      ? storedSettings.assistantInstructions
+      : getDefaultAssistantInstructions(language);
 
   return {
     ...DEFAULT_SETTINGS,
     ...storedSettings,
+    language,
     replyPlayback,
+    assistantInstructions,
     providerModels: {
       ...DEFAULT_SETTINGS.providerModels,
       ...extractStoredProviderModels(storedSettings),
@@ -193,9 +203,18 @@ export function useSettings() {
 
   const updateSettings = useCallback((partial: SettingsUpdate) => {
     setSettings((prev) => {
+      const nextLanguage = partial.language ?? prev.language;
+      const shouldRefreshAssistantInstructions =
+        partial.language &&
+        partial.assistantInstructions === undefined &&
+        isDefaultAssistantInstructions(prev.assistantInstructions);
+
       const next = mergeSettings({
         ...prev,
         ...partial,
+        assistantInstructions: shouldRefreshAssistantInstructions
+          ? getDefaultAssistantInstructions(nextLanguage)
+          : partial.assistantInstructions ?? prev.assistantInstructions,
         apiKeys: prev.apiKeys,
         providerModels: prev.providerModels,
       });

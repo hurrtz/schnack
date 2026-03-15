@@ -1,6 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { PROVIDER_LABELS } from "../constants/models";
-import { Provider, VoiceBackendMode } from "../types";
+import { translate } from "../i18n";
+import { AppLanguage, Provider, VoiceBackendMode } from "../types";
 import {
   getDeviceLocale,
   getFileAudioMimeType,
@@ -52,9 +53,17 @@ const STT_PROVIDER_CONFIGS: Partial<
   },
 };
 
-function requireProviderKey(provider: Provider, apiKey?: string) {
+function requireProviderKey(
+  provider: Provider,
+  apiKey: string | undefined,
+  language: AppLanguage
+) {
   if (!apiKey?.trim()) {
-    throw new Error(`${PROVIDER_LABELS[provider]} is not configured in Settings.`);
+    throw new Error(
+      translate(language, "providerConfiguredInSettings", {
+        provider: PROVIDER_LABELS[provider],
+      })
+    );
   }
 
   return apiKey.trim();
@@ -78,21 +87,26 @@ export async function transcribeAudio(params: {
   mode: VoiceBackendMode;
   provider?: Provider | null;
   apiKey?: string;
+  language: AppLanguage;
 }): Promise<string | null> {
-  const { fileUri, mode, provider, apiKey } = params;
+  const { fileUri, mode, provider, apiKey, language } = params;
 
   if (mode === "native") {
-    throw new Error("Native STT is handled directly in the app.");
+    throw new Error(translate(language, "nativeSttHandledInApp"));
   }
 
   if (!provider) {
-    throw new Error("Choose a speech-to-text provider in Settings.");
+    throw new Error(translate(language, "chooseSpeechToTextProviderInSettings"));
   }
 
   const config = STT_PROVIDER_CONFIGS[provider];
 
   if (!config) {
-    throw new Error(`${PROVIDER_LABELS[provider]} STT is not supported yet.`);
+    throw new Error(
+      translate(language, "sttNotSupportedYet", {
+        provider: PROVIDER_LABELS[provider],
+      })
+    );
   }
 
   if (config.kind === "gemini") {
@@ -104,7 +118,7 @@ export async function transcribeAudio(params: {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-goog-api-key": requireProviderKey(provider, apiKey),
+        "x-goog-api-key": requireProviderKey(provider, apiKey, language),
       },
       body: JSON.stringify({
         contents: [
@@ -131,7 +145,11 @@ export async function transcribeAudio(params: {
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(
-        `${PROVIDER_LABELS[provider]} STT error (${response.status}): ${errorText}`
+        translate(language, "sttError", {
+          provider: PROVIDER_LABELS[provider],
+          status: response.status,
+          errorText,
+        })
       );
     }
 
@@ -158,7 +176,7 @@ export async function transcribeAudio(params: {
   const response = await fetch(config.endpoint, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${requireProviderKey(provider, apiKey)}`,
+      Authorization: `Bearer ${requireProviderKey(provider, apiKey, language)}`,
     },
     body: formData,
   });
@@ -166,7 +184,11 @@ export async function transcribeAudio(params: {
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(
-      `${PROVIDER_LABELS[provider]} STT error (${response.status}): ${errorText}`
+      translate(language, "sttError", {
+        provider: PROVIDER_LABELS[provider],
+        status: response.status,
+        errorText,
+      })
     );
   }
 

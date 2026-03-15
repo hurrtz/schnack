@@ -2,7 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { renderHook, act } from "@testing-library/react-native";
 import { useSettings } from "../../src/hooks/useSettings";
-import { DEFAULT_SETTINGS } from "../../src/types";
+import {
+  DEFAULT_SETTINGS,
+  DEFAULT_ASSISTANT_INSTRUCTIONS_BY_LANGUAGE,
+} from "../../src/types";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn(() => Promise.resolve(null)),
@@ -86,6 +89,44 @@ describe("useSettings", () => {
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
       "@schnack/settings",
       expect.stringContaining('"lastProvider":"anthropic"')
+    );
+  });
+
+  it("switches built-in assistant instructions when the language changes", async () => {
+    const { result } = renderHook(() => useSettings());
+    await flushSettingsLoad();
+
+    await act(async () => {
+      result.current.updateSettings({ language: "de" });
+    });
+
+    expect(result.current.settings.language).toBe("de");
+    expect(result.current.settings.assistantInstructions).toBe(
+      DEFAULT_ASSISTANT_INSTRUCTIONS_BY_LANGUAGE.de
+    );
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      "@schnack/settings",
+      expect.stringContaining('"language":"de"')
+    );
+  });
+
+  it("does not overwrite custom assistant instructions on language change", async () => {
+    const { result } = renderHook(() => useSettings());
+    await flushSettingsLoad();
+
+    await act(async () => {
+      result.current.updateSettings({
+        assistantInstructions: "Always answer with one short sentence.",
+      });
+    });
+
+    await act(async () => {
+      result.current.updateSettings({ language: "de" });
+    });
+
+    expect(result.current.settings.language).toBe("de");
+    expect(result.current.settings.assistantInstructions).toBe(
+      "Always answer with one short sentence."
     );
   });
 

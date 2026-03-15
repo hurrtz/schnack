@@ -12,6 +12,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Swipeable } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PROVIDER_LABELS } from "../constants/models";
+import { useLocalization } from "../i18n";
 import { ConversationMeta } from "../types";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
@@ -39,6 +40,7 @@ export function ConversationDrawer({
   onClose,
 }: ConversationDrawerProps) {
   const { colors } = useTheme();
+  const { t, locale } = useLocalization();
   const insets = useSafeAreaInsets();
 
   const renderRightActions = (id: string) => (
@@ -47,7 +49,7 @@ export function ConversationDrawer({
       onPress={() => onDelete(id)}
     >
       <Feather name="trash-2" size={16} color="#FFFFFF" />
-      <Text style={styles.deleteText}>Delete</Text>
+      <Text style={styles.deleteText}>{t("delete")}</Text>
     </TouchableOpacity>
   );
 
@@ -59,16 +61,16 @@ export function ConversationDrawer({
     );
 
     if (diffDays === 0) {
-      return date.toLocaleTimeString([], {
+      return date.toLocaleTimeString(locale, {
         hour: "2-digit",
         minute: "2-digit",
       });
     }
     if (diffDays === 1) {
-      return "Yesterday";
+      return t("yesterday");
     }
 
-    return date.toLocaleDateString([], { month: "short", day: "numeric" });
+    return date.toLocaleDateString(locale, { month: "short", day: "numeric" });
   };
 
   return (
@@ -99,13 +101,13 @@ export function ConversationDrawer({
           >
             <View style={styles.headerCopy}>
               <Text style={[styles.eyebrow, { color: colors.accent }]}>
-                Memory
+                {t("memory")}
               </Text>
               <Text style={[styles.title, { color: colors.text }]}>
-                Conversations
+                {t("conversations")}
               </Text>
               <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                Jump between live threads or start a fresh room.
+                {t("drawerSubtitle")}
               </Text>
             </View>
             <TouchableOpacity
@@ -136,7 +138,7 @@ export function ConversationDrawer({
               style={[styles.newSession]}
             >
               <Feather name="plus" size={16} color="#F4F8FF" />
-              <Text style={styles.newSessionText}>New Session</Text>
+              <Text style={styles.newSessionText}>{t("newSession")}</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -163,13 +165,12 @@ export function ConversationDrawer({
                   <Feather name="message-circle" size={18} color={colors.accent} />
                 </View>
                 <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                  No saved conversations yet
+                  {t("noSavedConversationsYet")}
                 </Text>
                 <Text
                   style={[styles.emptyDescription, { color: colors.textSecondary }]}
                 >
-                  Start speaking from the main view and schnack will build a session
-                  automatically.
+                  {t("drawerEmptyDescription")}
                 </Text>
               </View>
             }
@@ -245,7 +246,7 @@ export function ConversationDrawer({
                           >
                             {item.lastProvider
                               ? PROVIDER_LABELS[item.lastProvider]
-                              : "No provider yet"}
+                              : t("noProviderYet")}
                           </Text>
                         </View>
                         <View style={styles.itemFooter}>
@@ -253,7 +254,7 @@ export function ConversationDrawer({
                             style={[styles.itemModel, { color: colors.textSecondary }]}
                             numberOfLines={1}
                           >
-                            {item.lastModel || "No model yet"}
+                            {item.lastModel || t("noModelYet")}
                           </Text>
                         <View
                           style={[
@@ -272,7 +273,7 @@ export function ConversationDrawer({
                                 { color: active ? colors.accent : colors.textSecondary },
                               ]}
                             >
-                              {active ? "Live" : "Saved"}
+                              {active ? t("live") : t("saved")}
                             </Text>
                           </View>
                           <TouchableOpacity
@@ -297,7 +298,7 @@ export function ConversationDrawer({
                                 { color: colors.textSecondary },
                               ]}
                             >
-                              Copy
+                              {t("copy")}
                             </Text>
                           </TouchableOpacity>
                         </View>

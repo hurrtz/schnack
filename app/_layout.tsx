@@ -1,15 +1,18 @@
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack } from "expo-router";
 import { SettingsProvider, useSharedSettings } from "../src/context/SettingsContext";
+import { LocalizationProvider } from "../src/i18n";
 import { ThemeProvider } from "../src/theme/ThemeContext";
 
 function RootLayoutInner() {
   const { settings } = useSharedSettings();
 
   return (
-    <ThemeProvider mode={settings.theme}>
-      <Stack screenOptions={{ headerShown: false }} />
-    </ThemeProvider>
+    <LocalizationProvider language={settings.language}>
+      <ThemeProvider mode={settings.theme}>
+        <Stack screenOptions={{ headerShown: false }} />
+      </ThemeProvider>
+    </LocalizationProvider>
   );
 }
 

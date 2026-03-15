@@ -13,6 +13,7 @@ export type InputMode = "push-to-talk" | "toggle-to-talk";
 export type ReplyPlayback = "stream" | "wait";
 export type TtsPlayback = ReplyPlayback;
 export type ThemeMode = "light" | "dark" | "system";
+export type AppLanguage = "en" | "de";
 export type VoiceBackendMode = "native" | "provider";
 export type AssistantResponseLength = "brief" | "normal" | "thorough";
 export type AssistantResponseTone =
@@ -37,6 +38,7 @@ export interface Settings {
   replyPlayback: ReplyPlayback;
   providerModels: ProviderModelSelections;
   providerTtsVoices: ProviderTtsVoiceSelections;
+  language: AppLanguage;
   theme: ThemeMode;
   lastProvider: Provider;
   sttMode: VoiceBackendMode;
@@ -49,8 +51,23 @@ export interface Settings {
   apiKeys: ProviderApiKeys;
 }
 
+export const DEFAULT_ASSISTANT_INSTRUCTIONS_BY_LANGUAGE: Record<AppLanguage, string> = {
+  en:
+    "You are a voice assistant. The user is speaking to you and will hear your response read aloud. Respond naturally and conversationally as if talking. Never use markdown, bullet points, numbered lists, headers, or any formatting. Keep responses concise and spoken-friendly.",
+  de:
+    "Du bist ein Sprachassistent. Die Nutzerin oder der Nutzer spricht mit dir und wird deine Antwort vorgelesen bekommen. Antworte natuerlich und gespraechsnah, als waerest du in einem echten Gespraech. Verwende niemals Markdown, Aufzaehlungen, nummerierte Listen, Ueberschriften oder sonstige Formatierung. Halte Antworten knapp und gut vorlesbar.",
+};
+
 export const DEFAULT_ASSISTANT_INSTRUCTIONS =
-  "You are a voice assistant. The user is speaking to you and will hear your response read aloud. Respond naturally and conversationally as if talking. Never use markdown, bullet points, numbered lists, headers, or any formatting. Keep responses concise and spoken-friendly.";
+  DEFAULT_ASSISTANT_INSTRUCTIONS_BY_LANGUAGE.en;
+
+export function getDefaultAssistantInstructions(language: AppLanguage) {
+  return DEFAULT_ASSISTANT_INSTRUCTIONS_BY_LANGUAGE[language];
+}
+
+export function isDefaultAssistantInstructions(value: string) {
+  return Object.values(DEFAULT_ASSISTANT_INSTRUCTIONS_BY_LANGUAGE).includes(value);
+}
 
 export const DEFAULT_SETTINGS: Settings = {
   inputMode: "push-to-talk",
@@ -79,13 +96,14 @@ export const DEFAULT_SETTINGS: Settings = {
     together: "af_alloy",
     xai: "ara",
   },
+  language: "en",
   theme: "system",
   lastProvider: "openai",
   sttMode: "provider",
   sttProvider: "openai",
   ttsMode: "provider",
   ttsProvider: "openai",
-  assistantInstructions: DEFAULT_ASSISTANT_INSTRUCTIONS,
+  assistantInstructions: getDefaultAssistantInstructions("en"),
   responseLength: "normal",
   responseTone: "professional",
   apiKeys: {

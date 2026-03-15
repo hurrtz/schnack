@@ -20,20 +20,22 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  NATIVE_STT_LANGUAGE_NOTE,
-  NATIVE_TTS_LANGUAGE_NOTE,
   PROVIDER_DEFAULT_TTS_VOICES,
-  PROVIDER_API_KEY_HINTS,
-  PROVIDER_API_KEY_PLACEHOLDERS,
   PROVIDER_API_KEY_URLS,
   PROVIDER_LABELS,
   PROVIDER_MODELS,
   PROVIDER_ORDER,
-  PROVIDER_STT_LANGUAGE_NOTES,
-  PROVIDER_TTS_LANGUAGE_NOTES,
-  PROVIDER_TTS_VOICE_OPTIONS,
+  getNativeSttLanguageNote,
+  getNativeTtsLanguageNote,
+  getProviderApiKeyHint,
+  getProviderApiKeyPlaceholder,
+  getProviderSttLanguageNote,
+  getProviderTtsLanguageNote,
+  getProviderTtsVoiceOptions,
 } from "../constants/models";
+import { useLocalization } from "../i18n";
 import {
+  AppLanguage,
   AssistantResponseLength,
   AssistantResponseTone,
   InputMode,
@@ -71,96 +73,117 @@ const TABS: SettingsTab[] = [
   "ui",
 ];
 
-const TAB_LABELS: Record<SettingsTab, string> = {
-  instructions: "Instructions",
-  providers: "Providers",
-  stt: "STT",
-  tts: "TTS",
-  ui: "UI",
-};
+function getTabLabel(
+  tab: SettingsTab,
+  t: ReturnType<typeof useLocalization>["t"]
+) {
+  switch (tab) {
+    case "instructions":
+      return t("instructions");
+    case "providers":
+      return t("providers");
+    case "stt":
+      return t("stt");
+    case "tts":
+      return t("tts");
+    case "ui":
+      return t("ui");
+  }
+}
 
-const TAB_DESCRIPTIONS: Partial<Record<SettingsTab, string>> = {
-  instructions:
-    "Shape the hidden guidance that steers the assistant before any provider sees the request.",
-  providers:
-    "Connect providers, store keys on-device, and decide which model each provider should use.",
-  stt:
-    "Control how speech is captured and which backend turns audio into text before it reaches the model.",
-  tts:
-    "Control when replies start speaking and which backend handles spoken output.",
-};
+function getTabDescription(
+  tab: SettingsTab,
+  t: ReturnType<typeof useLocalization>["t"]
+) {
+  switch (tab) {
+    case "instructions":
+      return t("instructionsTabDescription");
+    case "providers":
+      return t("providersTabDescription");
+    case "stt":
+      return t("sttTabDescription");
+    case "tts":
+      return t("ttsTabDescription");
+    default:
+      return null;
+  }
+}
 
-const RESPONSE_LENGTH_OPTIONS: {
+function getResponseLengthOptions(
+  t: ReturnType<typeof useLocalization>["t"]
+): {
   value: AssistantResponseLength;
   label: string;
   description: string;
-}[] = [
-  {
-    value: "brief",
-    label: "Brief",
-    description:
-      "Keep the answer tight. Use the minimum number of sentences needed to fully answer the user.",
-  },
-  {
-    value: "normal",
-    label: "Normal",
-    description:
-      "Aim for a balanced response length. Cover the important points without dragging the answer out.",
-  },
-  {
-    value: "thorough",
-    label: "Thorough",
-    description:
-      "Go deep and be comprehensive. Include nuance, detail, tradeoffs, and the reasoning that matters.",
-  },
-];
+}[] {
+  return [
+    {
+      value: "brief",
+      label: t("brief"),
+      description: t("briefDescription"),
+    },
+    {
+      value: "normal",
+      label: t("normal"),
+      description: t("normalDescription"),
+    },
+    {
+      value: "thorough",
+      label: t("thorough"),
+      description: t("thoroughDescription"),
+    },
+  ];
+}
 
-const RESPONSE_TONE_OPTIONS: {
+function getResponseToneOptions(
+  t: ReturnType<typeof useLocalization>["t"]
+): {
   value: AssistantResponseTone;
   label: string;
   description: string;
-}[] = [
-  {
-    value: "professional",
-    label: "Professional",
-    description:
-      "Speak like a senior consultant briefing a client. Precise language, no slang, measured and authoritative.",
-  },
-  {
-    value: "casual",
-    label: "Casual",
-    description:
-      "Speak like a smart friend at a coffee shop. Relaxed, natural, conversational. Contractions are fine, tangents are fine.",
-  },
-  {
-    value: "nerdy",
-    label: "Nerdy",
-    description:
-      "Speak like an enthusiastic expert who loves going deep. Use technical terminology freely, geek out about details, assume the user can keep up.",
-  },
-  {
-    value: "concise",
-    label: "Concise",
-    description:
-      "Be as brief as possible while still being complete. No preamble, no filler, just the answer. Think telegram style.",
-  },
-  {
-    value: "socratic",
-    label: "Socratic",
-    description:
-      "Challenge the user's thinking. Ask counter-questions, offer alternative perspectives, don't just confirm what they said. Be a sparring partner, not a yes-machine.",
-  },
-  {
-    value: "eli5",
-    label: "ELI5",
-    description:
-      "Explain everything as simply as possible. Use analogies, everyday language, zero jargon. Assume no prior knowledge on any topic.",
-  },
-];
+}[] {
+  return [
+    {
+      value: "professional",
+      label: t("professional"),
+      description: t("professionalDescription"),
+    },
+    {
+      value: "casual",
+      label: t("casual"),
+      description: t("casualDescription"),
+    },
+    {
+      value: "nerdy",
+      label: t("nerdy"),
+      description: t("nerdyDescription"),
+    },
+    {
+      value: "concise",
+      label: t("concise"),
+      description: t("conciseDescription"),
+    },
+    {
+      value: "socratic",
+      label: t("socratic"),
+      description: t("socraticDescription"),
+    },
+    {
+      value: "eli5",
+      label: t("eli5"),
+      description: t("eli5Description"),
+    },
+  ];
+}
+
+function getPreviewSampleText(language: AppLanguage) {
+  return language === "de" ? "Hallo, ich bin schnack." : "Hello, I'm schnack.";
+}
 
 function TabIntro({ tab }: { tab: SettingsTab }) {
   const { colors } = useTheme();
-  const description = TAB_DESCRIPTIONS[tab];
+  const { t } = useLocalization();
+  const description = getTabDescription(tab, t);
 
   if (!description) {
     return null;
@@ -293,6 +316,7 @@ function ProviderSection({
   onUpdateApiKey: (provider: Provider, apiKey: string) => void;
 }) {
   const { colors } = useTheme();
+  const { t, language } = useLocalization();
   const [selectedProvider, setSelectedProvider] = useState<Provider>(
     focusProvider ?? settings.lastProvider
   );
@@ -313,11 +337,10 @@ function ProviderSection({
       ]}
     >
       <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-        Providers
+        {t("providers")}
       </Text>
       <Text style={[styles.sectionIntro, { color: colors.textMuted }]}>
-        Keys are stored securely on this device. Providers stay disabled until
-        their key is entered here.
+        {t("providersTabDescription")}
       </Text>
 
       <View style={styles.providerButtonGrid}>
@@ -339,7 +362,9 @@ function ProviderSection({
               ]}
               onPress={() => setSelectedProvider(provider)}
               accessibilityRole="button"
-              accessibilityLabel={`Open ${PROVIDER_LABELS[provider]} settings`}
+              accessibilityLabel={t("openProviderSettings", {
+                provider: PROVIDER_LABELS[provider],
+              })}
               accessibilityState={{ selected: active }}
             >
               <ProviderIcon
@@ -364,7 +389,7 @@ function ProviderSection({
           {PROVIDER_LABELS[selectedProvider]}
         </Text>
         <Text style={[styles.apiKeyHint, { color: colors.textMuted }]}>
-          {PROVIDER_API_KEY_HINTS[selectedProvider]}
+          {getProviderApiKeyHint(selectedProvider, language)}
         </Text>
         <TouchableOpacity
           style={[
@@ -376,18 +401,20 @@ function ProviderSection({
           ]}
           onPress={handleOpenProviderPortal}
           accessibilityRole="link"
-          accessibilityLabel={`Create ${PROVIDER_LABELS[selectedProvider]} API key`}
+          accessibilityLabel={t("createProviderApiKey", {
+            provider: PROVIDER_LABELS[selectedProvider],
+          })}
           activeOpacity={0.85}
         >
           <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
-            Create API key
+            {t("createApiKey")}
           </Text>
           <Feather name="external-link" size={14} color={colors.accent} />
         </TouchableOpacity>
         <TextInput
           value={settings.apiKeys[selectedProvider]}
           onChangeText={(value) => onUpdateApiKey(selectedProvider, value)}
-          placeholder={PROVIDER_API_KEY_PLACEHOLDERS[selectedProvider]}
+          placeholder={getProviderApiKeyPlaceholder(selectedProvider, language)}
           placeholderTextColor={colors.textMuted}
           selectionColor={colors.accent}
           autoCapitalize="none"
@@ -403,7 +430,7 @@ function ProviderSection({
           ]}
         />
         <Picker
-          label={`${PROVIDER_LABELS[selectedProvider]} Model`}
+          label={`${PROVIDER_LABELS[selectedProvider]} ${t("model")}`}
           value={settings.providerModels[selectedProvider]}
           options={PROVIDER_MODELS[selectedProvider].map((model) => ({
             value: model.id,
@@ -424,10 +451,13 @@ function AssistantResponseSection({
   onUpdate: (partial: Partial<Omit<Settings, "apiKeys" | "providerModels">>) => void;
 }) {
   const { colors } = useTheme();
-  const selectedLength = RESPONSE_LENGTH_OPTIONS.find(
+  const { t } = useLocalization();
+  const responseLengthOptions = getResponseLengthOptions(t);
+  const responseToneOptions = getResponseToneOptions(t);
+  const selectedLength = responseLengthOptions.find(
     (option) => option.value === settings.responseLength
   );
-  const selectedTone = RESPONSE_TONE_OPTIONS.find(
+  const selectedTone = responseToneOptions.find(
     (option) => option.value === settings.responseTone
   );
 
@@ -439,10 +469,10 @@ function AssistantResponseSection({
       ]}
     >
       <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-        Assistant Instructions
+        {t("assistantInstructions")}
       </Text>
       <Text style={[styles.sectionIntro, { color: colors.textMuted }]}>
-        Shape the hidden guidance the model receives before every reply.
+        {t("assistantInstructionsIntro")}
       </Text>
 
       <View
@@ -452,13 +482,13 @@ function AssistantResponseSection({
         ]}
       >
         <Text style={[styles.promptLabel, { color: colors.textSecondary }]}>
-          Base Instructions
+          {t("baseInstructions")}
         </Text>
         <TextInput
           value={settings.assistantInstructions}
           onChangeText={(value) => onUpdate({ assistantInstructions: value })}
           multiline
-          placeholder="Define how the assistant should behave."
+          placeholder={t("assistantInstructionsPlaceholder")}
           placeholderTextColor={colors.textMuted}
           selectionColor={colors.accent}
           style={[
@@ -471,14 +501,14 @@ function AssistantResponseSection({
           ]}
         />
         <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
-          This is always prepended before the selected response length and tone.
+          {t("assistantInstructionsHint")}
         </Text>
       </View>
 
       <Picker
-        label="Adaptive Length"
+        label={t("adaptiveLength")}
         value={settings.responseLength}
-        options={RESPONSE_LENGTH_OPTIONS.map((option) => ({
+        options={responseLengthOptions.map((option) => ({
           value: option.value,
           label: option.label,
         }))}
@@ -493,9 +523,9 @@ function AssistantResponseSection({
       ) : null}
 
       <Picker
-        label="Response Tone"
+        label={t("responseTone")}
         value={settings.responseTone}
-        options={RESPONSE_TONE_OPTIONS.map((option) => ({
+        options={responseToneOptions.map((option) => ({
           value: option.value,
           label: option.label,
         }))}
@@ -534,6 +564,7 @@ function TtsPreviewSection({
   onUpdateProviderTtsVoice: (provider: Provider, voice: string) => void;
 }) {
   const { colors } = useTheme();
+  const { t } = useLocalization();
   const canPickProviderVoice =
     settings.ttsMode === "provider" && !!ttsProvider && voiceOptions.length > 0;
 
@@ -541,7 +572,7 @@ function TtsPreviewSection({
     <PickerSection>
       {canPickProviderVoice ? (
         <Picker
-          label="TTS Voice"
+          label={t("ttsVoice")}
           value={selectedVoice}
           options={voiceOptions}
           onChange={(value) => onUpdateProviderTtsVoice(ttsProvider!, value)}
@@ -559,12 +590,12 @@ function TtsPreviewSection({
           ]}
         >
           <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
-            Voice Selection
+            {t("voiceSelection")}
           </Text>
           <Text style={[styles.previewHint, { color: colors.textMuted, marginTop: 0 }]}>
             {settings.ttsMode === "native"
-              ? "Native playback uses the device voice chosen by the operating system."
-              : "This provider currently uses its default voice for preview and spoken replies."}
+              ? t("nativeVoiceSelectionHint")
+              : t("providerDefaultVoiceHint")}
           </Text>
         </View>
       )}
@@ -579,13 +610,13 @@ function TtsPreviewSection({
         ]}
       >
         <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
-          Voice Preview Text
+          {t("voicePreviewText")}
         </Text>
         <TextInput
           value={previewText}
           onChangeText={setPreviewText}
           multiline
-          placeholder="Type a phrase to hear this voice."
+          placeholder={t("voicePreviewPlaceholder")}
           placeholderTextColor={colors.textMuted}
           selectionColor={colors.accent}
           style={[
@@ -598,8 +629,7 @@ function TtsPreviewSection({
           ]}
         />
         <Text style={[styles.previewHint, { color: colors.textMuted }]}>
-          Uses the currently selected reply voice backend without sending
-          anything to the language model.
+          {t("voicePreviewHint")}
         </Text>
         <TouchableOpacity
           activeOpacity={0.9}
@@ -625,7 +655,7 @@ function TtsPreviewSection({
               color="#F4F8FF"
             />
             <Text style={styles.previewButtonText}>
-              {previewLoading ? "Generating Preview..." : "Preview Voice"}
+              {previewLoading ? t("generatingPreview") : t("previewVoice")}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -653,10 +683,11 @@ export function SettingsModal({
   onClose,
 }: SettingsModalProps) {
   const { colors } = useTheme();
+  const { t, language } = useLocalization();
   const insets = useSafeAreaInsets();
   const contentScrollRef = useRef<ScrollView>(null);
   const [activeTab, setActiveTab] = useState<SettingsTab>("instructions");
-  const [previewText, setPreviewText] = useState("Hallo, ich bin schnack.");
+  const [previewText, setPreviewText] = useState(getPreviewSampleText(language));
   const [previewLoading, setPreviewLoading] = useState(false);
 
   const enabledSttProviders = useMemo(
@@ -741,7 +772,7 @@ export function SettingsModal({
     }
 
     const provider = settings.ttsProvider;
-    const supportedVoices = PROVIDER_TTS_VOICE_OPTIONS[provider];
+    const supportedVoices = getProviderTtsVoiceOptions(provider, language);
     const defaultVoice = PROVIDER_DEFAULT_TTS_VOICES[provider];
 
     if (!supportedVoices?.length || !defaultVoice) {
@@ -755,12 +786,24 @@ export function SettingsModal({
       onUpdateProviderTtsVoice(provider, defaultVoice);
     }
   }, [
+    language,
     onUpdateProviderTtsVoice,
     settings.providerTtsVoices,
     settings.ttsMode,
     settings.ttsProvider,
     visible,
   ]);
+
+  useEffect(() => {
+    const localizedSample = getPreviewSampleText(language);
+
+    setPreviewText((previous) =>
+      previous === getPreviewSampleText("en") ||
+      previous === getPreviewSampleText("de")
+        ? localizedSample
+        : previous
+    );
+  }, [language]);
 
   const modalAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }, { translateY: translateY.value }],
@@ -787,20 +830,20 @@ export function SettingsModal({
     settings.ttsMode !== "provider" || enabledTtsProviders.length === 0;
   const sttLanguageNote =
     settings.sttMode === "native"
-      ? NATIVE_STT_LANGUAGE_NOTE
+      ? getNativeSttLanguageNote(language)
       : settings.sttProvider
-        ? PROVIDER_STT_LANGUAGE_NOTES[settings.sttProvider] ?? null
+        ? getProviderSttLanguageNote(settings.sttProvider, language)
         : null;
   const ttsLanguageNote =
     settings.ttsMode === "native"
-      ? NATIVE_TTS_LANGUAGE_NOTE
+      ? getNativeTtsLanguageNote(language)
       : settings.ttsProvider
-        ? PROVIDER_TTS_LANGUAGE_NOTES[settings.ttsProvider] ?? null
+        ? getProviderTtsLanguageNote(settings.ttsProvider, language)
         : null;
   const currentTtsProvider =
     settings.ttsMode === "provider" ? settings.ttsProvider : null;
   const ttsVoiceOptions = currentTtsProvider
-    ? (PROVIDER_TTS_VOICE_OPTIONS[currentTtsProvider] ?? []).map((voice) => ({
+    ? getProviderTtsVoiceOptions(currentTtsProvider, language).map((voice) => ({
         value: voice.id,
         label: voice.label,
       }))
@@ -848,7 +891,9 @@ export function SettingsModal({
 
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
             <View style={styles.headerCopy}>
-              <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
+              <Text style={[styles.title, { color: colors.text }]}>
+                {t("settings")}
+              </Text>
             </View>
             <TouchableOpacity
               style={[
@@ -895,7 +940,7 @@ export function SettingsModal({
                       { color: active ? colors.text : colors.textSecondary },
                     ]}
                   >
-                    {TAB_LABELS[tab]}
+                    {getTabLabel(tab, t)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -929,19 +974,17 @@ export function SettingsModal({
             {activeTab === "stt" ? (
               <>
                 <RadioGroup<InputMode>
-                  label="Input Mode"
+                  label={t("inputMode")}
                   options={[
                     {
                       value: "push-to-talk",
-                      label: "Push to Talk",
-                      description:
-                        "Hold the main button while speaking, then release to send.",
+                      label: t("pushToTalk"),
+                      description: t("pushToTalkDescription"),
                     },
                     {
                       value: "toggle-to-talk",
-                      label: "Toggle to Talk",
-                      description:
-                        "Tap once to start recording and tap again when you are done.",
+                      label: t("toggleToTalk"),
+                      description: t("toggleToTalkDescription"),
                     },
                   ]}
                   value={settings.inputMode}
@@ -949,19 +992,17 @@ export function SettingsModal({
                 />
 
                 <RadioGroup<VoiceBackendMode>
-                  label="Speech to Text"
+                  label={t("speechToText")}
                   options={[
                     {
                       value: "native",
-                      label: "App Native",
-                      description:
-                        "Use the system speech recognizer built into the device. No provider key is required.",
+                      label: t("appNative"),
+                      description: t("nativeSttDescription"),
                     },
                     {
                       value: "provider",
-                      label: "Provider",
-                      description:
-                        "Use a configured provider to transcribe your voice before it is sent to the model.",
+                      label: t("provider"),
+                      description: t("providerSttDescription"),
                     },
                   ]}
                   value={settings.sttMode}
@@ -970,7 +1011,7 @@ export function SettingsModal({
 
                 <PickerSection>
                   <Picker
-                    label="STT Provider"
+                    label={t("sttProvider")}
                     value={settings.sttProvider ?? ""}
                     options={renderProviderPickerOptions(enabledSttProviders)}
                     onChange={(value) =>
@@ -981,13 +1022,13 @@ export function SettingsModal({
                   <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
                     {settings.sttMode === "provider"
                       ? enabledSttProviders.length > 0
-                        ? "Only enabled providers with transcription support appear here."
-                        : "Enable a provider with STT support in the Providers tab to choose it here."
-                      : "Native STT uses the device speech recognizer directly and works independently of your provider keys."}
+                        ? t("sttProviderEnabledHint")
+                        : t("sttProviderMissingHint")
+                      : t("nativeSttHint")}
                   </Text>
                   {sttLanguageNote ? (
                     <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
-                      {`Language coverage: ${sttLanguageNote}`}
+                      {t("languageCoverage", { note: sttLanguageNote })}
                     </Text>
                   ) : null}
                 </PickerSection>
@@ -997,19 +1038,17 @@ export function SettingsModal({
             {activeTab === "tts" ? (
               <>
                 <RadioGroup<ReplyPlayback>
-                  label="Reply Playback"
+                  label={t("replyPlayback")}
                   options={[
                     {
                       value: "stream",
-                      label: "Sentences Arrive",
-                      description:
-                        "Start speaking as soon as complete sentences are ready.",
+                      label: t("sentencesArrive"),
+                      description: t("sentencesArriveDescription"),
                     },
                     {
                       value: "wait",
-                      label: "Full Reply First",
-                      description:
-                        "Generate the entire answer first, then play it in one pass.",
+                      label: t("fullReplyFirst"),
+                      description: t("fullReplyFirstDescription"),
                     },
                   ]}
                   value={settings.replyPlayback}
@@ -1017,19 +1056,17 @@ export function SettingsModal({
                 />
 
                 <RadioGroup<VoiceBackendMode>
-                  label="Text to Speech"
+                  label={t("textToSpeech")}
                   options={[
                     {
                       value: "native",
-                      label: "App Native",
-                      description:
-                        "Use the device speech engine for spoken replies and voice preview.",
+                      label: t("appNative"),
+                      description: t("nativeTtsDescription"),
                     },
                     {
                       value: "provider",
-                      label: "Provider",
-                      description:
-                        "Use a configured provider for spoken replies and preview.",
+                      label: t("provider"),
+                      description: t("providerTtsDescription"),
                     },
                   ]}
                   value={settings.ttsMode}
@@ -1038,7 +1075,7 @@ export function SettingsModal({
 
                 <PickerSection>
                   <Picker
-                    label="TTS Provider"
+                    label={t("ttsProvider")}
                     value={settings.ttsProvider ?? ""}
                     options={renderProviderPickerOptions(enabledTtsProviders)}
                     onChange={(value) =>
@@ -1049,13 +1086,13 @@ export function SettingsModal({
                   <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
                     {settings.ttsMode === "provider"
                       ? enabledTtsProviders.length > 0
-                        ? "Only enabled providers with spoken-reply support appear here."
-                        : "Enable a provider with TTS support in the Providers tab to choose it here."
-                      : "Native TTS uses the system voice stack and does not require a provider key."}
+                        ? t("ttsProviderEnabledHint")
+                        : t("ttsProviderMissingHint")
+                      : t("nativeTtsHint")}
                   </Text>
                   {ttsLanguageNote ? (
                     <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
-                      {`Language coverage: ${ttsLanguageNote}`}
+                      {t("languageCoverage", { note: ttsLanguageNote })}
                     </Text>
                   ) : null}
                 </PickerSection>
@@ -1075,16 +1112,31 @@ export function SettingsModal({
             ) : null}
 
             {activeTab === "ui" ? (
-              <RadioGroup<ThemeMode>
-                label="Theme"
-                options={[
-                  { value: "light", label: "Light" },
-                  { value: "dark", label: "Dark" },
-                  { value: "system", label: "System" },
-                ]}
-                value={settings.theme}
-                onChange={(value) => onUpdate({ theme: value })}
-              />
+              <>
+                <RadioGroup<ThemeMode>
+                  label={t("theme")}
+                  options={[
+                    { value: "light", label: t("light") },
+                    { value: "dark", label: t("dark") },
+                    { value: "system", label: t("system") },
+                  ]}
+                  value={settings.theme}
+                  onChange={(value) => onUpdate({ theme: value })}
+                />
+                <PickerSection>
+                  <Picker
+                    label={t("language")}
+                    value={settings.language}
+                    options={[
+                      { value: "en", label: t("english") },
+                      { value: "de", label: t("german") },
+                    ]}
+                    onChange={(value) =>
+                      onUpdate({ language: value as AppLanguage })
+                    }
+                  />
+                </PickerSection>
+              </>
             ) : null}
           </ScrollView>
         </Animated.View>

@@ -4,6 +4,7 @@ import {
   type ExpoSpeechRecognitionErrorEvent,
   type ExpoSpeechRecognitionResultEvent,
 } from "expo-speech-recognition";
+import { useLocalization } from "../i18n";
 import { EMPTY_VISUAL_LEVELS, appendMeterHistory } from "../utils/audioVisualization";
 
 const MIN_RECOGNITION_DURATION_MS = 300;
@@ -21,24 +22,28 @@ function volumeToMetering(value: number) {
   return -56 + (clamped / 10) * 56;
 }
 
-function buildErrorMessage(event: ExpoSpeechRecognitionErrorEvent) {
+function buildErrorMessage(
+  event: ExpoSpeechRecognitionErrorEvent,
+  t: ReturnType<typeof useLocalization>["t"]
+) {
   switch (event.error) {
     case "not-allowed":
-      return "Speech recognition permission not granted.";
+      return t("speechRecognitionPermissionNotGranted");
     case "service-not-allowed":
-      return "Speech recognition is unavailable on this device.";
+      return t("speechRecognitionUnavailableOnDevice");
     case "language-not-supported":
-      return "Speech recognition is not available for the current device language.";
+      return t("speechRecognitionUnavailableForDeviceLanguage");
     case "network":
-      return "Native speech recognition needs network access right now.";
+      return t("nativeSpeechRecognitionNeedsNetwork");
     case "no-speech":
-      return "No speech was detected.";
+      return t("noSpeechDetected");
     default:
-      return event.message || "Native speech recognition failed.";
+      return event.message || t("nativeSpeechRecognitionFailed");
   }
 }
 
 export function useNativeSpeechRecognizer() {
+  const { t } = useLocalization();
   const [isRecording, setIsRecording] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const [meteringData, setMeteringData] = useState(-160);
@@ -119,9 +124,9 @@ export function useNativeSpeechRecognizer() {
         return;
       }
 
-      rejectPendingStop(new Error(buildErrorMessage(event)));
+      rejectPendingStop(new Error(buildErrorMessage(event, t)));
     },
-    [rejectPendingStop, resolvePendingStop]
+    [rejectPendingStop, resolvePendingStop, t]
   );
 
   useEffect(() => {
@@ -186,13 +191,13 @@ export function useNativeSpeechRecognizer() {
     }
 
     if (!ExpoSpeechRecognitionModule.isRecognitionAvailable()) {
-      throw new Error("Speech recognition is unavailable on this device.");
+      throw new Error(t("speechRecognitionUnavailableOnDevice"));
     }
 
     const permissions = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
 
     if (!permissions.granted) {
-      throw new Error("Speech recognition permission not granted.");
+      throw new Error(t("speechRecognitionPermissionNotGranted"));
     }
 
     setLastError(null);
@@ -224,9 +229,9 @@ export function useNativeSpeechRecognizer() {
       resetVisualState();
       throw error instanceof Error
         ? error
-        : new Error("Couldn't start native speech recognition.");
+        : new Error(t("couldntStartNativeSpeechRecognition"));
     }
-  }, [clearPendingResolution, resetVisualState]);
+  }, [clearPendingResolution, resetVisualState, t]);
 
   const abortRecognition = useCallback(async () => {
     if (!isRecordingRef.current) {

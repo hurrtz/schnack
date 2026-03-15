@@ -31,6 +31,7 @@ import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useNativeSpeechRecognizer } from "../hooks/useNativeSpeechRecognizer";
 import { useConversations } from "../hooks/useConversations";
+import { useLocalization } from "../i18n";
 import { runVoicePipeline } from "../services/voicePipeline";
 import { synthesizeSpeech } from "../services/tts";
 import { useTheme } from "../theme/ThemeContext";
@@ -49,6 +50,7 @@ type ViewMode = "default" | "expanded";
 
 export function MainScreen() {
   const { colors, isDark } = useTheme();
+  const { t, language } = useLocalization();
   const {
     settings,
     updateSettings,
@@ -115,13 +117,14 @@ export function MainScreen() {
     settings.sttMode === "native" ? nativeStt.waveformData : recorder.waveformData;
   const ttsStatusLabel =
     settings.ttsMode === "native"
-      ? "System voice"
+      ? t("systemVoice")
       : ttsProvider
         ? `${PROVIDER_LABELS[ttsProvider]} · ${getTtsVoiceLabel(
             ttsProvider,
-            selectedTtsVoice
+            selectedTtsVoice,
+            language
           )}`
-        : "No TTS provider";
+        : t("noTtsProvider");
   const visualPhase: VoiceVisualPhase = isRecording
     ? "recording"
     : pipelinePhase === "transcribing"
@@ -153,7 +156,7 @@ export function MainScreen() {
   const copyText = useCallback(
     async (text: string, successMessage: string) => {
       if (!text.trim()) {
-        showToast("Nothing to copy yet.");
+        showToast(t("nothingToCopyYet"));
         return;
       }
 
@@ -161,17 +164,17 @@ export function MainScreen() {
         await Clipboard.setStringAsync(text);
         showToast(successMessage);
       } catch {
-        showToast("Couldn't copy that text.");
+        showToast(t("couldntCopyText"));
       }
     },
-    [showToast]
+    [showToast, t]
   );
 
   const handleCopyMessage = useCallback(
     async (content: string) => {
-      await copyText(content.trim(), "Message copied.");
+      await copyText(content.trim(), t("messageCopied"));
     },
-    [copyText]
+    [copyText, t]
   );
 
   const handleCopyThread = useCallback(
@@ -181,16 +184,16 @@ export function MainScreen() {
         : activeConversation;
 
       if (!conversation || conversation.messages.length === 0) {
-        showToast("No conversation to copy yet.");
+        showToast(t("noConversationToCopyYet"));
         return;
       }
 
       await copyText(
-        formatConversationForCopy(conversation),
-        "Thread copied."
+        formatConversationForCopy(conversation, language),
+        t("threadCopied")
       );
     },
-    [activeConversation, copyText, getConversationById, showToast]
+    [activeConversation, copyText, getConversationById, language, showToast, t]
   );
 
   const resetExpandedDrawer = useCallback(() => {
@@ -317,12 +320,14 @@ export function MainScreen() {
 
   const ensureVoiceSessionReady = useCallback(() => {
     if (!providerApiKey) {
-      showToast(`Add your ${providerLabel} API key in Settings to use this provider.`);
+      showToast(
+        t("addProviderKeyToUseProvider", { provider: providerLabel })
+      );
       return false;
     }
 
     if (settings.sttMode === "native" && !nativeStt.isAvailable) {
-      showToast("Speech recognition is unavailable on this device.");
+      showToast(t("speechRecognitionUnavailableOnDevice"));
       return false;
     }
 
@@ -330,13 +335,13 @@ export function MainScreen() {
       settings.sttMode === "provider" &&
       (!sttProvider || !availableSttProviders.includes(sttProvider) || !sttApiKey)
     ) {
-      showToast("Choose an enabled STT provider in Settings before starting a voice session.");
+      showToast(t("chooseSttBeforeVoiceSession"));
       return false;
     }
 
     if (settings.ttsMode === "provider") {
       if (!ttsProvider || !availableTtsProviders.includes(ttsProvider) || !ttsApiKey) {
-        showToast("Choose an enabled TTS provider in Settings before using spoken replies.");
+        showToast(t("chooseTtsBeforeSpokenReplies"));
         return false;
       }
     }
@@ -350,6 +355,7 @@ export function MainScreen() {
     nativeStt.isAvailable,
     settings.sttMode,
     settings.ttsMode,
+    t,
     showToast,
     sttApiKey,
     sttProvider,
@@ -391,6 +397,7 @@ export function MainScreen() {
           assistantInstructions: settings.assistantInstructions,
           responseLength: settings.responseLength,
           responseTone: settings.responseTone,
+          language,
           abortSignal: abortRef.current!.signal,
           callbacks: {
             onTranscription: (text) => {
@@ -439,7 +446,7 @@ export function MainScreen() {
         });
 
         if (!transcription) {
-          showToast("Couldn't catch that, try again.");
+          showToast(t("couldntCatchThatTryAgain"));
         }
       } catch {
         // Errors are surfaced through the toast callback above.
@@ -462,9 +469,11 @@ export function MainScreen() {
       settings.assistantInstructions,
       settings.responseLength,
       settings.responseTone,
+      language,
       showToast,
       sttApiKey,
       sttProvider,
+      t,
       ttsApiKey,
       ttsProvider,
       updateConversationContextSummary,
@@ -498,7 +507,7 @@ export function MainScreen() {
     } catch (error) {
       recordingStartedRef.current = null;
       const message =
-        error instanceof Error ? error.message : "Couldn't start voice input.";
+        error instanceof Error ? error.message : t("couldntStartVoiceInput");
       showToast(message);
     }
   }, [
@@ -509,6 +518,7 @@ export function MainScreen() {
     recorder,
     settings.sttMode,
     showToast,
+    t,
   ]);
 
   const handlePressOut = useCallback(async () => {
@@ -536,10 +546,10 @@ export function MainScreen() {
       }
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Couldn't process voice input.";
+        error instanceof Error ? error.message : t("couldntProcessVoiceInput");
       showToast(message);
     }
-  }, [handleVoiceCaptureDone, nativeStt, recorder, settings.sttMode, showToast]);
+  }, [handleVoiceCaptureDone, nativeStt, recorder, settings.sttMode, showToast, t]);
 
   const handleTogglePress = useCallback(async () => {
     if (!isRecording && !player.isPlaying && !isBusy && !ensureVoiceSessionReady()) {
@@ -575,7 +585,7 @@ export function MainScreen() {
         }
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : "Couldn't process voice input.";
+          error instanceof Error ? error.message : t("couldntProcessVoiceInput");
         showToast(message);
       }
       return;
@@ -589,7 +599,7 @@ export function MainScreen() {
       await recorder.startRecording();
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Couldn't start voice input.";
+        error instanceof Error ? error.message : t("couldntStartVoiceInput");
       showToast(message);
     }
   }, [
@@ -602,24 +612,29 @@ export function MainScreen() {
     recorder,
     settings.sttMode,
     showToast,
+    t,
   ]);
 
   const handleProviderChange = useCallback(
     (nextProvider: Provider) => {
       if (!settings.apiKeys[nextProvider].trim()) {
-        showToast(`Add your ${PROVIDER_LABELS[nextProvider]} API key in Settings to enable it.`);
+        showToast(
+          t("addProviderKeyToEnableProvider", {
+            provider: PROVIDER_LABELS[nextProvider],
+          })
+        );
         return;
       }
 
       updateSettings({ lastProvider: nextProvider });
     },
-    [settings.apiKeys, showToast, updateSettings]
+    [settings.apiKeys, showToast, t, updateSettings]
   );
 
   const handlePreviewVoice = useCallback(
     async (text: string) => {
       if (isRecording || isBusy) {
-        showToast("Stop the active voice session before previewing a voice.");
+        showToast(t("stopSessionBeforePreview"));
         return;
       }
 
@@ -634,7 +649,7 @@ export function MainScreen() {
         }
 
         if (!ttsProvider || !ttsApiKey) {
-          showToast("Choose an enabled TTS provider in Settings to preview voices.");
+          showToast(t("chooseTtsToPreviewVoices"));
           return;
         }
 
@@ -644,11 +659,12 @@ export function MainScreen() {
           mode: settings.ttsMode,
           provider: ttsProvider,
           apiKey: ttsApiKey,
+          language,
         });
         player.enqueueAudio(audioUri);
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : "Couldn't preview voice.";
+          error instanceof Error ? error.message : t("couldntPreviewVoice");
         showToast(message);
       }
     },
@@ -659,7 +675,9 @@ export function MainScreen() {
       settings.ttsMode,
       selectedTtsVoice,
       showToast,
+      t,
       ttsApiKey,
+      language,
       ttsProvider,
     ]
   );
@@ -680,26 +698,26 @@ export function MainScreen() {
     : baseMessages;
 
   const statusEyebrow = isRecording
-      ? "Live Input"
+      ? t("liveInput")
       : pipelinePhase === "transcribing"
-        ? "Parsing Input"
+        ? t("parsingInput")
         : pipelinePhase === "thinking"
-          ? "Awaiting Model"
+          ? t("awaitingModel")
       : player.isPlaying
-        ? "Voice Output"
-        : "Control Room";
+        ? t("voiceOutput")
+        : t("controlRoom");
   const statusTitle = isRecording
-      ? "Listening to your voice"
+      ? t("listeningToYourVoice")
       : pipelinePhase === "transcribing"
-        ? "Parsing your voice input"
+        ? t("parsingYourVoiceInput")
         : pipelinePhase === "thinking"
-          ? `Waiting for ${providerLabel}`
+          ? t("waitingForProvider", { provider: providerLabel })
       : player.isPlaying
-        ? "Speaking back to you"
-        : "Ready for the next thought";
-  const sessionTitle = activeConversation?.title || "Fresh session";
+        ? t("speakingBackToYou")
+        : t("readyForNextThought");
+  const sessionTitle = activeConversation?.title || t("freshSession");
   const sessionMeta = activeConversation
-    ? `${messages.length} messages · ${providerLabel} · ${model}`
+    ? `${t("messageCount", { count: messages.length })} · ${providerLabel} · ${model}`
     : `${providerLabel} · ${model}`;
 
   const renderTopBar = (compact = false) => (
@@ -868,7 +886,7 @@ export function MainScreen() {
                     />
                   </View>
                   <Text style={[styles.providerEmptyTitle, { color: colors.text }]}>
-                    Start with Groq
+                    {t("startWithGroq")}
                   </Text>
                   <Text
                     style={[
@@ -876,9 +894,7 @@ export function MainScreen() {
                       { color: colors.textSecondary },
                     ]}
                   >
-                    Groq offers a free tier, so it is the fastest way to unlock
-                    the app. Add its API key in Settings and the provider
-                    switcher will appear here right away.
+                    {t("groqStarterDescription")}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -947,7 +963,7 @@ export function MainScreen() {
                         { color: colors.textSecondary },
                       ]}
                     >
-                      {isActive ? "Live" : "Idle"}
+                      {isActive ? t("live") : t("idle")}
                     </Text>
                   </View>
                 </View>
@@ -977,7 +993,7 @@ export function MainScreen() {
                   <Text
                     style={[styles.eyebrow, { color: colors.textSecondary }]}
                   >
-                    Conversation
+                    {t("conversation")}
                   </Text>
                   <Text style={[styles.transcriptTitle, { color: colors.text }]}>
                     {sessionTitle}
@@ -996,7 +1012,7 @@ export function MainScreen() {
                   <Text
                     style={[styles.expandButtonText, { color: colors.text }]}
                   >
-                    Open
+                    {t("open")}
                   </Text>
                   <Feather
                     name="arrow-up-right"
@@ -1023,7 +1039,7 @@ export function MainScreen() {
                   <Text
                     style={[styles.copyButtonText, { color: colors.text }]}
                   >
-                    Copy Thread
+                    {t("copyThread")}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1037,8 +1053,8 @@ export function MainScreen() {
 
               <ChatTranscript
                 messages={messages}
-                emptyTitle="No transcript yet"
-                emptyDescription="Start with the voice stage above. Your messages and the model reply will land here instantly."
+                emptyTitle={t("noTranscriptYet")}
+                emptyDescription={t("previewTranscriptEmptyDescription")}
                 contentContainerStyle={styles.previewTranscriptContent}
                 scrollEnabled={false}
                 onCopyMessage={(message) => {
@@ -1093,7 +1109,7 @@ export function MainScreen() {
             <View style={styles.expandedTranscriptHeader}>
               <View style={styles.transcriptHeaderCopy}>
                 <Text style={[styles.eyebrow, { color: colors.textSecondary }]}>
-                  Transcript
+                  {t("transcript")}
                 </Text>
                 <Text style={[styles.transcriptTitle, { color: colors.text }]}>
                   {sessionTitle}
@@ -1123,15 +1139,15 @@ export function MainScreen() {
                 <Text
                   style={[styles.copyButtonText, { color: colors.text }]}
                 >
-                  Copy Thread
+                  {t("copyThread")}
                 </Text>
               </TouchableOpacity>
             </View>
 
             <ChatTranscript
               messages={messages}
-              emptyTitle="No conversation yet"
-              emptyDescription="Speak with the control above. Pull the drawer handle down when you want to return to the main stage."
+              emptyTitle={t("noConversationYet")}
+              emptyDescription={t("expandedTranscriptEmptyDescription")}
               contentContainerStyle={styles.expandedTranscriptContent}
               onCopyMessage={(message) => {
                 void handleCopyMessage(message.content);

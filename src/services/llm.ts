@@ -1,12 +1,15 @@
 import { PROVIDER_LABELS } from "../constants/models";
 import { networkFetch } from "./networkFetch";
 import {
+  AppLanguage,
   AssistantResponseLength,
   AssistantResponseTone,
   DEFAULT_ASSISTANT_INSTRUCTIONS,
+  getDefaultAssistantInstructions,
   Message,
   Provider,
 } from "../types";
+import { translate } from "../i18n";
 
 interface StreamChatParams {
   messages: Message[];
@@ -16,6 +19,7 @@ interface StreamChatParams {
   assistantInstructions: string;
   responseLength: AssistantResponseLength;
   responseTone: AssistantResponseTone;
+  language: AppLanguage;
   conversationSummary?: string;
   onChunk: (text: string) => void;
   onDone: (fullText: string) => void;
@@ -59,10 +63,13 @@ export function buildSystemPrompt(params: {
   assistantInstructions: string;
   responseLength: AssistantResponseLength;
   responseTone: AssistantResponseTone;
+  language: AppLanguage;
   conversationSummary?: string;
 }) {
   const instructions =
-    params.assistantInstructions.trim() || DEFAULT_ASSISTANT_INSTRUCTIONS;
+    params.assistantInstructions.trim() ||
+    getDefaultAssistantInstructions(params.language) ||
+    DEFAULT_ASSISTANT_INSTRUCTIONS;
   const summary = params.conversationSummary?.trim();
 
   return [
@@ -96,9 +103,17 @@ function toAPIMessages(messages: ChatMessage[]) {
   }));
 }
 
-function requireProviderKey(provider: Provider, apiKey: string) {
+function requireProviderKey(
+  provider: Provider,
+  apiKey: string,
+  language: AppLanguage
+) {
   if (!apiKey) {
-    throw new Error(`${PROVIDER_LABELS[provider]} is not configured in Settings.`);
+    throw new Error(
+      translate(language, "providerConfiguredInSettings", {
+        provider: PROVIDER_LABELS[provider],
+      })
+    );
   }
 
   return apiKey;
@@ -139,15 +154,25 @@ async function requestOpenAICompatibleChat(params: {
   model: string;
   messages: ChatMessage[];
   apiKey: string;
+  language: AppLanguage;
   systemPrompt: string;
   abortSignal?: AbortSignal;
 }) {
-  const { endpoint, provider, model, messages, apiKey, systemPrompt, abortSignal } = params;
+  const {
+    endpoint,
+    provider,
+    model,
+    messages,
+    apiKey,
+    language,
+    systemPrompt,
+    abortSignal,
+  } = params;
   const response = await networkFetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${requireProviderKey(provider, apiKey)}`,
+      Authorization: `Bearer ${requireProviderKey(provider, apiKey, language)}`,
     },
     body: JSON.stringify({
       model,
@@ -162,7 +187,11 @@ async function requestOpenAICompatibleChat(params: {
   if (!response.ok) {
     const errText = await response.text();
     throw new Error(
-      `${PROVIDER_LABELS[provider]} API error (${response.status}): ${errText}`
+      translate(language, "apiError", {
+        provider: PROVIDER_LABELS[provider],
+        status: response.status,
+        errorText: errText,
+      })
     );
   }
 
@@ -229,6 +258,7 @@ async function requestOpenAICompatibleChatStream(params: {
   model: string;
   messages: ChatMessage[];
   apiKey: string;
+  language: AppLanguage;
   systemPrompt: string;
   onChunk: (text: string) => void;
   abortSignal?: AbortSignal;
@@ -239,6 +269,7 @@ async function requestOpenAICompatibleChatStream(params: {
     model,
     messages,
     apiKey,
+    language,
     systemPrompt,
     onChunk,
     abortSignal,
@@ -247,7 +278,7 @@ async function requestOpenAICompatibleChatStream(params: {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${requireProviderKey(provider, apiKey)}`,
+      Authorization: `Bearer ${requireProviderKey(provider, apiKey, language)}`,
     },
     body: JSON.stringify({
       model,
@@ -263,7 +294,11 @@ async function requestOpenAICompatibleChatStream(params: {
   if (!response.ok) {
     const errText = await response.text();
     throw new Error(
-      `${PROVIDER_LABELS[provider]} API error (${response.status}): ${errText}`
+      translate(language, "apiError", {
+        provider: PROVIDER_LABELS[provider],
+        status: response.status,
+        errorText: errText,
+      })
     );
   }
 
@@ -274,6 +309,7 @@ async function requestOpenAICompatibleChatStream(params: {
       model,
       messages,
       apiKey,
+      language,
       systemPrompt,
       abortSignal,
     });
@@ -312,6 +348,7 @@ async function requestAnthropicChat(params: {
   model: string;
   messages: ChatMessage[];
   apiKey: string;
+  language: AppLanguage;
   systemPrompt: string;
   abortSignal?: AbortSignal;
 }) {
@@ -320,7 +357,7 @@ async function requestAnthropicChat(params: {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": requireProviderKey("anthropic", apiKey),
+      "x-api-key": requireProviderKey("anthropic", apiKey, params.language),
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
@@ -334,7 +371,13 @@ async function requestAnthropicChat(params: {
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Anthropic API error (${response.status}): ${errText}`);
+    throw new Error(
+      translate(params.language, "apiError", {
+        provider: PROVIDER_LABELS.anthropic,
+        status: response.status,
+        errorText: errText,
+      })
+    );
   }
 
   const data = await response.json();
@@ -347,6 +390,7 @@ async function requestAnthropicChatStream(params: {
   model: string;
   messages: ChatMessage[];
   apiKey: string;
+  language: AppLanguage;
   systemPrompt: string;
   onChunk: (text: string) => void;
   abortSignal?: AbortSignal;
@@ -356,7 +400,7 @@ async function requestAnthropicChatStream(params: {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": requireProviderKey("anthropic", apiKey),
+      "x-api-key": requireProviderKey("anthropic", apiKey, params.language),
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
@@ -371,7 +415,13 @@ async function requestAnthropicChatStream(params: {
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Anthropic API error (${response.status}): ${errText}`);
+    throw new Error(
+      translate(params.language, "apiError", {
+        provider: PROVIDER_LABELS.anthropic,
+        status: response.status,
+        errorText: errText,
+      })
+    );
   }
 
   if (!response.body) {
@@ -379,6 +429,7 @@ async function requestAnthropicChatStream(params: {
       model,
       messages,
       apiKey,
+      language: params.language,
       systemPrompt,
       abortSignal,
     });
@@ -445,6 +496,7 @@ async function requestCohereChat(params: {
   model: string;
   messages: ChatMessage[];
   apiKey: string;
+  language: AppLanguage;
   systemPrompt: string;
   abortSignal?: AbortSignal;
 }) {
@@ -453,7 +505,7 @@ async function requestCohereChat(params: {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${requireProviderKey("cohere", apiKey)}`,
+      Authorization: `Bearer ${requireProviderKey("cohere", apiKey, params.language)}`,
     },
     body: JSON.stringify({
       model,
@@ -467,7 +519,13 @@ async function requestCohereChat(params: {
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Cohere API error (${response.status}): ${errText}`);
+    throw new Error(
+      translate(params.language, "apiError", {
+        provider: PROVIDER_LABELS.cohere,
+        status: response.status,
+        errorText: errText,
+      })
+    );
   }
 
   const data = await response.json();
@@ -479,6 +537,7 @@ async function requestChatText(params: {
   model: string;
   provider: Provider;
   apiKey: string;
+  language: AppLanguage;
   systemPrompt: string;
   abortSignal?: AbortSignal;
 }) {
@@ -491,6 +550,7 @@ async function requestChatText(params: {
       model: params.model,
       messages: params.messages,
       apiKey: params.apiKey,
+      language: params.language,
       systemPrompt: params.systemPrompt,
       abortSignal: params.abortSignal,
     });
@@ -502,6 +562,7 @@ async function requestChatText(params: {
         model: params.model,
         messages: params.messages,
         apiKey: params.apiKey,
+        language: params.language,
         systemPrompt: params.systemPrompt,
         abortSignal: params.abortSignal,
       });
@@ -510,11 +571,16 @@ async function requestChatText(params: {
         model: params.model,
         messages: params.messages,
         apiKey: params.apiKey,
+        language: params.language,
         systemPrompt: params.systemPrompt,
         abortSignal: params.abortSignal,
       });
     default:
-      throw new Error(`${PROVIDER_LABELS[params.provider]} is not wired up yet.`);
+      throw new Error(
+        translate(params.language, "providerNotWiredUpYet", {
+          provider: PROVIDER_LABELS[params.provider],
+        })
+      );
   }
 }
 
@@ -533,6 +599,7 @@ export async function summarizeConversationContext(params: {
   model: string;
   provider: Provider;
   apiKey: string;
+  language: AppLanguage;
   abortSignal?: AbortSignal;
 }) {
   const existingSummary = params.existingSummary?.trim() ?? "";
@@ -555,9 +622,10 @@ export async function summarizeConversationContext(params: {
 
   const summary = await requestChatText({
     provider: params.provider,
-    model: params.model,
-    apiKey: params.apiKey,
-    systemPrompt: CONTEXT_SUMMARIZER_PROMPT,
+      model: params.model,
+      apiKey: params.apiKey,
+      language: params.language,
+      systemPrompt: CONTEXT_SUMMARIZER_PROMPT,
     messages: [
       {
         role: "user",
@@ -578,6 +646,7 @@ export async function streamChat({
   assistantInstructions,
   responseLength,
   responseTone,
+  language,
   conversationSummary,
   onChunk,
   onDone,
@@ -589,6 +658,7 @@ export async function streamChat({
       assistantInstructions,
       responseLength,
       responseTone,
+      language,
       conversationSummary,
     });
     const openAICompatibleEndpoint = OPENAI_COMPATIBLE_ENDPOINTS[provider];
@@ -601,6 +671,7 @@ export async function streamChat({
         model,
         messages,
         apiKey,
+        language,
         systemPrompt,
         onChunk,
         abortSignal,
@@ -610,6 +681,7 @@ export async function streamChat({
         model,
         messages,
         apiKey,
+        language,
         systemPrompt,
         onChunk,
         abortSignal,
@@ -620,6 +692,7 @@ export async function streamChat({
         model,
         provider,
         apiKey,
+        language,
         systemPrompt,
         abortSignal,
       });

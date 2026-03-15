@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
   withDelay,
 } from "react-native-reanimated";
+import { useLocalization } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 
@@ -27,6 +28,7 @@ export function Toast({
   duration = 4000,
 }: ToastProps) {
   const { colors } = useTheme();
+  const { t } = useLocalization();
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(-20);
 
@@ -88,7 +90,9 @@ export function Toast({
           ]}
           onPress={onRetry}
         >
-          <Text style={[styles.retry, { color: colors.accent }]}>Retry</Text>
+          <Text style={[styles.retry, { color: colors.accent }]}>
+            {t("retry")}
+          </Text>
         </TouchableOpacity>
       )}
     </Animated.View>

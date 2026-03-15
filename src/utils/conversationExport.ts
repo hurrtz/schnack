@@ -1,9 +1,11 @@
 import { Conversation, Message } from "../types";
 import { PROVIDER_LABELS } from "../constants/models";
+import { AppLanguage } from "../types";
+import { translate } from "../i18n";
 
-function formatSpeakerLabel(message: Message) {
+function formatSpeakerLabel(message: Message, language: AppLanguage) {
   if (message.role === "user") {
-    return "You";
+    return translate(language, "you");
   }
 
   if (message.provider && message.model) {
@@ -18,18 +20,26 @@ function formatSpeakerLabel(message: Message) {
     return message.model;
   }
 
-  return "Assistant";
+  return translate(language, "assistant");
 }
 
-export function formatMessageForCopy(message: Message) {
-  return `${formatSpeakerLabel(message)}\n${message.content.trim()}`;
+export function formatMessageForCopy(message: Message, language: AppLanguage) {
+  return `${formatSpeakerLabel(message, language)}\n${message.content.trim()}`;
 }
 
-export function formatConversationForCopy(conversation: Conversation) {
-  const title = conversation.title.trim() || "Untitled conversation";
+export function formatConversationForCopy(
+  conversation: Conversation,
+  language: AppLanguage
+) {
+  const title = conversation.title.trim() || translate(language, "untitledConversation");
   const body = conversation.messages
-    .map((message) => formatMessageForCopy(message))
+    .map((message) => formatMessageForCopy(message, language))
     .join("\n\n");
 
-  return [`Conversation: ${title}`, body].filter(Boolean).join("\n\n");
+  return [
+    translate(language, "conversationExportHeader", { title }),
+    body,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
