@@ -16,9 +16,16 @@ interface PickerProps {
   value: string;
   options: { value: string; label: string }[];
   onChange: (value: string) => void;
+  disabled?: boolean;
 }
 
-export function Picker({ label, value, options, onChange }: PickerProps) {
+export function Picker({
+  label,
+  value,
+  options,
+  onChange,
+  disabled = false,
+}: PickerProps) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
@@ -32,19 +39,25 @@ export function Picker({ label, value, options, onChange }: PickerProps) {
         style={[
           styles.dropdown,
           {
-            backgroundColor: colors.surfaceElevated,
+            backgroundColor: disabled ? colors.surface : colors.surfaceElevated,
             borderColor: colors.border,
             shadowColor: colors.glow,
+            opacity: disabled ? 0.55 : 1,
           },
         ]}
-        onPress={() => setOpen(true)}
+        onPress={() => {
+          if (!disabled) {
+            setOpen(true);
+          }
+        }}
+        disabled={disabled}
       >
         <View style={styles.dropdownText}>
           <Text style={[styles.dropdownLabel, { color: colors.textSecondary }]}>
-            Selection
+            {disabled ? "Unavailable" : "Selection"}
           </Text>
           <Text style={[styles.dropdownValue, { color: colors.text }]}>
-            {selected?.label || value}
+            {disabled ? "Choose a compatible provider first" : selected?.label || value}
           </Text>
         </View>
         <View

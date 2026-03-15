@@ -1,19 +1,48 @@
 import { synthesizeSpeech } from "../../src/services/tts";
+
 global.fetch = jest.fn();
 
-jest.mock("../../src/config", () => ({
-  OPENAI_API_KEY: "sk-test-key",
-  ANTHROPIC_API_KEY: "sk-ant-test-key",
+jest.mock("expo-file-system/legacy", () => ({
+  cacheDirectory: "/tmp/",
+  writeAsStringAsync: jest.fn(() => Promise.resolve()),
 }));
 
-describe("synthesizeSpeech", () => {
-  beforeEach(() => { jest.clearAllMocks(); });
+class MockFileReader {
+  public result: string | ArrayBuffer | null = null;
+  public onloadend: (() => void) | null = null;
+  public onerror: (() => void) | null = null;
 
-  it("calls OpenAI TTS API and returns audio ArrayBuffer", async () => {
-    const mockArrayBuffer = new ArrayBuffer(8);
-    (fetch as jest.Mock).mockResolvedValueOnce({ ok: true, arrayBuffer: () => Promise.resolve(mockArrayBuffer) });
-    const result = await synthesizeSpeech("Hello world", "alloy");
-    expect(result).toBe(mockArrayBuffer);
+  readAsDataURL() {
+    this.result = "data:audio/mpeg;base64,ZmFrZQ==";
+    this.onloadend?.();
+  }
+}
+
+Object.defineProperty(global, "FileReader", {
+  value: MockFileReader,
+  writable: true,
+});
+
+describe("synthesizeSpeech", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("calls the configured provider TTS API and returns a cached file path", async () => {
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(["fake-audio"])),
+    });
+
+    const result = await synthesizeSpeech({
+      text: "Hello world",
+      voice: "alloy",
+      mode: "provider",
+      provider: "openai",
+      apiKey: "sk-test",
+    });
+
+    expect(result).toMatch(/^\/tmp\/tts-/);
     const [url, options] = (fetch as jest.Mock).mock.calls[0];
     expect(url).toBe("https://api.openai.com/v1/audio/speech");
     expect(options.method).toBe("POST");
@@ -23,8 +52,13 @@ describe("synthesizeSpeech", () => {
     expect(body.input).toBe("Hello world");
   });
 
-  it("throws on API error", async () => {
-    (fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 400, text: () => Promise.resolve("Bad Request") });
-    await expect(synthesizeSpeech("Test", "alloy")).rejects.toThrow();
+  it("throws when provider mode is selected without a provider", async () => {
+    await expect(
+      synthesizeSpeech({
+        text: "Test",
+        voice: "alloy",
+        mode: "provider",
+      })
+    ).rejects.toThrow("Choose a text-to-speech provider");
   });
 });

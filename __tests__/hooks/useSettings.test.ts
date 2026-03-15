@@ -58,6 +58,21 @@ describe("useSettings", () => {
     });
   });
 
+  it("migrates legacy ttsPlayback into replyPlayback", async () => {
+    const legacyStored: Record<string, unknown> = { ...DEFAULT_SETTINGS };
+    delete legacyStored.replyPlayback;
+    legacyStored.ttsPlayback = "wait";
+
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(
+      JSON.stringify(legacyStored)
+    );
+
+    const { result } = renderHook(() => useSettings());
+    await flushSettingsLoad();
+
+    expect(result.current.settings.replyPlayback).toBe("wait");
+  });
+
   it("persists settings on update", async () => {
     const { result } = renderHook(() => useSettings());
     await flushSettingsLoad();

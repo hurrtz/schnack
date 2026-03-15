@@ -7,6 +7,8 @@ import {
   AssistantResponseTone,
   Message,
   Provider,
+  ReplyPlayback,
+  VoiceBackendMode,
 } from "../types";
 
 export function splitIntoSentences(text: string): string[] {
@@ -29,6 +31,7 @@ interface PipelineCallbacks {
   onChunk: (text: string) => void;
   onResponseDone: (fullText: string) => void;
   onAudioReady: (audioUri: string) => void;
+  onSpeechTextReady: (text: string, voice?: string) => void;
   onError: (error: Error) => void;
 }
 
@@ -38,9 +41,14 @@ export async function runVoicePipeline(params: {
   model: string;
   provider: Provider;
   providerApiKey: string;
-  openAIApiKey: string;
+  sttMode: VoiceBackendMode;
+  sttProvider?: Provider | null;
+  sttApiKey?: string;
+  ttsMode: VoiceBackendMode;
+  ttsProvider?: Provider | null;
+  ttsApiKey?: string;
   ttsVoice: string;
-  ttsPlayback: "stream" | "wait";
+  replyPlayback: ReplyPlayback;
   contextSummary?: string;
   summarizedMessageCount?: number;
   assistantInstructions: string;
@@ -55,9 +63,14 @@ export async function runVoicePipeline(params: {
     model,
     provider,
     providerApiKey,
-    openAIApiKey,
+    sttMode,
+    sttProvider,
+    sttApiKey,
+    ttsMode,
+    ttsProvider,
+    ttsApiKey,
     ttsVoice,
-    ttsPlayback,
+    replyPlayback,
     contextSummary,
     summarizedMessageCount,
     assistantInstructions,
@@ -67,7 +80,12 @@ export async function runVoicePipeline(params: {
     abortSignal,
   } = params;
 
-  const transcription = await transcribeAudio(audioUri, openAIApiKey);
+  const transcription = await transcribeAudio({
+    fileUri: audioUri,
+    mode: sttMode,
+    provider: sttProvider,
+    apiKey: sttApiKey,
+  });
   if (!transcription) return null;
   callbacks.onTranscription(transcription);
   if (abortSignal?.aborted) return transcription;
@@ -129,9 +147,26 @@ export async function runVoicePipeline(params: {
   const ttsQueue: Promise<void>[] = [];
 
   const enqueueTts = (sentence: string) => {
-    const promise = synthesizeSpeech(sentence, ttsVoice, openAIApiKey)
-      .then((audio) => { if (!abortSignal?.aborted) callbacks.onAudioReady(audio); })
-      .catch(callbacks.onError);
+    const promise =
+      ttsMode === "native"
+        ? Promise.resolve().then(() => {
+            if (!abortSignal?.aborted) {
+              callbacks.onSpeechTextReady(sentence, undefined);
+            }
+          })
+        : synthesizeSpeech({
+            text: sentence,
+            voice: ttsVoice,
+            mode: ttsMode,
+            provider: ttsProvider,
+            apiKey: ttsApiKey,
+          }).then((audio) => {
+            if (!abortSignal?.aborted) {
+              callbacks.onAudioReady(audio);
+            }
+          });
+
+    promise.catch(callbacks.onError);
     ttsQueue.push(promise);
   };
 
@@ -148,7 +183,7 @@ export async function runVoicePipeline(params: {
     onChunk: (text) => {
       if (abortSignal?.aborted) return;
       callbacks.onChunk(text);
-      if (ttsPlayback === "stream") {
+      if (replyPlayback === "stream") {
         sentenceBuffer += text;
         const sentences = splitIntoSentences(sentenceBuffer);
         if (sentences.length > 1) {
@@ -160,8 +195,11 @@ export async function runVoicePipeline(params: {
     onDone: async (fullText) => {
       if (abortSignal?.aborted) return;
       callbacks.onResponseDone(fullText);
-      if (ttsPlayback === "stream") { if (sentenceBuffer.trim()) enqueueTts(sentenceBuffer); }
-      else { enqueueTts(fullText); }
+      if (replyPlayback === "stream") {
+        if (sentenceBuffer.trim()) enqueueTts(sentenceBuffer);
+      } else {
+        enqueueTts(fullText);
+      }
     },
     onError: callbacks.onError,
   });

@@ -20,7 +20,7 @@ import { Toast } from "../components/Toast";
 import { ProviderIcon } from "../components/ProviderIcon";
 import { WaveformBar } from "../components/WaveformBar";
 import { WaveformCircle } from "../components/WaveformCircle";
-import { PROVIDER_LABELS, PROVIDER_ORDER } from "../constants/models";
+import { PROVIDER_LABELS } from "../constants/models";
 import { useSharedSettings } from "../context/SettingsContext";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
@@ -30,6 +30,11 @@ import { synthesizeSpeech } from "../services/tts";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Provider, VoiceVisualPhase } from "../types";
+import {
+  getEnabledProviders,
+  getEnabledSttProviders,
+  getEnabledTtsProviders,
+} from "../utils/providerCapabilities";
 
 type ViewMode = "default" | "expanded";
 
@@ -75,11 +80,14 @@ export function MainScreen() {
 
   const provider = settings.lastProvider;
   const providerApiKey = settings.apiKeys[provider].trim();
-  const openAIApiKey = settings.apiKeys.openai.trim();
   const model = settings.providerModels[provider];
-  const availableProviders = PROVIDER_ORDER.filter(
-    (candidate) => !!settings.apiKeys[candidate].trim()
-  );
+  const availableProviders = getEnabledProviders(settings);
+  const availableSttProviders = getEnabledSttProviders(settings);
+  const availableTtsProviders = getEnabledTtsProviders(settings);
+  const sttProvider = settings.sttMode === "provider" ? settings.sttProvider : null;
+  const ttsProvider = settings.ttsMode === "provider" ? settings.ttsProvider : null;
+  const sttApiKey = sttProvider ? settings.apiKeys[sttProvider].trim() : "";
+  const ttsApiKey = ttsProvider ? settings.apiKeys[ttsProvider].trim() : "";
   const providerLabel = PROVIDER_LABELS[provider];
   const isBusy = pipelinePhase !== "idle";
   const visualPhase: VoiceVisualPhase = recorder.isRecording
@@ -174,24 +182,92 @@ export function MainScreen() {
   }, [availableProviders, loaded, provider, providerApiKey, updateSettings]);
 
   useEffect(() => {
+    if (!loaded || settings.sttMode !== "provider") {
+      return;
+    }
+
+    const nextProvider =
+      sttProvider && availableSttProviders.includes(sttProvider)
+        ? sttProvider
+        : availableSttProviders[0] ?? null;
+
+    if (nextProvider !== settings.sttProvider) {
+      updateSettings({ sttProvider: nextProvider });
+    }
+  }, [
+    availableSttProviders,
+    loaded,
+    settings.sttMode,
+    settings.sttProvider,
+    sttProvider,
+    updateSettings,
+  ]);
+
+  useEffect(() => {
+    if (!loaded || settings.ttsMode !== "provider") {
+      return;
+    }
+
+    const nextProvider =
+      ttsProvider && availableTtsProviders.includes(ttsProvider)
+        ? ttsProvider
+        : availableTtsProviders[0] ?? null;
+
+    if (nextProvider !== settings.ttsProvider) {
+      updateSettings({ ttsProvider: nextProvider });
+    }
+  }, [
+    availableTtsProviders,
+    loaded,
+    settings.ttsMode,
+    settings.ttsProvider,
+    ttsProvider,
+    updateSettings,
+  ]);
+
+  useEffect(() => {
     if (viewMode === "expanded") {
       expandedDrawerTranslateY.setValue(0);
     }
   }, [expandedDrawerTranslateY, viewMode]);
 
   const ensureVoiceSessionReady = useCallback(() => {
-    if (!openAIApiKey) {
-      showToast("Add your OpenAI API key in Settings to use voice input and playback.");
-      return false;
-    }
-
     if (!providerApiKey) {
       showToast(`Add your ${providerLabel} API key in Settings to use this provider.`);
       return false;
     }
 
+    if (settings.sttMode === "native") {
+      showToast("Native STT is planned but not wired in this build yet.");
+      return false;
+    }
+
+    if (!sttProvider || !availableSttProviders.includes(sttProvider) || !sttApiKey) {
+      showToast("Choose an enabled STT provider in Settings before starting a voice session.");
+      return false;
+    }
+
+    if (settings.ttsMode === "provider") {
+      if (!ttsProvider || !availableTtsProviders.includes(ttsProvider) || !ttsApiKey) {
+        showToast("Choose an enabled TTS provider in Settings before using spoken replies.");
+        return false;
+      }
+    }
+
     return true;
-  }, [openAIApiKey, providerApiKey, providerLabel, showToast]);
+  }, [
+    availableSttProviders,
+    availableTtsProviders,
+    providerApiKey,
+    providerLabel,
+    settings.sttMode,
+    settings.ttsMode,
+    showToast,
+    sttApiKey,
+    sttProvider,
+    ttsApiKey,
+    ttsProvider,
+  ]);
 
   const handleRecordingDone = useCallback(
     async (audioUri: string) => {
@@ -209,9 +285,14 @@ export function MainScreen() {
           model,
           provider,
           providerApiKey,
-          openAIApiKey,
+          sttMode: settings.sttMode,
+          sttProvider,
+          sttApiKey,
+          ttsMode: settings.ttsMode,
+          ttsProvider,
+          ttsApiKey,
           ttsVoice: settings.ttsVoice,
-          ttsPlayback: settings.ttsPlayback,
+          replyPlayback: settings.replyPlayback,
           assistantInstructions: settings.assistantInstructions,
           responseLength: settings.responseLength,
           responseTone: settings.responseTone,
@@ -250,6 +331,9 @@ export function MainScreen() {
             onAudioReady: (audioData) => {
               player.enqueueAudio(audioData);
             },
+            onSpeechTextReady: (text) => {
+              player.speakText(text);
+            },
             onError: (error) => {
               setPipelinePhase("idle");
               showToast(error.message, () => handleRecordingDone(audioUri));
@@ -271,16 +355,21 @@ export function MainScreen() {
       addMessage,
       createConversation,
       model,
-      openAIApiKey,
       player,
       provider,
       providerApiKey,
-      settings.ttsPlayback,
+      settings.replyPlayback,
       settings.ttsVoice,
+      settings.sttMode,
+      settings.ttsMode,
       settings.assistantInstructions,
       settings.responseLength,
       settings.responseTone,
       showToast,
+      sttApiKey,
+      sttProvider,
+      ttsApiKey,
+      ttsProvider,
       updateConversationContextSummary,
     ]
   );
@@ -358,12 +447,7 @@ export function MainScreen() {
   );
 
   const handlePreviewVoice = useCallback(
-    async (text: string, voice: string) => {
-      if (!openAIApiKey) {
-        showToast("Add your OpenAI API key in Settings to preview voices.");
-        return;
-      }
-
+    async (text: string) => {
       if (recorder.isRecording || isBusy) {
         showToast("Stop the active voice session before previewing a voice.");
         return;
@@ -374,7 +458,23 @@ export function MainScreen() {
           await player.stopPlayback();
         }
         player.resetCancellation();
-        const audioUri = await synthesizeSpeech(text, voice, openAIApiKey);
+        if (settings.ttsMode === "native") {
+          player.speakText(text);
+          return;
+        }
+
+        if (!ttsProvider || !ttsApiKey) {
+          showToast("Choose an enabled TTS provider in Settings to preview voices.");
+          return;
+        }
+
+        const audioUri = await synthesizeSpeech({
+          text,
+          voice: settings.ttsVoice,
+          mode: settings.ttsMode,
+          provider: ttsProvider,
+          apiKey: ttsApiKey,
+        });
         player.enqueueAudio(audioUri);
       } catch (error) {
         const message =
@@ -382,7 +482,16 @@ export function MainScreen() {
         showToast(message);
       }
     },
-    [isBusy, openAIApiKey, player, recorder.isRecording, showToast]
+    [
+      isBusy,
+      player,
+      recorder.isRecording,
+      settings.ttsMode,
+      settings.ttsVoice,
+      showToast,
+      ttsApiKey,
+      ttsProvider,
+    ]
   );
 
   const baseMessages = activeConversation?.messages || [];

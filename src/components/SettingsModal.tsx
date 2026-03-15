@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Linking,
   Modal,
@@ -18,6 +18,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   PROVIDER_API_KEY_HINTS,
   PROVIDER_API_KEY_PLACEHOLDERS,
@@ -32,14 +33,16 @@ import {
   AssistantResponseTone,
   InputMode,
   Provider,
+  ReplyPlayback,
   Settings,
   ThemeMode,
-  TtsPlayback,
+  VoiceBackendMode,
 } from "../types";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
-import { ProviderIcon } from "./ProviderIcon";
+import { getEnabledSttProviders, getEnabledTtsProviders } from "../utils/providerCapabilities";
 import { Picker } from "./Picker";
+import { ProviderIcon } from "./ProviderIcon";
 
 interface SettingsModalProps {
   visible: boolean;
@@ -48,9 +51,38 @@ interface SettingsModalProps {
   onUpdate: (partial: Partial<Omit<Settings, "apiKeys" | "providerModels">>) => void;
   onUpdateProviderModel: (provider: Provider, model: string) => void;
   onUpdateApiKey: (provider: Provider, apiKey: string) => void;
-  onPreviewVoice: (text: string, voice: string) => Promise<void>;
+  onPreviewVoice: (text: string) => Promise<void>;
   onClose: () => void;
 }
+
+type SettingsTab = "instructions" | "providers" | "stt" | "tts" | "ui";
+
+const TABS: SettingsTab[] = [
+  "instructions",
+  "providers",
+  "stt",
+  "tts",
+  "ui",
+];
+
+const TAB_LABELS: Record<SettingsTab, string> = {
+  instructions: "Instructions",
+  providers: "Providers",
+  stt: "STT",
+  tts: "TTS",
+  ui: "UI",
+};
+
+const TAB_DESCRIPTIONS: Partial<Record<SettingsTab, string>> = {
+  instructions:
+    "Shape the hidden guidance that steers the assistant before any provider sees the request.",
+  providers:
+    "Connect providers, store keys on-device, and decide which model each provider should use.",
+  stt:
+    "Control how speech is captured and which backend turns audio into text before it reaches the model.",
+  tts:
+    "Control when replies start speaking and which backend handles spoken output.",
+};
 
 const RESPONSE_LENGTH_OPTIONS: {
   value: AssistantResponseLength;
@@ -120,6 +152,21 @@ const RESPONSE_TONE_OPTIONS: {
   },
 ];
 
+function TabIntro({ tab }: { tab: SettingsTab }) {
+  const { colors } = useTheme();
+  const description = TAB_DESCRIPTIONS[tab];
+
+  if (!description) {
+    return null;
+  }
+
+  return (
+    <Text style={[styles.tabIntroText, { color: colors.textSecondary }]}>
+      {description}
+    </Text>
+  );
+}
+
 function RadioGroup<T extends string>({
   label,
   options,
@@ -127,7 +174,7 @@ function RadioGroup<T extends string>({
   onChange,
 }: {
   label: string;
-  options: { value: T; label: string; description?: string }[];
+  options: { value: T; label: string; description?: string; disabled?: boolean }[];
   value: T;
   onChange: (v: T) => void;
 }) {
@@ -147,13 +194,19 @@ function RadioGroup<T extends string>({
       <View style={styles.radioRow}>
         {options.map((opt) => {
           const active = value === opt.value;
+          const disabled = !!opt.disabled;
 
           return (
             <TouchableOpacity
               key={opt.value}
               style={styles.radioButtonWrap}
-              onPress={() => onChange(opt.value)}
-              activeOpacity={0.9}
+              onPress={() => {
+                if (!disabled) {
+                  onChange(opt.value);
+                }
+              }}
+              activeOpacity={disabled ? 1 : 0.9}
+              disabled={disabled}
             >
               {active ? (
                 <LinearGradient
@@ -163,7 +216,10 @@ function RadioGroup<T extends string>({
                   style={[
                     styles.radioButton,
                     styles.radioButtonActive,
-                    { shadowColor: colors.glowStrong },
+                    {
+                      shadowColor: colors.glowStrong,
+                      opacity: disabled ? 0.45 : 1,
+                    },
                   ]}
                 >
                   <Text style={[styles.radioLabel, styles.radioLabelActive]}>
@@ -177,6 +233,7 @@ function RadioGroup<T extends string>({
                     {
                       backgroundColor: colors.surface,
                       borderColor: colors.border,
+                      opacity: disabled ? 0.45 : 1,
                     },
                   ]}
                 >
@@ -195,12 +252,7 @@ function RadioGroup<T extends string>({
         })}
       </View>
       {activeOption?.description ? (
-        <Text
-          style={[
-            styles.sectionHint,
-            { color: colors.textMuted },
-          ]}
-        >
+        <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
           {activeOption.description}
         </Text>
       ) : null}
@@ -208,11 +260,7 @@ function RadioGroup<T extends string>({
   );
 }
 
-function PickerSection({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function PickerSection({ children }: { children: React.ReactNode }) {
   const { colors } = useTheme();
 
   return (
@@ -239,7 +287,7 @@ function ProviderSection({
   onUpdateApiKey: (provider: Provider, apiKey: string) => void;
 }) {
   const { colors } = useTheme();
-  const [selectedProvider, setSelectedProvider] = React.useState<Provider>(
+  const [selectedProvider, setSelectedProvider] = useState<Provider>(
     focusProvider ?? settings.lastProvider
   );
 
@@ -309,12 +357,7 @@ function ProviderSection({
         <Text style={[styles.apiKeyTitle, { color: colors.text }]}>
           {PROVIDER_LABELS[selectedProvider]}
         </Text>
-        <Text
-          style={[
-            styles.apiKeyHint,
-            { color: colors.textMuted },
-          ]}
-        >
+        <Text style={[styles.apiKeyHint, { color: colors.textMuted }]}>
           {PROVIDER_API_KEY_HINTS[selectedProvider]}
         </Text>
         <TouchableOpacity
@@ -463,6 +506,130 @@ function AssistantResponseSection({
   );
 }
 
+function TtsPreviewSection({
+  previewText,
+  setPreviewText,
+  previewLoading,
+  onPreview,
+  supportsVoicePicker,
+  settings,
+  onUpdate,
+}: {
+  previewText: string;
+  setPreviewText: (text: string) => void;
+  previewLoading: boolean;
+  onPreview: () => Promise<void>;
+  supportsVoicePicker: boolean;
+  settings: Settings;
+  onUpdate: (partial: Partial<Omit<Settings, "apiKeys" | "providerModels">>) => void;
+}) {
+  const { colors } = useTheme();
+
+  return (
+    <PickerSection>
+      {supportsVoicePicker ? (
+        <Picker
+          label="TTS Voice"
+          value={settings.ttsVoice}
+          options={TTS_VOICES.map((voice) => ({
+            value: voice,
+            label: voice.charAt(0).toUpperCase() + voice.slice(1),
+          }))}
+          onChange={(value) => onUpdate({ ttsVoice: value })}
+        />
+      ) : (
+        <View
+          style={[
+            styles.previewCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              marginTop: 0,
+              marginBottom: 8,
+            },
+          ]}
+        >
+          <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
+            Voice Selection
+          </Text>
+          <Text style={[styles.previewHint, { color: colors.textMuted, marginTop: 0 }]}>
+            Native playback uses the device voice chosen by the operating system.
+          </Text>
+        </View>
+      )}
+
+      <View
+        style={[
+          styles.previewCard,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
+          Voice Preview Text
+        </Text>
+        <TextInput
+          value={previewText}
+          onChangeText={setPreviewText}
+          multiline
+          placeholder="Type a phrase to hear this voice."
+          placeholderTextColor={colors.textMuted}
+          selectionColor={colors.accent}
+          style={[
+            styles.previewInput,
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.border,
+              color: colors.text,
+            },
+          ]}
+        />
+        <Text style={[styles.previewHint, { color: colors.textMuted }]}>
+          Uses the currently selected reply voice backend without sending
+          anything to the language model.
+        </Text>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => {
+            void onPreview();
+          }}
+          disabled={previewLoading || !previewText.trim()}
+        >
+          <LinearGradient
+            colors={[colors.accentGradientStart, colors.accentGradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.previewButton,
+              !previewText.trim() || previewLoading
+                ? styles.previewButtonDisabled
+                : null,
+            ]}
+          >
+            <Feather
+              name={previewLoading ? "loader" : "volume-2"}
+              size={16}
+              color="#F4F8FF"
+            />
+            <Text style={styles.previewButtonText}>
+              {previewLoading ? "Generating Preview..." : "Preview Voice"}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    </PickerSection>
+  );
+}
+
+function renderProviderPickerOptions(providers: Provider[]) {
+  return providers.map((provider) => ({
+    value: provider,
+    label: PROVIDER_LABELS[provider],
+  }));
+}
+
 export function SettingsModal({
   visible,
   settings,
@@ -474,32 +641,87 @@ export function SettingsModal({
   onClose,
 }: SettingsModalProps) {
   const { colors } = useTheme();
-  const [previewText, setPreviewText] = React.useState(
-    "Hallo, ich bin VoxAI."
+  const insets = useSafeAreaInsets();
+  const contentScrollRef = useRef<ScrollView>(null);
+  const [activeTab, setActiveTab] = useState<SettingsTab>("instructions");
+  const [previewText, setPreviewText] = useState("Hallo, ich bin VoxAI.");
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  const enabledSttProviders = useMemo(
+    () => getEnabledSttProviders(settings),
+    [settings]
   );
-  const [previewLoading, setPreviewLoading] = React.useState(false);
+  const enabledTtsProviders = useMemo(
+    () => getEnabledTtsProviders(settings),
+    [settings]
+  );
 
   const scale = useSharedValue(0.96);
   const translateY = useSharedValue(16);
   const opacity = useSharedValue(0);
 
   useEffect(() => {
-    if (visible) {
-      scale.value = withTiming(1, {
-        duration: 240,
-        easing: Easing.out(Easing.ease),
-      });
-      translateY.value = withTiming(0, {
-        duration: 240,
-        easing: Easing.out(Easing.ease),
-      });
-      opacity.value = withTiming(1, { duration: 220 });
-    } else {
+    if (!visible) {
       scale.value = 0.96;
       translateY.value = 16;
       opacity.value = 0;
+      return;
     }
-  }, [visible, opacity, scale, translateY]);
+
+    if (focusProvider) {
+      setActiveTab("providers");
+    }
+
+    scale.value = withTiming(1, {
+      duration: 240,
+      easing: Easing.out(Easing.ease),
+    });
+    translateY.value = withTiming(0, {
+      duration: 240,
+      easing: Easing.out(Easing.ease),
+    });
+    opacity.value = withTiming(1, { duration: 220 });
+  }, [focusProvider, opacity, scale, translateY, visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      contentScrollRef.current?.scrollTo({ y: 0, animated: false });
+    });
+  }, [activeTab, visible]);
+
+  useEffect(() => {
+    if (!visible || settings.sttMode !== "provider") {
+      return;
+    }
+
+    const nextProvider =
+      settings.sttProvider && enabledSttProviders.includes(settings.sttProvider)
+        ? settings.sttProvider
+        : enabledSttProviders[0] ?? null;
+
+    if (nextProvider !== settings.sttProvider) {
+      onUpdate({ sttProvider: nextProvider });
+    }
+  }, [enabledSttProviders, onUpdate, settings.sttMode, settings.sttProvider, visible]);
+
+  useEffect(() => {
+    if (!visible || settings.ttsMode !== "provider") {
+      return;
+    }
+
+    const nextProvider =
+      settings.ttsProvider && enabledTtsProviders.includes(settings.ttsProvider)
+        ? settings.ttsProvider
+        : enabledTtsProviders[0] ?? null;
+
+    if (nextProvider !== settings.ttsProvider) {
+      onUpdate({ ttsProvider: nextProvider });
+    }
+  }, [enabledTtsProviders, onUpdate, settings.ttsMode, settings.ttsProvider, visible]);
 
   const modalAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }, { translateY: translateY.value }],
@@ -514,15 +736,29 @@ export function SettingsModal({
 
     setPreviewLoading(true);
     try {
-      await onPreviewVoice(trimmed, settings.ttsVoice);
+      await onPreviewVoice(trimmed);
     } finally {
       setPreviewLoading(false);
     }
   };
 
+  const providerPickerDisabled =
+    settings.sttMode !== "provider" || enabledSttProviders.length === 0;
+  const ttsProviderPickerDisabled =
+    settings.ttsMode !== "provider" || enabledTtsProviders.length === 0;
+  const supportsOpenAiVoicePicker =
+    settings.ttsMode === "provider" && settings.ttsProvider === "openai";
+
   return (
     <Modal visible={visible} transparent animationType="none">
-      <View style={styles.overlay}>
+      <View
+        style={[
+          styles.overlay,
+          {
+            paddingTop: Math.max(insets.top + 10, 24),
+          },
+        ]}
+      >
         <TouchableOpacity
           style={[styles.backdrop, { backgroundColor: colors.overlay }]}
           activeOpacity={1}
@@ -540,33 +776,15 @@ export function SettingsModal({
           ]}
         >
           <LinearGradient
-            colors={[
-              colors.accentSoft,
-              "rgba(255, 255, 255, 0)",
-            ]}
+            colors={[colors.accentSoft, "rgba(255, 255, 255, 0)"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.heroGlow}
           />
 
-          <View
-            style={[
-              styles.header,
-              { borderBottomColor: colors.border },
-            ]}
-          >
+          <View style={[styles.header, { borderBottomColor: colors.border }]}>
             <View style={styles.headerCopy}>
-              <Text style={[styles.eyebrow, { color: colors.accent }]}>
-                Conversation System
-              </Text>
-              <Text style={[styles.title, { color: colors.text }]}>
-                Settings
-              </Text>
-              <Text
-                style={[styles.subtitle, { color: colors.textSecondary }]}
-              >
-                Shape how VoxAI listens, speaks, and renders the room around it.
-              </Text>
+              <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
             </View>
             <TouchableOpacity
               style={[
@@ -583,144 +801,213 @@ export function SettingsModal({
           </View>
 
           <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tabRow}
+          >
+            {TABS.map((tab) => {
+              const active = tab === activeTab;
+
+              return (
+                <TouchableOpacity
+                  key={tab}
+                  style={[
+                    styles.tabButton,
+                    {
+                      backgroundColor: active
+                        ? colors.surfaceElevated
+                        : colors.surface,
+                      borderColor: active ? colors.borderStrong : colors.border,
+                    },
+                  ]}
+                  onPress={() => setActiveTab(tab)}
+                  activeOpacity={0.85}
+                >
+                  <Text
+                    style={[
+                      styles.tabButtonText,
+                      { color: active ? colors.text : colors.textSecondary },
+                    ]}
+                  >
+                    {TAB_LABELS[tab]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          <ScrollView
+            ref={contentScrollRef}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             nestedScrollEnabled
           >
-            <RadioGroup<InputMode>
-              label="Input Mode"
-              options={[
-                {
-                  value: "push-to-talk",
-                  label: "Push to Talk",
-                  description: "Hold the main button while speaking, then release to send.",
-                },
-                {
-                  value: "toggle-to-talk",
-                  label: "Toggle to Talk",
-                  description: "Tap once to start recording and tap again when you are done.",
-                },
-              ]}
-              value={settings.inputMode}
-              onChange={(v) => onUpdate({ inputMode: v })}
-            />
+            <TabIntro tab={activeTab} />
 
-            <RadioGroup<TtsPlayback>
-              label="TTS Playback"
-              options={[
-                {
-                  value: "stream",
-                  label: "Stream",
-                  description: "Replies start speaking as soon as complete sentences are ready.",
-                },
-                {
-                  value: "wait",
-                  label: "Wait",
-                  description: "The full reply is generated first, then played back in one pass.",
-                },
-              ]}
-              value={settings.ttsPlayback}
-              onChange={(v) => onUpdate({ ttsPlayback: v })}
-            />
+            {activeTab === "instructions" ? (
+              <AssistantResponseSection settings={settings} onUpdate={onUpdate} />
+            ) : null}
 
-            <ProviderSection
-              settings={settings}
-              focusProvider={focusProvider}
-              onUpdateProviderModel={onUpdateProviderModel}
-              onUpdateApiKey={onUpdateApiKey}
-            />
-
-            <AssistantResponseSection
-              settings={settings}
-              onUpdate={onUpdate}
-            />
-
-            <PickerSection>
-              <Picker
-                label="TTS Voice"
-                value={settings.ttsVoice}
-                options={TTS_VOICES.map((v) => ({
-                  value: v,
-                  label: v.charAt(0).toUpperCase() + v.slice(1),
-                }))}
-                onChange={(v) => onUpdate({ ttsVoice: v })}
+            {activeTab === "providers" ? (
+              <ProviderSection
+                settings={settings}
+                focusProvider={focusProvider}
+                onUpdateProviderModel={onUpdateProviderModel}
+                onUpdateApiKey={onUpdateApiKey}
               />
-              <View
-                style={[
-                  styles.previewCard,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Text
-                  style={[styles.previewLabel, { color: colors.textSecondary }]}
-                >
-                  Voice Preview Text
-                </Text>
-                <TextInput
-                  value={previewText}
-                  onChangeText={setPreviewText}
-                  multiline
-                  placeholder="Type a phrase to hear this voice."
-                  placeholderTextColor={colors.textMuted}
-                  selectionColor={colors.accent}
-                  style={[
-                    styles.previewInput,
+            ) : null}
+
+            {activeTab === "stt" ? (
+              <>
+                <RadioGroup<InputMode>
+                  label="Input Mode"
+                  options={[
                     {
-                      backgroundColor: colors.surfaceElevated,
-                      borderColor: colors.border,
-                      color: colors.text,
+                      value: "push-to-talk",
+                      label: "Push to Talk",
+                      description:
+                        "Hold the main button while speaking, then release to send.",
+                    },
+                    {
+                      value: "toggle-to-talk",
+                      label: "Toggle to Talk",
+                      description:
+                        "Tap once to start recording and tap again when you are done.",
                     },
                   ]}
+                  value={settings.inputMode}
+                  onChange={(value) => onUpdate({ inputMode: value })}
                 />
-                <Text
-                  style={[styles.previewHint, { color: colors.textMuted }]}
-                >
-                  Uses the selected voice without sending anything to the model.
-                </Text>
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={handlePreviewVoice}
-                  disabled={previewLoading || !previewText.trim()}
-                >
-                  <LinearGradient
-                    colors={[colors.accentGradientStart, colors.accentGradientEnd]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={[
-                      styles.previewButton,
-                      !previewText.trim() || previewLoading
-                        ? styles.previewButtonDisabled
-                        : null,
-                    ]}
-                  >
-                    <Feather
-                      name={previewLoading ? "loader" : "volume-2"}
-                      size={16}
-                      color="#F4F8FF"
-                    />
-                    <Text style={styles.previewButtonText}>
-                      {previewLoading ? "Generating Preview..." : "Preview Voice"}
-                    </Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            </PickerSection>
 
-            <RadioGroup<ThemeMode>
-              label="Theme"
-              options={[
-                { value: "light", label: "Light" },
-                { value: "dark", label: "Dark" },
-                { value: "system", label: "System" },
-              ]}
-              value={settings.theme}
-              onChange={(v) => onUpdate({ theme: v })}
-            />
+                <RadioGroup<VoiceBackendMode>
+                  label="Speech to Text"
+                  options={[
+                    {
+                      value: "native",
+                      label: "App Native",
+                      disabled: true,
+                      description:
+                        "Native STT is planned next. Provider STT is the active route in this build.",
+                    },
+                    {
+                      value: "provider",
+                      label: "Provider",
+                      description:
+                        "Use a configured provider to transcribe your voice before it is sent to the model.",
+                    },
+                  ]}
+                  value={settings.sttMode}
+                  onChange={(value) => onUpdate({ sttMode: value })}
+                />
+
+                <PickerSection>
+                  <Picker
+                    label="STT Provider"
+                    value={settings.sttProvider ?? ""}
+                    options={renderProviderPickerOptions(enabledSttProviders)}
+                    onChange={(value) =>
+                      onUpdate({ sttProvider: value as Provider })
+                    }
+                    disabled={providerPickerDisabled}
+                  />
+                  <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+                    {settings.sttMode === "provider"
+                      ? enabledSttProviders.length > 0
+                        ? "Only enabled providers with transcription support appear here."
+                        : "Enable a provider with STT support in the Providers tab to choose it here."
+                      : "Native STT is shown in the architecture now, but it is not wired in this build yet."}
+                  </Text>
+                </PickerSection>
+              </>
+            ) : null}
+
+            {activeTab === "tts" ? (
+              <>
+                <RadioGroup<ReplyPlayback>
+                  label="Reply Playback"
+                  options={[
+                    {
+                      value: "stream",
+                      label: "Sentences Arrive",
+                      description:
+                        "Start speaking as soon as complete sentences are ready.",
+                    },
+                    {
+                      value: "wait",
+                      label: "Full Reply First",
+                      description:
+                        "Generate the entire answer first, then play it in one pass.",
+                    },
+                  ]}
+                  value={settings.replyPlayback}
+                  onChange={(value) => onUpdate({ replyPlayback: value })}
+                />
+
+                <RadioGroup<VoiceBackendMode>
+                  label="Text to Speech"
+                  options={[
+                    {
+                      value: "native",
+                      label: "App Native",
+                      description:
+                        "Use the device speech engine for spoken replies and voice preview.",
+                    },
+                    {
+                      value: "provider",
+                      label: "Provider",
+                      description:
+                        "Use a configured provider for spoken replies and preview.",
+                    },
+                  ]}
+                  value={settings.ttsMode}
+                  onChange={(value) => onUpdate({ ttsMode: value })}
+                />
+
+                <PickerSection>
+                  <Picker
+                    label="TTS Provider"
+                    value={settings.ttsProvider ?? ""}
+                    options={renderProviderPickerOptions(enabledTtsProviders)}
+                    onChange={(value) =>
+                      onUpdate({ ttsProvider: value as Provider })
+                    }
+                    disabled={ttsProviderPickerDisabled}
+                  />
+                  <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+                    {settings.ttsMode === "provider"
+                      ? enabledTtsProviders.length > 0
+                        ? "Only enabled providers with spoken-reply support appear here."
+                        : "Enable a provider with TTS support in the Providers tab to choose it here."
+                      : "Native TTS uses the system voice stack and does not require a provider key."}
+                  </Text>
+                </PickerSection>
+
+                <TtsPreviewSection
+                  previewText={previewText}
+                  setPreviewText={setPreviewText}
+                  previewLoading={previewLoading}
+                  onPreview={handlePreviewVoice}
+                  supportsVoicePicker={supportsOpenAiVoicePicker}
+                  settings={settings}
+                  onUpdate={onUpdate}
+                />
+              </>
+            ) : null}
+
+            {activeTab === "ui" ? (
+              <RadioGroup<ThemeMode>
+                label="Theme"
+                options={[
+                  { value: "light", label: "Light" },
+                  { value: "dark", label: "Dark" },
+                  { value: "system", label: "System" },
+                ]}
+                value={settings.theme}
+                onChange={(value) => onUpdate({ theme: value })}
+              />
+            ) : null}
           </ScrollView>
         </Animated.View>
       </View>
@@ -731,9 +1018,10 @@ export function SettingsModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -741,7 +1029,7 @@ const styles = StyleSheet.create({
   modal: {
     width: "100%",
     maxWidth: 460,
-    maxHeight: "86%",
+    maxHeight: "88%",
     borderRadius: 30,
     borderWidth: 1,
     overflow: "hidden",
@@ -759,7 +1047,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: 16,
     paddingHorizontal: 22,
@@ -771,21 +1059,10 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 6,
   },
-  eyebrow: {
-    fontSize: 11,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    fontFamily: fonts.mono,
-  },
   title: {
     fontSize: 28,
     lineHeight: 32,
     fontFamily: fonts.displayHeavy,
-  },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 21,
-    fontFamily: fonts.body,
   },
   closeButton: {
     width: 40,
@@ -795,14 +1072,47 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
+  tabRow: {
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 12,
+    gap: 10,
+  },
+  tabButton: {
+    minHeight: 38,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabButtonText: {
+    fontSize: 13,
+    fontFamily: fonts.display,
+  },
   content: {
-    padding: 18,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 20,
     gap: 14,
+  },
+  tabIntroText: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: fonts.body,
+    marginBottom: 2,
   },
   sectionCard: {
     borderRadius: 24,
     borderWidth: 1,
     padding: 16,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 1.1,
+    marginBottom: 12,
+    fontFamily: fonts.mono,
   },
   sectionIntro: {
     fontSize: 12,
@@ -949,13 +1259,6 @@ const styles = StyleSheet.create({
     color: "#F4F8FF",
     fontSize: 14,
     fontFamily: fonts.display,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 1.1,
-    marginBottom: 12,
-    fontFamily: fonts.mono,
   },
   radioRow: {
     flexDirection: "row",

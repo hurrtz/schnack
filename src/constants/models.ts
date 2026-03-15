@@ -12,6 +12,8 @@ export interface ProviderConfig {
   apiKeyPlaceholder: string;
   apiKeyHint: string;
   apiKeyUrl: string;
+  sttSupport: "none" | "provider";
+  ttsSupport: "none" | "provider";
   models: ModelInfo[];
 }
 
@@ -127,6 +129,8 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyPlaceholder: "sk-...",
     apiKeyHint: "Required for voice transcription, voice previews, and spoken replies.",
     apiKeyUrl: "https://platform.openai.com/settings/organization/api-keys",
+    sttSupport: "provider",
+    ttsSupport: "provider",
     models: OPENAI_MODELS,
   },
   anthropic: {
@@ -135,6 +139,8 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyPlaceholder: "sk-ant-...",
     apiKeyHint: "Unlocks Anthropic models in the main stage.",
     apiKeyUrl: "https://platform.claude.com/settings/keys",
+    sttSupport: "none",
+    ttsSupport: "none",
     models: ANTHROPIC_MODELS,
   },
   gemini: {
@@ -143,6 +149,8 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyPlaceholder: "AIza...",
     apiKeyHint: "Unlocks Gemini models through the Google API.",
     apiKeyUrl: "https://aistudio.google.com/app/apikey",
+    sttSupport: "none",
+    ttsSupport: "none",
     models: GOOGLE_MODELS,
   },
   xai: {
@@ -151,6 +159,8 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyPlaceholder: "xai-...",
     apiKeyHint: "Unlocks Grok models from xAI.",
     apiKeyUrl: "https://console.x.ai/team/default/api-keys",
+    sttSupport: "none",
+    ttsSupport: "none",
     models: XAI_MODELS,
   },
   groq: {
@@ -159,6 +169,8 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyPlaceholder: "gsk_...",
     apiKeyHint: "Groq offers a free tier and unlocks fast hosted inference models.",
     apiKeyUrl: "https://console.groq.com/keys",
+    sttSupport: "provider",
+    ttsSupport: "none",
     models: GROQ_MODELS,
   },
   deepseek: {
@@ -167,6 +179,8 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyPlaceholder: "sk-...",
     apiKeyHint: "Unlocks DeepSeek chat and reasoning models.",
     apiKeyUrl: "https://platform.deepseek.com/api_keys",
+    sttSupport: "none",
+    ttsSupport: "none",
     models: DEEPSEEK_MODELS,
   },
   mistral: {
@@ -175,6 +189,8 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyPlaceholder: "Enter API key",
     apiKeyHint: "Unlocks Mistral hosted models.",
     apiKeyUrl: "https://console.mistral.ai/api-keys",
+    sttSupport: "none",
+    ttsSupport: "none",
     models: MISTRAL_MODELS,
   },
   cohere: {
@@ -183,6 +199,8 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyPlaceholder: "Enter API key",
     apiKeyHint: "Unlocks Cohere command models.",
     apiKeyUrl: "https://dashboard.cohere.com/api-keys",
+    sttSupport: "none",
+    ttsSupport: "none",
     models: COHERE_MODELS,
   },
   together: {
@@ -191,6 +209,8 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyPlaceholder: "Enter API key",
     apiKeyHint: "Unlocks Together-hosted open models.",
     apiKeyUrl: "https://api.together.ai/settings/api-keys",
+    sttSupport: "provider",
+    ttsSupport: "none",
     models: TOGETHER_MODELS,
   },
   nvidia: {
@@ -199,6 +219,8 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyPlaceholder: "nvapi-...",
     apiKeyHint: "Unlocks NVIDIA hosted foundation models.",
     apiKeyUrl: "https://build.nvidia.com/settings/api-keys",
+    sttSupport: "none",
+    ttsSupport: "none",
     models: NVIDIA_MODELS,
   },
 };
@@ -230,6 +252,16 @@ export const PROVIDER_API_KEY_PLACEHOLDERS: Record<Provider, string> =
 export const PROVIDER_API_KEY_URLS: Record<Provider, string> = Object.fromEntries(
   PROVIDER_ORDER.map((provider) => [provider, PROVIDER_CONFIGS[provider].apiKeyUrl])
 ) as Record<Provider, string>;
+
+export const PROVIDER_STT_SUPPORT: Record<Provider, "none" | "provider"> =
+  Object.fromEntries(
+    PROVIDER_ORDER.map((provider) => [provider, PROVIDER_CONFIGS[provider].sttSupport])
+  ) as Record<Provider, "none" | "provider">;
+
+export const PROVIDER_TTS_SUPPORT: Record<Provider, "none" | "provider"> =
+  Object.fromEntries(
+    PROVIDER_ORDER.map((provider) => [provider, PROVIDER_CONFIGS[provider].ttsSupport])
+  ) as Record<Provider, "none" | "provider">;
 
 export const TTS_VOICES = [
   "alloy", "ash", "ballad", "coral", "echo", "fable",

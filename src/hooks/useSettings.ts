@@ -6,6 +6,7 @@ import {
   Provider,
   ProviderApiKeys,
   ProviderModelSelections,
+  ReplyPlayback,
   Settings,
   DEFAULT_SETTINGS,
 } from "../types";
@@ -17,6 +18,7 @@ type PublicSettings = Omit<Settings, "apiKeys">;
 type SettingsUpdate = Partial<Omit<Settings, "apiKeys" | "providerModels">>;
 
 type LegacyStoredSettings = Partial<Settings> & {
+  ttsPlayback?: ReplyPlayback;
   openaiModel?: string;
   anthropicModel?: string;
   geminiModel?: string;
@@ -76,9 +78,15 @@ function mergeSettings(
   storedSettings?: LegacyStoredSettings,
   storedApiKeys?: Partial<ProviderApiKeys>
 ): Settings {
+  const replyPlayback =
+    storedSettings?.replyPlayback ??
+    storedSettings?.ttsPlayback ??
+    DEFAULT_SETTINGS.replyPlayback;
+
   return {
     ...DEFAULT_SETTINGS,
     ...storedSettings,
+    replyPlayback,
     providerModels: {
       ...DEFAULT_SETTINGS.providerModels,
       ...extractStoredProviderModels(storedSettings),

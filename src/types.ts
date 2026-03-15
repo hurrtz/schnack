@@ -10,8 +10,10 @@ export type Provider =
   | "together"
   | "xai";
 export type InputMode = "push-to-talk" | "toggle-to-talk";
-export type TtsPlayback = "stream" | "wait";
+export type ReplyPlayback = "stream" | "wait";
+export type TtsPlayback = ReplyPlayback;
 export type ThemeMode = "light" | "dark" | "system";
+export type VoiceBackendMode = "native" | "provider";
 export type AssistantResponseLength = "brief" | "normal" | "thorough";
 export type AssistantResponseTone =
   | "professional"
@@ -31,11 +33,15 @@ export type VoiceVisualPhase =
 
 export interface Settings {
   inputMode: InputMode;
-  ttsPlayback: TtsPlayback;
+  replyPlayback: ReplyPlayback;
   providerModels: ProviderModelSelections;
   ttsVoice: string;
   theme: ThemeMode;
   lastProvider: Provider;
+  sttMode: VoiceBackendMode;
+  sttProvider: Provider | null;
+  ttsMode: VoiceBackendMode;
+  ttsProvider: Provider | null;
   assistantInstructions: string;
   responseLength: AssistantResponseLength;
   responseTone: AssistantResponseTone;
@@ -47,7 +53,7 @@ export const DEFAULT_ASSISTANT_INSTRUCTIONS =
 
 export const DEFAULT_SETTINGS: Settings = {
   inputMode: "push-to-talk",
-  ttsPlayback: "stream",
+  replyPlayback: "stream",
   providerModels: {
     openai: "gpt-5.4",
     anthropic: "claude-sonnet-4-20250514",
@@ -63,6 +69,10 @@ export const DEFAULT_SETTINGS: Settings = {
   ttsVoice: "alloy",
   theme: "system",
   lastProvider: "openai",
+  sttMode: "provider",
+  sttProvider: "openai",
+  ttsMode: "provider",
+  ttsProvider: "openai",
   assistantInstructions: DEFAULT_ASSISTANT_INSTRUCTIONS,
   responseLength: "normal",
   responseTone: "professional",
