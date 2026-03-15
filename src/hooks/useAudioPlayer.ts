@@ -205,12 +205,12 @@ export function useAudioPlayer() {
     queueRef.current = [];
     nativeQueueRef.current = [];
     player.pause();
-    player.replace(null);
     await Speech.stop();
     stopNativeMetering();
     nativeSpeakingRef.current = false;
     setNativeSpeaking(false);
     playingRef.current = false;
+    didFinishRef.current = false;
     resetVisualState();
   }, [player, resetVisualState, stopNativeMetering]);
 
@@ -222,7 +222,7 @@ export function useAudioPlayer() {
     setNativeSpeaking(false);
     playingRef.current = false;
     didFinishRef.current = false;
-    player.replace(null);
+    player.pause();
     resetVisualState();
   }, [player, resetVisualState]);
 
