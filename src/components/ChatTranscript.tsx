@@ -27,7 +27,7 @@ export function ChatTranscript({
   messages,
   onTap,
   emptyTitle = "Your conversation appears here",
-  emptyDescription = "Press and hold the voice control, then speak naturally. VoxAI will keep the thread and speak back.",
+  emptyDescription = "Press and hold the voice control, then speak naturally. schnack will keep the thread and speak back.",
   contentContainerStyle,
   scrollEnabled = true,
   onCopyMessage,

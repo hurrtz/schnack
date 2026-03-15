@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "VoxAI",
+    "name": "schnack",
     "slug": "voxai",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,7 +9,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.tobiaswinkler.app.voxai",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "VoxAI needs microphone access to record your voice for conversations."
+        "NSMicrophoneUsageDescription": "schnack needs microphone access to record your voice for conversations."
       },
       "appleTeamId": "X7H939KJR7"
     },
@@ -20,8 +20,8 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "Allow VoxAI to use the microphone for native speech input.",
-          "speechRecognitionPermission": "Allow VoxAI to transcribe your voice with the system speech recognizer."
+          "microphonePermission": "Allow schnack to use the microphone for native speech input.",
+          "speechRecognitionPermission": "Allow schnack to transcribe your voice with the system speech recognizer."
         }
       ],
       "./plugins/withBuildReactNativeFromSource"

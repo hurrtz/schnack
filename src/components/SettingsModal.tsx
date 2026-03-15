@@ -656,7 +656,7 @@ export function SettingsModal({
   const insets = useSafeAreaInsets();
   const contentScrollRef = useRef<ScrollView>(null);
   const [activeTab, setActiveTab] = useState<SettingsTab>("instructions");
-  const [previewText, setPreviewText] = useState("Hallo, ich bin VoxAI.");
+  const [previewText, setPreviewText] = useState("Hallo, ich bin schnack.");
   const [previewLoading, setPreviewLoading] = useState(false);
 
   const enabledSttProviders = useMemo(

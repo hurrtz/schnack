@@ -168,7 +168,7 @@ export function ConversationDrawer({
                 <Text
                   style={[styles.emptyDescription, { color: colors.textSecondary }]}
                 >
-                  Start speaking from the main view and VoxAI will build a session
+                  Start speaking from the main view and schnack will build a session
                   automatically.
                 </Text>
               </View>
