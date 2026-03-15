@@ -23,7 +23,7 @@ describe("streamChat", () => {
     });
     (fetch as jest.Mock).mockResolvedValueOnce({ ok: true, body: stream });
     const chunks: string[] = [];
-    await streamChat({ messages: mockMessages, model: "gpt-4o", provider: "openai", onChunk: (text) => chunks.push(text), onDone: () => {}, onError: () => {} });
+    await streamChat({ messages: mockMessages, model: "gpt-4o", provider: "openai", apiKey: "sk-test-key", assistantInstructions: "", responseLength: "normal", responseTone: "professional", onChunk: (text) => chunks.push(text), onDone: () => {}, onError: () => {} });
     expect(chunks).toEqual(["Hi"]);
     expect((fetch as jest.Mock).mock.calls[0][0]).toBe("https://api.openai.com/v1/chat/completions");
   });
@@ -39,7 +39,7 @@ describe("streamChat", () => {
     });
     (fetch as jest.Mock).mockResolvedValueOnce({ ok: true, body: stream });
     const chunks: string[] = [];
-    await streamChat({ messages: mockMessages, model: "claude-sonnet-4-6", provider: "anthropic", onChunk: (text) => chunks.push(text), onDone: () => {}, onError: () => {} });
+    await streamChat({ messages: mockMessages, model: "claude-sonnet-4-6", provider: "anthropic", apiKey: "sk-ant-test-key", assistantInstructions: "", responseLength: "normal", responseTone: "professional", onChunk: (text) => chunks.push(text), onDone: () => {}, onError: () => {} });
     expect(chunks).toEqual(["Hi"]);
     expect((fetch as jest.Mock).mock.calls[0][0]).toBe("https://api.anthropic.com/v1/messages");
   });

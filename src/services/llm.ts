@@ -169,6 +169,138 @@ async function requestOpenAICompatibleChat(params: {
   return extractOpenAICompatibleText(data.choices?.[0]?.message?.content);
 }
 
+async function readEventStream(
+  stream: ReadableStream<Uint8Array>,
+  onEvent: (event: { type: string; data: string }) => void | Promise<void>
+) {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  const flushEventBlocks = async () => {
+    let separatorMatch = buffer.match(/\r?\n\r?\n/);
+
+    while (separatorMatch && separatorMatch.index !== undefined) {
+      const separatorIndex = separatorMatch.index;
+      const separatorLength = separatorMatch[0].length;
+      const rawBlock = buffer.slice(0, separatorIndex).trim();
+      buffer = buffer.slice(separatorIndex + separatorLength);
+
+      if (rawBlock) {
+        let type = "message";
+        const dataLines: string[] = [];
+
+        for (const line of rawBlock.split(/\r?\n/)) {
+          if (line.startsWith("event:")) {
+            type = line.slice(6).trim();
+          } else if (line.startsWith("data:")) {
+            dataLines.push(line.slice(5).trimStart());
+          }
+        }
+
+        await onEvent({
+          type,
+          data: dataLines.join("\n"),
+        });
+      }
+
+      separatorMatch = buffer.match(/\r?\n\r?\n/);
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) {
+      buffer += decoder.decode();
+      await flushEventBlocks();
+      return;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    await flushEventBlocks();
+  }
+}
+
+async function requestOpenAICompatibleChatStream(params: {
+  endpoint: string;
+  provider: Provider;
+  model: string;
+  messages: ChatMessage[];
+  apiKey: string;
+  systemPrompt: string;
+  onChunk: (text: string) => void;
+  abortSignal?: AbortSignal;
+}) {
+  const {
+    endpoint,
+    provider,
+    model,
+    messages,
+    apiKey,
+    systemPrompt,
+    onChunk,
+    abortSignal,
+  } = params;
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${requireProviderKey(provider, apiKey)}`,
+    },
+    body: JSON.stringify({
+      model,
+      stream: true,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...toAPIMessages(messages),
+      ],
+    }),
+    signal: abortSignal,
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(
+      `${PROVIDER_LABELS[provider]} API error (${response.status}): ${errText}`
+    );
+  }
+
+  if (!response.body) {
+    return requestOpenAICompatibleChat({
+      endpoint,
+      provider,
+      model,
+      messages,
+      apiKey,
+      systemPrompt,
+      abortSignal,
+    });
+  }
+
+  let fullText = "";
+
+  await readEventStream(response.body, async ({ data }) => {
+    if (!data || data === "[DONE]") {
+      return;
+    }
+
+    const payload = JSON.parse(data);
+    const delta = extractOpenAICompatibleText(
+      payload.choices?.[0]?.delta?.content
+    );
+
+    if (!delta) {
+      return;
+    }
+
+    fullText += delta;
+    onChunk(delta);
+  });
+
+  return fullText;
+}
+
 async function requestAnthropicChat(params: {
   model: string;
   messages: ChatMessage[];
@@ -202,6 +334,77 @@ async function requestAnthropicChat(params: {
   return data.content
     ?.map((part: { text?: string }) => part.text || "")
     .join("") || "";
+}
+
+async function requestAnthropicChatStream(params: {
+  model: string;
+  messages: ChatMessage[];
+  apiKey: string;
+  systemPrompt: string;
+  onChunk: (text: string) => void;
+  abortSignal?: AbortSignal;
+}) {
+  const { model, messages, apiKey, systemPrompt, onChunk, abortSignal } = params;
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": requireProviderKey("anthropic", apiKey),
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 4096,
+      system: systemPrompt,
+      stream: true,
+      messages: toAPIMessages(messages),
+    }),
+    signal: abortSignal,
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Anthropic API error (${response.status}): ${errText}`);
+  }
+
+  if (!response.body) {
+    return requestAnthropicChat({
+      model,
+      messages,
+      apiKey,
+      systemPrompt,
+      abortSignal,
+    });
+  }
+
+  let fullText = "";
+
+  await readEventStream(response.body, async ({ type, data }) => {
+    if (!data) {
+      return;
+    }
+
+    if (type !== "content_block_delta") {
+      return;
+    }
+
+    const payload = JSON.parse(data);
+    const delta =
+      payload?.type === "content_block_delta" &&
+      payload?.delta?.type === "text_delta" &&
+      typeof payload.delta.text === "string"
+        ? payload.delta.text
+        : "";
+
+    if (!delta) {
+      return;
+    }
+
+    fullText += delta;
+    onChunk(delta);
+  });
+
+  return fullText;
 }
 
 function extractCohereText(content: unknown): string {
@@ -375,16 +578,44 @@ export async function streamChat({
       responseTone,
       conversationSummary,
     });
-    const fullText = await requestChatText({
-      messages,
-      model,
-      provider,
-      apiKey,
-      systemPrompt,
-      abortSignal,
-    });
+    const openAICompatibleEndpoint = OPENAI_COMPATIBLE_ENDPOINTS[provider];
+    let fullText = "";
 
-    onChunk(fullText);
+    if (openAICompatibleEndpoint) {
+      fullText = await requestOpenAICompatibleChatStream({
+        endpoint: openAICompatibleEndpoint,
+        provider,
+        model,
+        messages,
+        apiKey,
+        systemPrompt,
+        onChunk,
+        abortSignal,
+      });
+    } else if (provider === "anthropic") {
+      fullText = await requestAnthropicChatStream({
+        model,
+        messages,
+        apiKey,
+        systemPrompt,
+        onChunk,
+        abortSignal,
+      });
+    } else {
+      fullText = await requestChatText({
+        messages,
+        model,
+        provider,
+        apiKey,
+        systemPrompt,
+        abortSignal,
+      });
+
+      if (fullText) {
+        onChunk(fullText);
+      }
+    }
+
     onDone(fullText);
   } catch (error) {
     if (abortSignal?.aborted) {
