@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { PROVIDER_LABELS } from "../constants/models";
 import { useTheme } from "../theme/ThemeContext";
@@ -8,9 +8,10 @@ import { Message } from "../types";
 
 interface ChatBubbleProps {
   message: Message;
+  onCopy?: (message: Message) => void;
 }
 
-export function ChatBubble({ message }: ChatBubbleProps) {
+export function ChatBubble({ message, onCopy }: ChatBubbleProps) {
   const { colors, isDark } = useTheme();
   const isUser = message.role === "user";
   const providerLabel = message.provider
@@ -55,37 +56,43 @@ export function ChatBubble({ message }: ChatBubbleProps) {
         isUser ? styles.wrapperUser : styles.wrapperAssistant,
       ]}
     >
-      {isUser ? (
-        <LinearGradient
-          colors={[colors.accentGradientStart, colors.accentGradientEnd]}
-          start={{ x: 0.08, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[
-            styles.bubble,
-            styles.bubbleUser,
-            {
-              borderColor: "rgba(255, 255, 255, 0.14)",
-              shadowColor: colors.glowStrong,
-            },
-          ]}
-        >
-          {bubbleContent}
-        </LinearGradient>
-      ) : (
-        <View
-          style={[
-            styles.bubble,
-            styles.bubbleAssistant,
-            {
-              backgroundColor: colors.bubbleAssistant,
-              borderColor: colors.border,
-              shadowColor: isDark ? "#000000" : colors.glow,
-            },
-          ]}
-        >
-          {bubbleContent}
-        </View>
-      )}
+      <TouchableOpacity
+        activeOpacity={0.92}
+        onLongPress={onCopy ? () => onCopy(message) : undefined}
+        delayLongPress={220}
+      >
+        {isUser ? (
+          <LinearGradient
+            colors={[colors.accentGradientStart, colors.accentGradientEnd]}
+            start={{ x: 0.08, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.bubble,
+              styles.bubbleUser,
+              {
+                borderColor: "rgba(255, 255, 255, 0.14)",
+                shadowColor: colors.glowStrong,
+              },
+            ]}
+          >
+            {bubbleContent}
+          </LinearGradient>
+        ) : (
+          <View
+            style={[
+              styles.bubble,
+              styles.bubbleAssistant,
+              {
+                backgroundColor: colors.bubbleAssistant,
+                borderColor: colors.border,
+                shadowColor: isDark ? "#000000" : colors.glow,
+              },
+            ]}
+          >
+            {bubbleContent}
+          </View>
+        )}
+      </TouchableOpacity>
     </View>
   );
 }

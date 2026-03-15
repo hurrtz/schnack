@@ -20,6 +20,7 @@ interface ChatTranscriptProps {
   emptyDescription?: string;
   contentContainerStyle?: StyleProp<ViewStyle>;
   scrollEnabled?: boolean;
+  onCopyMessage?: (message: Message) => void;
 }
 
 export function ChatTranscript({
@@ -29,6 +30,7 @@ export function ChatTranscript({
   emptyDescription = "Press and hold the voice control, then speak naturally. VoxAI will keep the thread and speak back.",
   contentContainerStyle,
   scrollEnabled = true,
+  onCopyMessage,
 }: ChatTranscriptProps) {
   const { colors } = useTheme();
   const listRef = useRef<FlatList>(null);
@@ -46,7 +48,9 @@ export function ChatTranscript({
       ref={listRef}
       data={messages}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <ChatBubble message={item} />}
+      renderItem={({ item }) => (
+        <ChatBubble message={item} onCopy={onCopyMessage} />
+      )}
       contentContainerStyle={[
         styles.list,
         messages.length === 0 ? styles.listEmpty : null,

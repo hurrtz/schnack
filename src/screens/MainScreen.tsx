@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -32,6 +33,9 @@ import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Provider, VoiceVisualPhase } from "../types";
 import {
+  formatConversationForCopy,
+} from "../utils/conversationExport";
+import {
   getEnabledProviders,
   getEnabledSttProviders,
   getEnabledTtsProviders,
@@ -53,6 +57,7 @@ export function MainScreen() {
     activeConversation,
     createConversation,
     selectConversation,
+    getConversationById,
     addMessage,
     updateConversationContextSummary,
     deleteConversation,
@@ -130,6 +135,49 @@ export function MainScreen() {
       setToast({ message, onRetry });
     },
     []
+  );
+
+  const copyText = useCallback(
+    async (text: string, successMessage: string) => {
+      if (!text.trim()) {
+        showToast("Nothing to copy yet.");
+        return;
+      }
+
+      try {
+        await Clipboard.setStringAsync(text);
+        showToast(successMessage);
+      } catch {
+        showToast("Couldn't copy that text.");
+      }
+    },
+    [showToast]
+  );
+
+  const handleCopyMessage = useCallback(
+    async (content: string) => {
+      await copyText(content.trim(), "Message copied.");
+    },
+    [copyText]
+  );
+
+  const handleCopyThread = useCallback(
+    async (conversationId?: string) => {
+      const conversation = conversationId
+        ? await getConversationById(conversationId)
+        : activeConversation;
+
+      if (!conversation || conversation.messages.length === 0) {
+        showToast("No conversation to copy yet.");
+        return;
+      }
+
+      await copyText(
+        formatConversationForCopy(conversation),
+        "Thread copied."
+      );
+    },
+    [activeConversation, copyText, getConversationById, showToast]
   );
 
   const resetExpandedDrawer = useCallback(() => {
@@ -947,6 +995,28 @@ export function MainScreen() {
                 </TouchableOpacity>
               </View>
 
+              <View style={styles.transcriptHeaderActions}>
+                <TouchableOpacity
+                  style={[
+                    styles.copyButton,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    void handleCopyThread();
+                  }}
+                >
+                  <Feather name="copy" size={14} color={colors.accent} />
+                  <Text
+                    style={[styles.copyButtonText, { color: colors.text }]}
+                  >
+                    Copy Thread
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <View
                 style={[
                   styles.dragHandle,
@@ -960,6 +1030,9 @@ export function MainScreen() {
                 emptyDescription="Start with the voice stage above. Your messages and the model reply will land here instantly."
                 contentContainerStyle={styles.previewTranscriptContent}
                 scrollEnabled={false}
+                onCopyMessage={(message) => {
+                  void handleCopyMessage(message.content);
+                }}
               />
             </View>
           </ScrollView>
@@ -1023,6 +1096,25 @@ export function MainScreen() {
                   {providerLabel} · {model}
                 </Text>
               </View>
+              <TouchableOpacity
+                style={[
+                  styles.copyButton,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+                onPress={() => {
+                  void handleCopyThread();
+                }}
+              >
+                <Feather name="copy" size={14} color={colors.accent} />
+                <Text
+                  style={[styles.copyButtonText, { color: colors.text }]}
+                >
+                  Copy Thread
+                </Text>
+              </TouchableOpacity>
             </View>
 
             <ChatTranscript
@@ -1030,6 +1122,9 @@ export function MainScreen() {
               emptyTitle="No conversation yet"
               emptyDescription="Speak with the control above. Pull the drawer handle down when you want to return to the main stage."
               contentContainerStyle={styles.expandedTranscriptContent}
+              onCopyMessage={(message) => {
+                void handleCopyMessage(message.content);
+              }}
             />
           </Animated.View>
         </View>
@@ -1050,6 +1145,9 @@ export function MainScreen() {
         conversations={conversations}
         activeId={activeConversation?.id || null}
         onSelect={selectConversation}
+        onCopyThread={(id) => {
+          void handleCopyThread(id);
+        }}
         onNewSession={clearActiveConversation}
         onDelete={deleteConversation}
         onClose={() => setDrawerVisible(false)}
@@ -1318,9 +1416,27 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 14,
   },
+  transcriptHeaderActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginBottom: 10,
+  },
   transcriptHeaderCopy: {
     flex: 1,
     gap: 4,
+  },
+  copyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  copyButtonText: {
+    fontSize: 12,
+    fontFamily: fonts.display,
   },
   transcriptTitle: {
     fontSize: 20,

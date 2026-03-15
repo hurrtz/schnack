@@ -22,6 +22,7 @@ interface ConversationDrawerProps {
   conversations: ConversationMeta[];
   activeId: string | null;
   onSelect: (id: string) => void;
+  onCopyThread: (id: string) => void;
   onNewSession: () => void;
   onDelete: (id: string) => void;
   onClose: () => void;
@@ -32,6 +33,7 @@ export function ConversationDrawer({
   conversations,
   activeId,
   onSelect,
+  onCopyThread,
   onNewSession,
   onDelete,
   onClose,
@@ -253,11 +255,11 @@ export function ConversationDrawer({
                           >
                             {item.lastModel || "No model yet"}
                           </Text>
-                          <View
-                            style={[
-                              styles.statePill,
-                              {
-                                backgroundColor: active
+                        <View
+                          style={[
+                            styles.statePill,
+                            {
+                              backgroundColor: active
                                   ? colors.accentSoft
                                   : colors.surfaceAlt,
                                 borderColor: colors.border,
@@ -273,6 +275,31 @@ export function ConversationDrawer({
                               {active ? "Live" : "Saved"}
                             </Text>
                           </View>
+                          <TouchableOpacity
+                            style={[
+                              styles.copyAction,
+                              {
+                                backgroundColor: colors.surfaceAlt,
+                                borderColor: colors.border,
+                              },
+                            ]}
+                            onPress={() => onCopyThread(item.id)}
+                            activeOpacity={0.88}
+                          >
+                            <Feather
+                              name="copy"
+                              size={13}
+                              color={colors.textSecondary}
+                            />
+                            <Text
+                              style={[
+                                styles.copyActionText,
+                                { color: colors.textSecondary },
+                              ]}
+                            >
+                              Copy
+                            </Text>
+                          </TouchableOpacity>
                         </View>
                       </View>
                     </View>
@@ -467,6 +494,21 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
+  },
+  copyAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  copyActionText: {
+    fontSize: 11,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    fontFamily: fonts.mono,
   },
   stateText: {
     fontSize: 11,

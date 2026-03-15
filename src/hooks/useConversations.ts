@@ -161,6 +161,15 @@ export function useConversations() {
     }
   }, [setActiveConversationValue]);
 
+  const getConversationById = useCallback(async (id: string) => {
+    if (activeConversationRef.current?.id === id) {
+      return activeConversationRef.current;
+    }
+
+    const raw = await AsyncStorage.getItem(conversationKey(id));
+    return raw ? (JSON.parse(raw) as Conversation) : null;
+  }, []);
+
   const addMessage = useCallback((msg: Omit<Message, "id" | "timestamp">) => {
     const currentConversation = activeConversationRef.current;
 
@@ -237,6 +246,7 @@ export function useConversations() {
     activeConversation,
     createConversation,
     selectConversation,
+    getConversationById,
     addMessage,
     updateConversationContextSummary,
     deleteConversation,
