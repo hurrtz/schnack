@@ -245,6 +245,15 @@ export function MainScreen() {
     }
   }, [expandedDrawerTranslateY, viewMode]);
 
+  useEffect(() => {
+    if (!nativeStt.lastError) {
+      return;
+    }
+
+    showToast(nativeStt.lastError);
+    nativeStt.clearLastError();
+  }, [nativeStt.clearLastError, nativeStt.lastError, showToast]);
+
   const ensureVoiceSessionReady = useCallback(() => {
     if (!providerApiKey) {
       showToast(`Add your ${providerLabel} API key in Settings to use this provider.`);

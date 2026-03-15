@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Platform } from "react-native";
 import {
   ExpoSpeechRecognitionModule,
   type ExpoSpeechRecognitionErrorEvent,
@@ -41,6 +40,7 @@ function buildErrorMessage(event: ExpoSpeechRecognitionErrorEvent) {
 
 export function useNativeSpeechRecognizer() {
   const [isRecording, setIsRecording] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
   const [meteringData, setMeteringData] = useState(-160);
   const [waveformData, setWaveformData] = useState(EMPTY_VISUAL_LEVELS);
   const isRecordingRef = useRef(false);
@@ -83,7 +83,12 @@ export function useNativeSpeechRecognizer() {
       isRecordingRef.current = false;
       setIsRecording(false);
       resetVisualState();
-      reject?.(error);
+      if (reject) {
+        reject(error);
+        return;
+      }
+
+      setLastError(error.message);
     },
     [clearPendingResolution, resetVisualState]
   );
@@ -184,16 +189,13 @@ export function useNativeSpeechRecognizer() {
       throw new Error("Speech recognition is unavailable on this device.");
     }
 
-    const supportsOnDevice = ExpoSpeechRecognitionModule.supportsOnDeviceRecognition();
-    const permissions =
-      supportsOnDevice && Platform.OS === "ios"
-        ? await ExpoSpeechRecognitionModule.requestMicrophonePermissionsAsync()
-        : await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    const permissions = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
 
     if (!permissions.granted) {
       throw new Error("Speech recognition permission not granted.");
     }
 
+    setLastError(null);
     latestTranscriptRef.current = "";
     finalTranscriptRef.current = "";
     clearPendingResolution();
@@ -208,7 +210,7 @@ export function useNativeSpeechRecognizer() {
         interimResults: true,
         continuous: false,
         addsPunctuation: true,
-        requiresOnDeviceRecognition: supportsOnDevice,
+        requiresOnDeviceRecognition: false,
         iosTaskHint: "dictation",
         iosVoiceProcessingEnabled: true,
         volumeChangeEventOptions: {
@@ -263,13 +265,19 @@ export function useNativeSpeechRecognizer() {
     });
   }, [abortRecognition]);
 
+  const clearLastError = useCallback(() => {
+    setLastError(null);
+  }, []);
+
   return {
     isAvailable: ExpoSpeechRecognitionModule.isRecognitionAvailable(),
     isRecording,
+    lastError,
     meteringData,
     waveformData,
     startRecognition,
     stopRecognition,
     abortRecognition,
+    clearLastError,
   };
 }

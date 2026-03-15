@@ -888,7 +888,7 @@ export function SettingsModal({
                       value: "native",
                       label: "App Native",
                       description:
-                        "Use the system speech recognizer. VoxAI prefers on-device transcription when the device supports it.",
+                        "Use the system speech recognizer built into the device. No provider key is required.",
                     },
                     {
                       value: "provider",
@@ -916,7 +916,7 @@ export function SettingsModal({
                       ? enabledSttProviders.length > 0
                         ? "Only enabled providers with transcription support appear here."
                         : "Enable a provider with STT support in the Providers tab to choose it here."
-                      : "Native STT uses the device speech recognizer and does not require any provider key."}
+                      : "Native STT uses the device speech recognizer directly and works independently of your provider keys."}
                   </Text>
                 </PickerSection>
               </>
