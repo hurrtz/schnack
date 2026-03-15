@@ -20,10 +20,13 @@ export interface ProviderConfig {
 }
 
 export const NATIVE_STT_LANGUAGE_NOTE =
-  "Language support depends on the device OS, installed speech packs, and recognizer availability. German and English usually work well on current iOS and Android devices, but coverage and quality vary by device.";
+  "Language support depends on the device OS, installed speech packs, and recognizer availability. The exact language list varies by device.";
 
 export const NATIVE_TTS_LANGUAGE_NOTE =
-  "Language support depends on the system voices installed on the device. German and English are usually available, but pronunciation quality, voice selection, and offline availability vary by OS and device.";
+  "Language support depends on the system voices installed on the device. The exact language list, pronunciation quality, and offline availability vary by OS and device.";
+
+const WHISPER_WELL_SUPPORTED_LANGUAGES =
+  "Afrikaans, Arabic, Armenian, Azerbaijani, Belarusian, Bosnian, Bulgarian, Catalan, Chinese, Croatian, Czech, Danish, Dutch, English, Estonian, Finnish, French, Galician, German, Greek, Hebrew, Hindi, Hungarian, Icelandic, Indonesian, Italian, Japanese, Kannada, Kazakh, Korean, Latvian, Lithuanian, Macedonian, Malay, Marathi, Maori, Nepali, Norwegian, Persian, Polish, Portuguese, Romanian, Russian, Serbian, Slovak, Slovenian, Spanish, Swahili, Swedish, Tagalog, Tamil, Thai, Turkish, Ukrainian, Urdu, Vietnamese, and Welsh.";
 
 export const PROVIDER_ORDER: Provider[] = [
   "openai",
@@ -197,9 +200,9 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     sttSupport: "provider",
     ttsSupport: "provider",
     sttLanguageNote:
-      "whisper-1 is multilingual. OpenAI publishes 50+ well-supported languages, including German and English. The underlying model was trained on 98 languages overall, but accuracy drops outside OpenAI's published list.",
+      `whisper-1 is multilingual. OpenAI's published well-supported language set is: ${WHISPER_WELL_SUPPORTED_LANGUAGES}`,
     ttsLanguageNote:
-      "tts-1 supports multilingual output, so German, English, and many other languages work. OpenAI notes that the voices are optimized for English.",
+      "tts-1 supports multilingual output. OpenAI does not publish a compact well-supported language list for TTS in the same way it does for STT, and notes that the voices are optimized for English.",
     models: OPENAI_MODELS,
   },
   anthropic: {
@@ -241,7 +244,7 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     sttSupport: "provider",
     ttsSupport: "none",
     sttLanguageNote:
-      "The app uses whisper-large-v3-turbo here. Groq documents it as multilingual and suitable for German and English. If multilingual accuracy matters more than speed, Groq recommends whisper-large-v3 over the turbo variant.",
+      `The app uses whisper-large-v3-turbo here. Groq documents it as multilingual. For the Whisper family, a published well-supported language set is: ${WHISPER_WELL_SUPPORTED_LANGUAGES} If multilingual accuracy matters more than speed, Groq recommends whisper-large-v3 over the turbo variant.`,
     models: GROQ_MODELS,
   },
   deepseek: {
@@ -283,7 +286,7 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     sttSupport: "provider",
     ttsSupport: "none",
     sttLanguageNote:
-      "The current integration uses openai/whisper-large-v3. It is multilingual and accepts ISO 639-1 language hints such as de for German and en for English.",
+      `The current integration uses openai/whisper-large-v3. It is multilingual and accepts ISO 639-1 language hints. A published well-supported language set for Whisper is: ${WHISPER_WELL_SUPPORTED_LANGUAGES}`,
     models: TOGETHER_MODELS,
   },
   nvidia: {
