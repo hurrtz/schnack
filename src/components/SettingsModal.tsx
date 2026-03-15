@@ -819,6 +819,7 @@ export function SettingsModal({
           styles.overlay,
           {
             paddingTop: Math.max(insets.top + 10, 24),
+            paddingBottom: 0,
           },
         ]}
       >
@@ -901,6 +902,7 @@ export function SettingsModal({
 
           <ScrollView
             ref={contentScrollRef}
+            style={styles.contentScroll}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
@@ -1095,7 +1097,6 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingBottom: 16,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -1103,7 +1104,7 @@ const styles = StyleSheet.create({
   modal: {
     width: "100%",
     maxWidth: 460,
-    maxHeight: "88%",
+    flex: 1,
     borderRadius: 30,
     borderWidth: 1,
     overflow: "hidden",
@@ -1136,7 +1137,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     lineHeight: 32,
-    fontFamily: fonts.displayHeavy,
+    fontFamily: fonts.display,
   },
   closeButton: {
     width: 40,
@@ -1163,6 +1164,9 @@ const styles = StyleSheet.create({
   tabButtonText: {
     fontSize: 13,
     fontFamily: fonts.display,
+  },
+  contentScroll: {
+    flex: 1,
   },
   content: {
     paddingHorizontal: 18,

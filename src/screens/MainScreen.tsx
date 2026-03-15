@@ -729,16 +729,14 @@ export function MainScreen() {
           ]}
         >
           <Text style={[styles.compactBrandText, { color: colors.text }]}>
-            VOX
-          </Text>
-          <Text style={[styles.compactBrandText, { color: colors.accent }]}>
-            AI
+            Schnack
           </Text>
         </View>
       ) : (
         <View style={styles.wordmark}>
-          <Text style={[styles.wordmarkText, { color: colors.text }]}>VOX</Text>
-          <Text style={[styles.wordmarkText, { color: colors.accent }]}>AI</Text>
+          <Text style={[styles.wordmarkText, { color: colors.text }]}>
+            Schnack
+          </Text>
         </View>
       )}
 
@@ -1231,7 +1229,7 @@ const styles = StyleSheet.create({
   },
   wordmarkText: {
     fontSize: 24,
-    letterSpacing: 2.4,
+    letterSpacing: 0.8,
     fontFamily: fonts.displayHeavy,
   },
   compactBrand: {
@@ -1245,7 +1243,7 @@ const styles = StyleSheet.create({
   },
   compactBrandText: {
     fontSize: 14,
-    letterSpacing: 1.6,
+    letterSpacing: 0.6,
     fontFamily: fonts.displayHeavy,
   },
   heroCard: {

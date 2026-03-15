@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     lineHeight: 30,
-    fontFamily: fonts.displayHeavy,
+    fontFamily: fonts.display,
   },
   subtitle: {
     fontSize: 14,
