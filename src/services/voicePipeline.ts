@@ -25,6 +25,29 @@ export function splitIntoSentences(text: string): string[] {
   return result;
 }
 
+function extractCompleteSentences(text: string): {
+  completeSentences: string[];
+  remainder: string;
+} {
+  if (!text) {
+    return {
+      completeSentences: [],
+      remainder: "",
+    };
+  }
+
+  const segments = splitIntoSentences(text);
+  const endsWithSentenceBoundary = /[.!?\n]\s*$/.test(text);
+  const completeCount = endsWithSentenceBoundary
+    ? segments.length
+    : Math.max(segments.length - 1, 0);
+
+  return {
+    completeSentences: segments.slice(0, completeCount).filter((segment) => segment.trim()),
+    remainder: segments.slice(completeCount).join(""),
+  };
+}
+
 interface PipelineCallbacks {
   onTranscription: (text: string) => void;
   onContextSummary?: (summary: string, summarizedMessageCount: number) => void;
@@ -199,11 +222,11 @@ export async function runVoicePipeline(params: {
       callbacks.onChunk(text);
       if (replyPlayback === "stream") {
         sentenceBuffer += text;
-        const sentences = splitIntoSentences(sentenceBuffer);
-        if (sentences.length > 1) {
-          for (let i = 0; i < sentences.length - 1; i++) enqueueTts(sentences[i]);
-          sentenceBuffer = sentences[sentences.length - 1];
+        const { completeSentences, remainder } = extractCompleteSentences(sentenceBuffer);
+        for (const sentence of completeSentences) {
+          enqueueTts(sentence);
         }
+        sentenceBuffer = remainder;
       }
     },
     onDone: async (fullText) => {

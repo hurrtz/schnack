@@ -43,4 +43,39 @@ describe("streamChat", () => {
     expect(chunks).toEqual(["Hi"]);
     expect((fetch as jest.Mock).mock.calls[0][0]).toBe("https://api.anthropic.com/v1/messages");
   });
+
+  it("emits a chunk when openai-compatible streaming falls back to a full response", async () => {
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      body: null,
+    });
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: "Hi there.",
+            },
+          },
+        ],
+      }),
+    });
+
+    const chunks: string[] = [];
+    await streamChat({
+      messages: mockMessages,
+      model: "gpt-4o",
+      provider: "openai",
+      apiKey: "sk-test-key",
+      assistantInstructions: "",
+      responseLength: "normal",
+      responseTone: "professional",
+      onChunk: (text) => chunks.push(text),
+      onDone: () => {},
+      onError: () => {},
+    });
+
+    expect(chunks).toEqual(["Hi there."]);
+  });
 });

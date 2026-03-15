@@ -69,4 +69,54 @@ describe("runVoicePipeline", () => {
     expect(callbacks.onSpeechTextReady).toHaveBeenCalledWith("Wind is moving air.", undefined);
     expect(synthesizeSpeech).not.toHaveBeenCalled();
   });
+
+  it("speaks a completed sentence immediately in stream mode", async () => {
+    (streamChat as jest.Mock).mockImplementation(
+      async ({
+        onChunk,
+        onDone,
+      }: {
+        onChunk: (text: string) => void;
+        onDone: (text: string) => Promise<void>;
+      }) => {
+        onChunk("Wind is moving air.");
+        await Promise.resolve();
+        expect(events).toEqual(["speak:Wind is moving air."]);
+        await onDone("Wind is moving air.");
+      }
+    );
+
+    const events: string[] = [];
+    const callbacks = {
+      onTranscription: jest.fn(),
+      onChunk: jest.fn(),
+      onResponseDone: jest.fn(() => {
+        events.push("response-done");
+      }),
+      onAudioReady: jest.fn(),
+      onSpeechTextReady: jest.fn((text: string) => {
+        events.push(`speak:${text}`);
+      }),
+      onError: jest.fn(),
+    };
+
+    await runVoicePipeline({
+      transcriptionOverride: "Explain wind.",
+      messages: [],
+      model: "llama-3.3-70b-versatile",
+      provider: "groq",
+      providerApiKey: "gsk-test",
+      sttMode: "native",
+      ttsMode: "native",
+      ttsVoice: "alloy",
+      replyPlayback: "stream",
+      assistantInstructions: "You are a voice assistant.",
+      responseLength: "normal",
+      responseTone: "professional",
+      callbacks,
+    });
+
+    expect(callbacks.onSpeechTextReady).toHaveBeenCalledWith("Wind is moving air.", undefined);
+    expect(events).toEqual(["speak:Wind is moving air.", "response-done"]);
+  });
 });

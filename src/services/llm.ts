@@ -1,4 +1,5 @@
 import { PROVIDER_LABELS } from "../constants/models";
+import { networkFetch } from "./networkFetch";
 import {
   AssistantResponseLength,
   AssistantResponseTone,
@@ -142,7 +143,7 @@ async function requestOpenAICompatibleChat(params: {
   abortSignal?: AbortSignal;
 }) {
   const { endpoint, provider, model, messages, apiKey, systemPrompt, abortSignal } = params;
-  const response = await fetch(endpoint, {
+  const response = await networkFetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -242,7 +243,7 @@ async function requestOpenAICompatibleChatStream(params: {
     onChunk,
     abortSignal,
   } = params;
-  const response = await fetch(endpoint, {
+  const response = await networkFetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -267,7 +268,7 @@ async function requestOpenAICompatibleChatStream(params: {
   }
 
   if (!response.body) {
-    return requestOpenAICompatibleChat({
+    const fullText = await requestOpenAICompatibleChat({
       endpoint,
       provider,
       model,
@@ -276,6 +277,12 @@ async function requestOpenAICompatibleChatStream(params: {
       systemPrompt,
       abortSignal,
     });
+
+    if (fullText) {
+      onChunk(fullText);
+    }
+
+    return fullText;
   }
 
   let fullText = "";
@@ -309,7 +316,7 @@ async function requestAnthropicChat(params: {
   abortSignal?: AbortSignal;
 }) {
   const { model, messages, apiKey, systemPrompt, abortSignal } = params;
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await networkFetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -345,7 +352,7 @@ async function requestAnthropicChatStream(params: {
   abortSignal?: AbortSignal;
 }) {
   const { model, messages, apiKey, systemPrompt, onChunk, abortSignal } = params;
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await networkFetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -368,13 +375,19 @@ async function requestAnthropicChatStream(params: {
   }
 
   if (!response.body) {
-    return requestAnthropicChat({
+    const fullText = await requestAnthropicChat({
       model,
       messages,
       apiKey,
       systemPrompt,
       abortSignal,
     });
+
+    if (fullText) {
+      onChunk(fullText);
+    }
+
+    return fullText;
   }
 
   let fullText = "";
@@ -436,7 +449,7 @@ async function requestCohereChat(params: {
   abortSignal?: AbortSignal;
 }) {
   const { model, messages, apiKey, systemPrompt, abortSignal } = params;
-  const response = await fetch("https://api.cohere.com/v2/chat", {
+  const response = await networkFetch("https://api.cohere.com/v2/chat", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
