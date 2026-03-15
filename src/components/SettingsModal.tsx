@@ -866,8 +866,10 @@ export function SettingsModal({
 
           <ScrollView
             horizontal
+            style={styles.tabScroll}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.tabRow}
+            contentInsetAdjustmentBehavior="never"
           >
             {TABS.map((tab) => {
               const active = tab === activeTab;
@@ -1150,8 +1152,13 @@ const styles = StyleSheet.create({
   tabRow: {
     paddingHorizontal: 18,
     paddingTop: 16,
-    paddingBottom: 12,
+    paddingBottom: 14,
     gap: 10,
+    alignItems: "center",
+  },
+  tabScroll: {
+    flexGrow: 0,
+    minHeight: 68,
   },
   tabButton: {
     minHeight: 38,
