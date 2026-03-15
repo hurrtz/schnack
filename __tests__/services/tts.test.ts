@@ -70,7 +70,7 @@ describe("synthesizeSpeech", () => {
 
     const result = await synthesizeSpeech({
       text: "Hello world",
-      voice: "alloy",
+      voice: "af_alloy",
       mode: "provider",
       provider: "together",
       apiKey: "together-test",
@@ -109,7 +109,7 @@ describe("synthesizeSpeech", () => {
 
     const result = await synthesizeSpeech({
       text: "Hallo Welt",
-      voice: "nova",
+      voice: "Aoede",
       mode: "provider",
       provider: "gemini",
       apiKey: "AIza-test",
@@ -135,7 +135,7 @@ describe("synthesizeSpeech", () => {
 
     const result = await synthesizeSpeech({
       text: "Hello world",
-      voice: "verse",
+      voice: "leo",
       mode: "provider",
       provider: "xai",
       apiKey: "xai-test",

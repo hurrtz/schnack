@@ -24,6 +24,7 @@ export type AssistantResponseTone =
   | "eli5";
 export type ProviderApiKeys = Record<Provider, string>;
 export type ProviderModelSelections = Record<Provider, string>;
+export type ProviderTtsVoiceSelections = Record<Provider, string>;
 export type VoiceVisualPhase =
   | "idle"
   | "recording"
@@ -35,7 +36,7 @@ export interface Settings {
   inputMode: InputMode;
   replyPlayback: ReplyPlayback;
   providerModels: ProviderModelSelections;
-  ttsVoice: string;
+  providerTtsVoices: ProviderTtsVoiceSelections;
   theme: ThemeMode;
   lastProvider: Provider;
   sttMode: VoiceBackendMode;
@@ -66,7 +67,18 @@ export const DEFAULT_SETTINGS: Settings = {
     together: "openai/gpt-oss-20b",
     xai: "grok-4",
   },
-  ttsVoice: "alloy",
+  providerTtsVoices: {
+    openai: "alloy",
+    anthropic: "",
+    gemini: "Kore",
+    cohere: "",
+    deepseek: "",
+    groq: "",
+    mistral: "",
+    nvidia: "",
+    together: "af_alloy",
+    xai: "ara",
+  },
   theme: "system",
   lastProvider: "openai",
   sttMode: "provider",

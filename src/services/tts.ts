@@ -1,5 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
-import { PROVIDER_LABELS } from "../constants/models";
+import { PROVIDER_DEFAULT_TTS_VOICES, PROVIDER_LABELS } from "../constants/models";
 import { Provider, VoiceBackendMode } from "../types";
 import { getTogetherTtsLanguageCode } from "../utils/speechLanguage";
 
@@ -152,63 +152,6 @@ async function writeBase64AudioFile(base64: string, extension: "mp3" | "wav") {
   return path;
 }
 
-function mapVoiceForTogether(voice: string) {
-  switch (voice) {
-    case "echo":
-      return "am_echo";
-    case "nova":
-      return "af_nova";
-    case "onyx":
-      return "am_michael";
-    case "sage":
-      return "bf_emma";
-    case "shimmer":
-      return "af_bella";
-    default:
-      return "af_alloy";
-  }
-}
-
-function mapVoiceForGemini(voice: string) {
-  switch (voice) {
-    case "echo":
-      return "Puck";
-    case "fable":
-      return "Fenrir";
-    case "nova":
-      return "Aoede";
-    case "onyx":
-      return "Charon";
-    case "sage":
-      return "Sadaltager";
-    case "shimmer":
-      return "Leda";
-    default:
-      return "Kore";
-  }
-}
-
-function mapVoiceForXai(voice: string) {
-  switch (voice) {
-    case "echo":
-      return "rex";
-    case "fable":
-      return "sam";
-    case "nova":
-      return "eve";
-    case "onyx":
-      return "max";
-    case "sage":
-      return "sal";
-    case "shimmer":
-      return "zoe";
-    case "verse":
-      return "leo";
-    default:
-      return "ara";
-  }
-}
-
 function getGeminiAudioPart(data: any) {
   const parts = data?.candidates?.[0]?.content?.parts;
 
@@ -244,6 +187,9 @@ export async function synthesizeSpeech(params: {
     throw new Error(`${PROVIDER_LABELS[provider]} TTS is not supported yet.`);
   }
 
+  const selectedVoice =
+    voice || config.voiceFallback || PROVIDER_DEFAULT_TTS_VOICES[provider] || "";
+
   if (config.kind === "gemini") {
     const response = await fetch(config.endpoint, {
       method: "POST",
@@ -266,7 +212,7 @@ export async function synthesizeSpeech(params: {
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: {
-                voiceName: mapVoiceForGemini(voice || config.voiceFallback),
+                voiceName: selectedVoice,
               },
             },
           },
@@ -303,7 +249,7 @@ export async function synthesizeSpeech(params: {
     provider === "together"
       ? {
           model: config.model,
-          voice: mapVoiceForTogether(voice || config.voiceFallback),
+          voice: selectedVoice,
           input: text,
           response_format: "mp3",
           language: getTogetherTtsLanguageCode(text),
@@ -312,7 +258,8 @@ export async function synthesizeSpeech(params: {
         ? {
             model: config.model,
             text,
-            voice_id: mapVoiceForXai(voice || config.voiceFallback),
+            voice_id: selectedVoice,
+            language: "auto",
             output_format: {
               codec: "mp3",
               sample_rate: 24000,
@@ -321,7 +268,7 @@ export async function synthesizeSpeech(params: {
           }
         : {
             model: config.model,
-            voice: voice || config.voiceFallback,
+            voice: selectedVoice,
             input: text,
             response_format: "mp3",
           };

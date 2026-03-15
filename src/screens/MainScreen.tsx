@@ -21,7 +21,11 @@ import { Toast } from "../components/Toast";
 import { ProviderIcon } from "../components/ProviderIcon";
 import { WaveformBar } from "../components/WaveformBar";
 import { WaveformCircle } from "../components/WaveformCircle";
-import { PROVIDER_LABELS } from "../constants/models";
+import {
+  getTtsVoiceLabel,
+  PROVIDER_DEFAULT_TTS_VOICES,
+  PROVIDER_LABELS,
+} from "../constants/models";
 import { useSharedSettings } from "../context/SettingsContext";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
@@ -49,6 +53,7 @@ export function MainScreen() {
     settings,
     updateSettings,
     updateProviderModel,
+    updateProviderTtsVoice,
     updateApiKey,
     loaded,
   } = useSharedSettings();
@@ -95,6 +100,11 @@ export function MainScreen() {
   const ttsProvider = settings.ttsMode === "provider" ? settings.ttsProvider : null;
   const sttApiKey = sttProvider ? settings.apiKeys[sttProvider].trim() : "";
   const ttsApiKey = ttsProvider ? settings.apiKeys[ttsProvider].trim() : "";
+  const selectedTtsVoice = ttsProvider
+    ? settings.providerTtsVoices[ttsProvider] ||
+      PROVIDER_DEFAULT_TTS_VOICES[ttsProvider] ||
+      ""
+    : "";
   const providerLabel = PROVIDER_LABELS[provider];
   const isBusy = pipelinePhase !== "idle";
   const isRecording =
@@ -107,7 +117,10 @@ export function MainScreen() {
     settings.ttsMode === "native"
       ? "System voice"
       : ttsProvider
-        ? `${PROVIDER_LABELS[ttsProvider]} · ${settings.ttsVoice}`
+        ? `${PROVIDER_LABELS[ttsProvider]} · ${getTtsVoiceLabel(
+            ttsProvider,
+            selectedTtsVoice
+          )}`
         : "No TTS provider";
   const visualPhase: VoiceVisualPhase = isRecording
     ? "recording"
@@ -373,7 +386,7 @@ export function MainScreen() {
           ttsMode: settings.ttsMode,
           ttsProvider,
           ttsApiKey,
-          ttsVoice: settings.ttsVoice,
+          ttsVoice: selectedTtsVoice,
           replyPlayback: settings.replyPlayback,
           assistantInstructions: settings.assistantInstructions,
           responseLength: settings.responseLength,
@@ -443,7 +456,7 @@ export function MainScreen() {
       provider,
       providerApiKey,
       settings.replyPlayback,
-      settings.ttsVoice,
+      selectedTtsVoice,
       settings.sttMode,
       settings.ttsMode,
       settings.assistantInstructions,
@@ -627,7 +640,7 @@ export function MainScreen() {
 
         const audioUri = await synthesizeSpeech({
           text,
-          voice: settings.ttsVoice,
+          voice: selectedTtsVoice,
           mode: settings.ttsMode,
           provider: ttsProvider,
           apiKey: ttsApiKey,
@@ -644,7 +657,7 @@ export function MainScreen() {
       isRecording,
       player,
       settings.ttsMode,
-      settings.ttsVoice,
+      selectedTtsVoice,
       showToast,
       ttsApiKey,
       ttsProvider,
@@ -1136,6 +1149,7 @@ export function MainScreen() {
         focusProvider={settingsFocusProvider}
         onUpdate={updateSettings}
         onUpdateProviderModel={updateProviderModel}
+        onUpdateProviderTtsVoice={updateProviderTtsVoice}
         onUpdateApiKey={updateApiKey}
         onPreviewVoice={handlePreviewVoice}
         onClose={closeSettings}

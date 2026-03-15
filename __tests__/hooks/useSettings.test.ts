@@ -62,6 +62,8 @@ describe("useSettings", () => {
     const legacyStored: Record<string, unknown> = { ...DEFAULT_SETTINGS };
     delete legacyStored.replyPlayback;
     legacyStored.ttsPlayback = "wait";
+    delete legacyStored.providerTtsVoices;
+    legacyStored.ttsVoice = "shimmer";
 
     (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(
       JSON.stringify(legacyStored)
@@ -71,6 +73,10 @@ describe("useSettings", () => {
     await flushSettingsLoad();
 
     expect(result.current.settings.replyPlayback).toBe("wait");
+    expect(result.current.settings.providerTtsVoices.openai).toBe("shimmer");
+    expect(result.current.settings.providerTtsVoices.gemini).toBe(
+      DEFAULT_SETTINGS.providerTtsVoices.gemini
+    );
   });
 
   it("persists settings on update", async () => {
@@ -96,6 +102,21 @@ describe("useSettings", () => {
       expect.stringContaining('"groq":"openai/gpt-oss-120b"')
     );
     expect(result.current.settings.providerModels.groq).toBe("openai/gpt-oss-120b");
+  });
+
+  it("persists provider TTS voice selections", async () => {
+    const { result } = renderHook(() => useSettings());
+    await flushSettingsLoad();
+
+    await act(async () => {
+      result.current.updateProviderTtsVoice("gemini", "Aoede");
+    });
+
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      "@voxai/settings",
+      expect.stringContaining('"gemini":"Aoede"')
+    );
+    expect(result.current.settings.providerTtsVoices.gemini).toBe("Aoede");
   });
 
   it("persists provider api keys in SecureStore", async () => {

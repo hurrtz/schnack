@@ -6,6 +6,7 @@ import {
   Provider,
   ProviderApiKeys,
   ProviderModelSelections,
+  ProviderTtsVoiceSelections,
   ReplyPlayback,
   Settings,
   DEFAULT_SETTINGS,
@@ -19,6 +20,7 @@ type SettingsUpdate = Partial<Omit<Settings, "apiKeys" | "providerModels">>;
 
 type LegacyStoredSettings = Partial<Settings> & {
   ttsPlayback?: ReplyPlayback;
+  ttsVoice?: string;
   openaiModel?: string;
   anthropicModel?: string;
   geminiModel?: string;
@@ -74,6 +76,38 @@ function extractStoredProviderModels(
   }, {} as Partial<ProviderModelSelections>);
 }
 
+function extractStoredProviderTtsVoices(
+  storedSettings?: LegacyStoredSettings
+): Partial<ProviderTtsVoiceSelections> {
+  if (!storedSettings) {
+    return {};
+  }
+
+  const storedProviderVoices =
+    (storedSettings.providerTtsVoices as Partial<ProviderTtsVoiceSelections> | undefined) ??
+    {};
+  const legacyTtsVoice =
+    typeof storedSettings.ttsVoice === "string" && storedSettings.ttsVoice
+      ? storedSettings.ttsVoice
+      : undefined;
+
+  return PROVIDER_ORDER.reduce((accumulator, provider) => {
+    const providerVoice = storedProviderVoices[provider];
+    const value =
+      typeof providerVoice === "string" && providerVoice
+        ? providerVoice
+        : provider === "openai" && legacyTtsVoice
+          ? legacyTtsVoice
+          : undefined;
+
+    if (value) {
+      accumulator[provider] = value;
+    }
+
+    return accumulator;
+  }, {} as Partial<ProviderTtsVoiceSelections>);
+}
+
 function mergeSettings(
   storedSettings?: LegacyStoredSettings,
   storedApiKeys?: Partial<ProviderApiKeys>
@@ -90,6 +124,10 @@ function mergeSettings(
     providerModels: {
       ...DEFAULT_SETTINGS.providerModels,
       ...extractStoredProviderModels(storedSettings),
+    },
+    providerTtsVoices: {
+      ...DEFAULT_SETTINGS.providerTtsVoices,
+      ...extractStoredProviderTtsVoices(storedSettings),
     },
     apiKeys: {
       ...DEFAULT_SETTINGS.apiKeys,
@@ -180,6 +218,20 @@ export function useSettings() {
     });
   }, []);
 
+  const updateProviderTtsVoice = useCallback((provider: Provider, value: string) => {
+    setSettings((prev) => {
+      const next = {
+        ...prev,
+        providerTtsVoices: {
+          ...prev.providerTtsVoices,
+          [provider]: value,
+        },
+      };
+      void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toPublicSettings(next)));
+      return next;
+    });
+  }, []);
+
   const updateApiKey = useCallback((provider: Provider, value: string) => {
     const nextValue = value.trim();
 
@@ -194,5 +246,12 @@ export function useSettings() {
     void persistApiKey(provider, nextValue);
   }, []);
 
-  return { settings, updateSettings, updateProviderModel, updateApiKey, loaded };
+  return {
+    settings,
+    updateSettings,
+    updateProviderModel,
+    updateProviderTtsVoice,
+    updateApiKey,
+    loaded,
+  };
 }

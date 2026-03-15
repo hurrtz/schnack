@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   NATIVE_STT_LANGUAGE_NOTE,
   NATIVE_TTS_LANGUAGE_NOTE,
+  PROVIDER_DEFAULT_TTS_VOICES,
   PROVIDER_API_KEY_HINTS,
   PROVIDER_API_KEY_PLACEHOLDERS,
   PROVIDER_API_KEY_URLS,
@@ -30,7 +31,7 @@ import {
   PROVIDER_ORDER,
   PROVIDER_STT_LANGUAGE_NOTES,
   PROVIDER_TTS_LANGUAGE_NOTES,
-  TTS_VOICES,
+  PROVIDER_TTS_VOICE_OPTIONS,
 } from "../constants/models";
 import {
   AssistantResponseLength,
@@ -54,6 +55,7 @@ interface SettingsModalProps {
   focusProvider?: Provider;
   onUpdate: (partial: Partial<Omit<Settings, "apiKeys" | "providerModels">>) => void;
   onUpdateProviderModel: (provider: Provider, model: string) => void;
+  onUpdateProviderTtsVoice: (provider: Provider, voice: string) => void;
   onUpdateApiKey: (provider: Provider, apiKey: string) => void;
   onPreviewVoice: (text: string) => Promise<void>;
   onClose: () => void;
@@ -515,31 +517,34 @@ function TtsPreviewSection({
   setPreviewText,
   previewLoading,
   onPreview,
-  supportsVoicePicker,
+  ttsProvider,
+  voiceOptions,
+  selectedVoice,
   settings,
-  onUpdate,
+  onUpdateProviderTtsVoice,
 }: {
   previewText: string;
   setPreviewText: (text: string) => void;
   previewLoading: boolean;
   onPreview: () => Promise<void>;
-  supportsVoicePicker: boolean;
+  ttsProvider: Provider | null;
+  voiceOptions: { value: string; label: string }[];
+  selectedVoice: string;
   settings: Settings;
-  onUpdate: (partial: Partial<Omit<Settings, "apiKeys" | "providerModels">>) => void;
+  onUpdateProviderTtsVoice: (provider: Provider, voice: string) => void;
 }) {
   const { colors } = useTheme();
+  const canPickProviderVoice =
+    settings.ttsMode === "provider" && !!ttsProvider && voiceOptions.length > 0;
 
   return (
     <PickerSection>
-      {supportsVoicePicker ? (
+      {canPickProviderVoice ? (
         <Picker
           label="TTS Voice"
-          value={settings.ttsVoice}
-          options={TTS_VOICES.map((voice) => ({
-            value: voice,
-            label: voice.charAt(0).toUpperCase() + voice.slice(1),
-          }))}
-          onChange={(value) => onUpdate({ ttsVoice: value })}
+          value={selectedVoice}
+          options={voiceOptions}
+          onChange={(value) => onUpdateProviderTtsVoice(ttsProvider!, value)}
         />
       ) : (
         <View
@@ -557,7 +562,9 @@ function TtsPreviewSection({
             Voice Selection
           </Text>
           <Text style={[styles.previewHint, { color: colors.textMuted, marginTop: 0 }]}>
-            Native playback uses the device voice chosen by the operating system.
+            {settings.ttsMode === "native"
+              ? "Native playback uses the device voice chosen by the operating system."
+              : "This provider currently uses its default voice for preview and spoken replies."}
           </Text>
         </View>
       )}
@@ -640,6 +647,7 @@ export function SettingsModal({
   focusProvider,
   onUpdate,
   onUpdateProviderModel,
+  onUpdateProviderTtsVoice,
   onUpdateApiKey,
   onPreviewVoice,
   onClose,
@@ -727,6 +735,33 @@ export function SettingsModal({
     }
   }, [enabledTtsProviders, onUpdate, settings.ttsMode, settings.ttsProvider, visible]);
 
+  useEffect(() => {
+    if (!visible || settings.ttsMode !== "provider" || !settings.ttsProvider) {
+      return;
+    }
+
+    const provider = settings.ttsProvider;
+    const supportedVoices = PROVIDER_TTS_VOICE_OPTIONS[provider];
+    const defaultVoice = PROVIDER_DEFAULT_TTS_VOICES[provider];
+
+    if (!supportedVoices?.length || !defaultVoice) {
+      return;
+    }
+
+    const currentVoice = settings.providerTtsVoices[provider];
+    const isValid = supportedVoices.some((voice) => voice.id === currentVoice);
+
+    if (!isValid) {
+      onUpdateProviderTtsVoice(provider, defaultVoice);
+    }
+  }, [
+    onUpdateProviderTtsVoice,
+    settings.providerTtsVoices,
+    settings.ttsMode,
+    settings.ttsProvider,
+    visible,
+  ]);
+
   const modalAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }, { translateY: translateY.value }],
     opacity: opacity.value,
@@ -750,8 +785,6 @@ export function SettingsModal({
     settings.sttMode !== "provider" || enabledSttProviders.length === 0;
   const ttsProviderPickerDisabled =
     settings.ttsMode !== "provider" || enabledTtsProviders.length === 0;
-  const supportsOpenAiVoicePicker =
-    settings.ttsMode === "provider" && settings.ttsProvider === "openai";
   const sttLanguageNote =
     settings.sttMode === "native"
       ? NATIVE_STT_LANGUAGE_NOTE
@@ -764,6 +797,20 @@ export function SettingsModal({
       : settings.ttsProvider
         ? PROVIDER_TTS_LANGUAGE_NOTES[settings.ttsProvider] ?? null
         : null;
+  const currentTtsProvider =
+    settings.ttsMode === "provider" ? settings.ttsProvider : null;
+  const ttsVoiceOptions = currentTtsProvider
+    ? (PROVIDER_TTS_VOICE_OPTIONS[currentTtsProvider] ?? []).map((voice) => ({
+        value: voice.id,
+        label: voice.label,
+      }))
+    : [];
+  const selectedTtsVoice =
+    currentTtsProvider && settings.providerTtsVoices[currentTtsProvider]
+      ? settings.providerTtsVoices[currentTtsProvider]
+      : currentTtsProvider
+        ? PROVIDER_DEFAULT_TTS_VOICES[currentTtsProvider] ?? ""
+        : "";
 
   return (
     <Modal visible={visible} transparent animationType="none">
@@ -1014,9 +1061,11 @@ export function SettingsModal({
                   setPreviewText={setPreviewText}
                   previewLoading={previewLoading}
                   onPreview={handlePreviewVoice}
-                  supportsVoicePicker={supportsOpenAiVoicePicker}
+                  ttsProvider={currentTtsProvider}
+                  voiceOptions={ttsVoiceOptions}
+                  selectedVoice={selectedTtsVoice}
                   settings={settings}
-                  onUpdate={onUpdate}
+                  onUpdateProviderTtsVoice={onUpdateProviderTtsVoice}
                 />
               </>
             ) : null}

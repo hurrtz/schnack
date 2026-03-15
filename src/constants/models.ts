@@ -6,6 +6,11 @@ export interface ModelInfo {
   releaseDate?: string;
 }
 
+export interface TtsVoiceOption {
+  id: string;
+  label: string;
+}
+
 export interface ProviderConfig {
   label: string;
   shortLabel: string;
@@ -367,9 +372,97 @@ export const PROVIDER_TTS_LANGUAGE_NOTES: Partial<Record<Provider, string>> =
     )
   ) as Partial<Record<Provider, string>>;
 
-export const TTS_VOICES = [
-  "alloy", "ash", "ballad", "coral", "echo", "fable",
-  "onyx", "nova", "sage", "shimmer", "verse",
-] as const;
+export const OPENAI_TTS_VOICES: TtsVoiceOption[] = [
+  { id: "alloy", label: "Alloy" },
+  { id: "ash", label: "Ash" },
+  { id: "ballad", label: "Ballad" },
+  { id: "coral", label: "Coral" },
+  { id: "echo", label: "Echo" },
+  { id: "fable", label: "Fable" },
+  { id: "onyx", label: "Onyx" },
+  { id: "nova", label: "Nova" },
+  { id: "sage", label: "Sage" },
+  { id: "shimmer", label: "Shimmer" },
+  { id: "verse", label: "Verse" },
+];
 
-export type TtsVoice = (typeof TTS_VOICES)[number];
+export const GEMINI_TTS_VOICES: TtsVoiceOption[] = [
+  { id: "Zephyr", label: "Zephyr · Bright" },
+  { id: "Puck", label: "Puck · Upbeat" },
+  { id: "Charon", label: "Charon · Informative" },
+  { id: "Kore", label: "Kore · Firm" },
+  { id: "Fenrir", label: "Fenrir · Excitable" },
+  { id: "Leda", label: "Leda · Youthful" },
+  { id: "Orus", label: "Orus · Firm" },
+  { id: "Aoede", label: "Aoede · Breezy" },
+  { id: "Callirrhoe", label: "Callirrhoe · Easy-going" },
+  { id: "Autonoe", label: "Autonoe · Bright" },
+  { id: "Enceladus", label: "Enceladus · Breathy" },
+  { id: "Iapetus", label: "Iapetus · Clear" },
+  { id: "Umbriel", label: "Umbriel · Easy-going" },
+  { id: "Algieba", label: "Algieba · Smooth" },
+  { id: "Despina", label: "Despina · Smooth" },
+  { id: "Erinome", label: "Erinome · Clear" },
+  { id: "Algenib", label: "Algenib · Gravelly" },
+  { id: "Rasalgethi", label: "Rasalgethi · Informative" },
+  { id: "Laomedeia", label: "Laomedeia · Upbeat" },
+  { id: "Achernar", label: "Achernar · Soft" },
+  { id: "Alnilam", label: "Alnilam · Firm" },
+  { id: "Schedar", label: "Schedar · Even" },
+  { id: "Gacrux", label: "Gacrux · Mature" },
+  { id: "Pulcherrima", label: "Pulcherrima · Forward" },
+  { id: "Achird", label: "Achird · Friendly" },
+  { id: "Zubenelgenubi", label: "Zubenelgenubi · Casual" },
+  { id: "Vindemiatrix", label: "Vindemiatrix · Gentle" },
+  { id: "Sadachbia", label: "Sadachbia · Lively" },
+  { id: "Sadaltager", label: "Sadaltager · Knowledgeable" },
+  { id: "Sulafat", label: "Sulafat · Warm" },
+];
+
+export const TOGETHER_TTS_VOICES: TtsVoiceOption[] = [
+  { id: "af_heart", label: "af_heart" },
+  { id: "af_alloy", label: "af_alloy" },
+  { id: "af_aoede", label: "af_aoede" },
+  { id: "af_bella", label: "af_bella" },
+  { id: "af_jessica", label: "af_jessica" },
+  { id: "af_kore", label: "af_kore" },
+  { id: "af_nicole", label: "af_nicole" },
+  { id: "af_nova", label: "af_nova" },
+  { id: "af_river", label: "af_river" },
+  { id: "af_sarah", label: "af_sarah" },
+  { id: "af_sky", label: "af_sky" },
+  { id: "am_adam", label: "am_adam" },
+  { id: "am_echo", label: "am_echo" },
+  { id: "am_eric", label: "am_eric" },
+  { id: "am_fenrir", label: "am_fenrir" },
+  { id: "am_liam", label: "am_liam" },
+];
+
+export const XAI_TTS_VOICES: TtsVoiceOption[] = [
+  { id: "eve", label: "Eve · Energetic" },
+  { id: "ara", label: "Ara · Warm" },
+  { id: "rex", label: "Rex · Confident" },
+  { id: "sal", label: "Sal · Balanced" },
+  { id: "leo", label: "Leo · Authoritative" },
+];
+
+export const PROVIDER_TTS_VOICE_OPTIONS: Partial<Record<Provider, TtsVoiceOption[]>> = {
+  openai: OPENAI_TTS_VOICES,
+  gemini: GEMINI_TTS_VOICES,
+  together: TOGETHER_TTS_VOICES,
+  xai: XAI_TTS_VOICES,
+};
+
+export const PROVIDER_DEFAULT_TTS_VOICES: Partial<Record<Provider, string>> = {
+  openai: "alloy",
+  gemini: "Kore",
+  together: "af_alloy",
+  xai: "ara",
+};
+
+export function getTtsVoiceLabel(provider: Provider, voiceId: string) {
+  const option = PROVIDER_TTS_VOICE_OPTIONS[provider]?.find(
+    (voice) => voice.id === voiceId
+  );
+  return option?.label ?? voiceId;
+}
