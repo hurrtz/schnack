@@ -1,4 +1,4 @@
-# VoxAI Visual Redesign — Cohesive Glow Aesthetic
+# Schnack Visual Redesign — Cohesive Glow Aesthetic
 
 ## Overview
 

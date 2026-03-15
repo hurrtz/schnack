@@ -1,13 +1,13 @@
 {
   "expo": {
     "name": "schnack",
-    "slug": "voxai",
+    "slug": "schnack",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.tobiaswinkler.app.voxai",
+      "bundleIdentifier": "com.tobiaswinkler.app.schnack",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "schnack needs microphone access to record your voice for conversations."
       },
@@ -26,10 +26,10 @@
       ],
       "./plugins/withBuildReactNativeFromSource"
     ],
-    "scheme": "voxai",
+    "scheme": "schnack",
     "icon": "./assets/branding/appIcon.png",
     "android": {
-      "package": "com.tobiaswinkler.voxai"
+      "package": "com.tobiaswinkler.schnack"
     }
   }
 }

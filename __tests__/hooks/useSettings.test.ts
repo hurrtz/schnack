@@ -33,10 +33,10 @@ describe("useSettings", () => {
     (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify(saved));
     (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) => {
       const values: Record<string, string | null> = {
-        "voxai.provider_key.openai": "sk-openai",
-        "voxai.provider_key.anthropic": "sk-anthropic",
-        "voxai.provider_key.gemini": "AIza-test",
-        "voxai.provider_key.nvidia": "nvapi-test",
+        "schnack.provider_key.openai": "sk-openai",
+        "schnack.provider_key.anthropic": "sk-anthropic",
+        "schnack.provider_key.gemini": "AIza-test",
+        "schnack.provider_key.nvidia": "nvapi-test",
       };
 
       return Promise.resolve(values[key] ?? null);
@@ -84,7 +84,7 @@ describe("useSettings", () => {
     await flushSettingsLoad();
     await act(async () => { result.current.updateSettings({ lastProvider: "anthropic" }); });
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-      "@voxai/settings",
+      "@schnack/settings",
       expect.stringContaining('"lastProvider":"anthropic"')
     );
   });
@@ -98,7 +98,7 @@ describe("useSettings", () => {
     });
 
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-      "@voxai/settings",
+      "@schnack/settings",
       expect.stringContaining('"groq":"openai/gpt-oss-120b"')
     );
     expect(result.current.settings.providerModels.groq).toBe("openai/gpt-oss-120b");
@@ -113,7 +113,7 @@ describe("useSettings", () => {
     });
 
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-      "@voxai/settings",
+      "@schnack/settings",
       expect.stringContaining('"gemini":"Aoede"')
     );
     expect(result.current.settings.providerTtsVoices.gemini).toBe("Aoede");
@@ -128,7 +128,7 @@ describe("useSettings", () => {
     });
 
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
-      "voxai.provider_key.gemini",
+      "schnack.provider_key.gemini",
       "AIza-live-key"
     );
     expect(result.current.settings.apiKeys.gemini).toBe("AIza-live-key");
@@ -143,7 +143,7 @@ describe("useSettings", () => {
     });
 
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(
-      "voxai.provider_key.nvidia"
+      "schnack.provider_key.nvidia"
     );
   });
 });

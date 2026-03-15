@@ -3,8 +3,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import uuid from "react-native-uuid";
 import { Conversation, ConversationMeta, Message, Provider } from "../types";
 
-const META_KEY = "@voxai/conversations";
-const conversationKey = (id: string) => `@voxai/conversation/${id}`;
+const META_KEY = "@schnack/conversations";
+const conversationKey = (id: string) => `@schnack/conversation/${id}`;
 
 function truncateTitle(text: string, max = 40): string {
   if (text.length <= max) return text;

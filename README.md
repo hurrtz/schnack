@@ -103,8 +103,8 @@ __tests__/              Focused hook and service tests
 ## Notes
 
 - Home screen icons and launcher assets require a new native build. OTA updates alone will not change them.
-- The current tracked iOS bundle identifier is `com.tobiaswinkler.app.voxai`.
-- The current tracked Android package remains `com.tobiaswinkler.voxai`.
+- The current tracked iOS bundle identifier is `com.tobiaswinkler.app.schnack`.
+- The current tracked Android package remains `com.tobiaswinkler.schnack`.
 
 ## License
 

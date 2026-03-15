@@ -12,8 +12,8 @@ import {
   DEFAULT_SETTINGS,
 } from "../types";
 
-const STORAGE_KEY = "@voxai/settings";
-const API_KEY_STORAGE_PREFIX = "voxai.provider_key";
+const STORAGE_KEY = "@schnack/settings";
+const API_KEY_STORAGE_PREFIX = "schnack.provider_key";
 
 type PublicSettings = Omit<Settings, "apiKeys">;
 type SettingsUpdate = Partial<Omit<Settings, "apiKeys" | "providerModels">>;
