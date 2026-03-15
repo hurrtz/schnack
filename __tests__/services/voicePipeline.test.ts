@@ -119,4 +119,118 @@ describe("runVoicePipeline", () => {
     expect(callbacks.onSpeechTextReady).toHaveBeenCalledWith("Wind is moving air.", undefined);
     expect(events).toEqual(["speak:Wind is moving air.", "response-done"]);
   });
+
+  it("batches provider TTS into small chunks in stream mode", async () => {
+    (streamChat as jest.Mock).mockImplementation(
+      async ({
+        onChunk,
+        onDone,
+      }: {
+        onChunk: (text: string) => void;
+        onDone: (text: string) => Promise<void>;
+      }) => {
+        onChunk("Sentence one. Sentence two.");
+        await onDone("Sentence one. Sentence two.");
+      }
+    );
+
+    const callbacks = {
+      onTranscription: jest.fn(),
+      onChunk: jest.fn(),
+      onResponseDone: jest.fn(),
+      onAudioReady: jest.fn(),
+      onSpeechTextReady: jest.fn(),
+      onError: jest.fn(),
+    };
+
+    await runVoicePipeline({
+      transcriptionOverride: "Explain glass.",
+      messages: [],
+      model: "gpt-5.4",
+      provider: "openai",
+      providerApiKey: "sk-test",
+      sttMode: "native",
+      ttsMode: "provider",
+      ttsProvider: "openai",
+      ttsApiKey: "sk-test",
+      ttsVoice: "alloy",
+      replyPlayback: "stream",
+      assistantInstructions: "You are a voice assistant.",
+      responseLength: "normal",
+      responseTone: "professional",
+      callbacks,
+    });
+
+    expect(synthesizeSpeech).toHaveBeenNthCalledWith(1, {
+      text: "Sentence one. Sentence two.",
+      voice: "alloy",
+      mode: "provider",
+      provider: "openai",
+      apiKey: "sk-test",
+    });
+    expect(callbacks.onAudioReady).toHaveBeenCalledTimes(1);
+    expect(callbacks.onSpeechTextReady).not.toHaveBeenCalled();
+  });
+
+  it("flushes provider stream playback at sentence count boundaries", async () => {
+    (streamChat as jest.Mock).mockImplementation(
+      async ({
+        onChunk,
+        onDone,
+      }: {
+        onChunk: (text: string) => void;
+        onDone: (text: string) => Promise<void>;
+      }) => {
+        onChunk("One. Two. Three.");
+        await onDone("One. Two. Three.");
+      }
+    );
+
+    (synthesizeSpeech as jest.Mock)
+      .mockResolvedValueOnce("/tmp/tts-1.mp3")
+      .mockResolvedValueOnce("/tmp/tts-2.mp3");
+
+    const callbacks = {
+      onTranscription: jest.fn(),
+      onChunk: jest.fn(),
+      onResponseDone: jest.fn(),
+      onAudioReady: jest.fn(),
+      onSpeechTextReady: jest.fn(),
+      onError: jest.fn(),
+    };
+
+    await runVoicePipeline({
+      transcriptionOverride: "Count.",
+      messages: [],
+      model: "gpt-5.4",
+      provider: "openai",
+      providerApiKey: "sk-test",
+      sttMode: "native",
+      ttsMode: "provider",
+      ttsProvider: "openai",
+      ttsApiKey: "sk-test",
+      ttsVoice: "alloy",
+      replyPlayback: "stream",
+      assistantInstructions: "You are a voice assistant.",
+      responseLength: "normal",
+      responseTone: "professional",
+      callbacks,
+    });
+
+    expect(synthesizeSpeech).toHaveBeenNthCalledWith(1, {
+      text: "One. Two.",
+      voice: "alloy",
+      mode: "provider",
+      provider: "openai",
+      apiKey: "sk-test",
+    });
+    expect(synthesizeSpeech).toHaveBeenNthCalledWith(2, {
+      text: "Three.",
+      voice: "alloy",
+      mode: "provider",
+      provider: "openai",
+      apiKey: "sk-test",
+    });
+    expect(callbacks.onAudioReady).toHaveBeenCalledTimes(2);
+  });
 });

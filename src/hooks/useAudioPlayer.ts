@@ -31,8 +31,8 @@ export function useAudioPlayer() {
   const [waveformData, setWaveformData] = useState(EMPTY_VISUAL_LEVELS);
   const queueRef = useRef<string[]>([]);
   const playingRef = useRef(false);
+  const startingRef = useRef(false);
   const cancelledRef = useRef(false);
-  const didFinishRef = useRef(false);
   const nativeQueueRef = useRef<Array<{ text: string; voice?: string }>>([]);
   const nativeSpeakingRef = useRef(false);
   const nativeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -120,7 +120,10 @@ export function useAudioPlayer() {
   });
 
   const playNext = useCallback(async () => {
-    if (playingRef.current || cancelledRef.current) return;
+    if (playingRef.current || cancelledRef.current || startingRef.current) {
+      return;
+    }
+
     const audioUri = queueRef.current.shift();
 
     if (!audioUri) {
@@ -128,27 +131,39 @@ export function useAudioPlayer() {
       return;
     }
 
-    playingRef.current = true;
-    await setAudioModeAsync({
-      allowsRecording: false,
-      playsInSilentMode: true,
-    });
-    player.replace(audioUri);
-    player.play();
+    startingRef.current = true;
+
+    try {
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+      });
+
+      if (cancelledRef.current) {
+        return;
+      }
+
+      player.replace(audioUri);
+      player.play();
+      playingRef.current = true;
+    } finally {
+      startingRef.current = false;
+    }
   }, [player, resetVisualState]);
 
   useEffect(() => {
     playingRef.current = status.playing;
-  }, [status.playing]);
+    if (!status.playing && !nativeSpeaking) {
+      if (queueRef.current.length > 0 && !cancelledRef.current) {
+        void playNext();
+        return;
+      }
 
-  useEffect(() => {
-    if (status.didJustFinish && !didFinishRef.current) {
-      playingRef.current = false;
-      void playNext();
+      if (!startingRef.current) {
+        resetVisualState();
+      }
     }
-
-    didFinishRef.current = status.didJustFinish;
-  }, [playNext, status.didJustFinish]);
+  }, [nativeSpeaking, playNext, resetVisualState, status.playing]);
 
   useEffect(() => {
     if (nativeSpeaking) {
@@ -209,8 +224,8 @@ export function useAudioPlayer() {
     stopNativeMetering();
     nativeSpeakingRef.current = false;
     setNativeSpeaking(false);
+    startingRef.current = false;
     playingRef.current = false;
-    didFinishRef.current = false;
     resetVisualState();
   }, [player, resetVisualState, stopNativeMetering]);
 
@@ -220,8 +235,8 @@ export function useAudioPlayer() {
     nativeQueueRef.current = [];
     nativeSpeakingRef.current = false;
     setNativeSpeaking(false);
+    startingRef.current = false;
     playingRef.current = false;
-    didFinishRef.current = false;
     player.pause();
     resetVisualState();
   }, [player, resetVisualState]);

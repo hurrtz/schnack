@@ -25,6 +25,9 @@ export function splitIntoSentences(text: string): string[] {
   return result;
 }
 
+const STREAM_PROVIDER_TTS_MAX_CHARS = 260;
+const STREAM_PROVIDER_TTS_MAX_SENTENCES = 2;
+
 function extractCompleteSentences(text: string): {
   completeSentences: string[];
   remainder: string;
@@ -176,6 +179,8 @@ export async function runVoicePipeline(params: {
   let sentenceBuffer = "";
   let ttsChain = Promise.resolve();
   const ttsQueue: Promise<void>[] = [];
+  let streamProviderTtsBuffer = "";
+  let streamProviderTtsSentenceCount = 0;
 
   const enqueueTts = (sentence: string) => {
     const task = ttsChain.then(async () => {
@@ -207,6 +212,39 @@ export async function runVoicePipeline(params: {
     ttsQueue.push(task.catch(() => undefined));
   };
 
+  const flushStreamProviderTtsBuffer = () => {
+    const text = streamProviderTtsBuffer.trim();
+
+    if (!text) {
+      streamProviderTtsBuffer = "";
+      streamProviderTtsSentenceCount = 0;
+      return;
+    }
+
+    enqueueTts(text);
+    streamProviderTtsBuffer = "";
+    streamProviderTtsSentenceCount = 0;
+  };
+
+  const enqueueStreamPlayback = (sentence: string) => {
+    if (ttsMode === "native") {
+      enqueueTts(sentence);
+      return;
+    }
+
+    streamProviderTtsBuffer += sentence;
+    streamProviderTtsSentenceCount += 1;
+
+    const shouldFlush =
+      /\n/.test(sentence) ||
+      streamProviderTtsBuffer.trim().length >= STREAM_PROVIDER_TTS_MAX_CHARS ||
+      streamProviderTtsSentenceCount >= STREAM_PROVIDER_TTS_MAX_SENTENCES;
+
+    if (shouldFlush) {
+      flushStreamProviderTtsBuffer();
+    }
+  };
+
   await streamChat({
     messages: allMessages,
     model,
@@ -224,7 +262,7 @@ export async function runVoicePipeline(params: {
         sentenceBuffer += text;
         const { completeSentences, remainder } = extractCompleteSentences(sentenceBuffer);
         for (const sentence of completeSentences) {
-          enqueueTts(sentence);
+          enqueueStreamPlayback(sentence);
         }
         sentenceBuffer = remainder;
       }
@@ -233,7 +271,10 @@ export async function runVoicePipeline(params: {
       if (abortSignal?.aborted) return;
       callbacks.onResponseDone(fullText);
       if (replyPlayback === "stream") {
-        if (sentenceBuffer.trim()) enqueueTts(sentenceBuffer);
+        if (sentenceBuffer.trim()) {
+          enqueueStreamPlayback(sentenceBuffer);
+        }
+        flushStreamProviderTtsBuffer();
       } else {
         enqueueTts(fullText);
       }
