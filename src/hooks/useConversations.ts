@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import uuid from "react-native-uuid";
-import { Conversation, ConversationMeta, Message } from "../types";
+import { Conversation, ConversationMeta, Message, Provider } from "../types";
 
 const META_KEY = "@voxai/conversations";
 const conversationKey = (id: string) => `@voxai/conversation/${id}`;
@@ -13,15 +13,27 @@ function truncateTitle(text: string, max = 40): string {
   return (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated) + "...";
 }
 
-function inferLastModel(messages: Message[]): string | null {
+function inferLastAssistantState(messages: Message[]) {
+  let lastModel: string | null = null;
+  let lastProvider: Provider | null = null;
+
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const candidate = messages[index];
-    if (candidate.model) {
-      return candidate.model;
+
+    if (!lastModel && candidate.model) {
+      lastModel = candidate.model;
+    }
+
+    if (!lastProvider && candidate.provider) {
+      lastProvider = candidate.provider;
+    }
+
+    if (lastModel && lastProvider) {
+      break;
     }
   }
 
-  return null;
+  return { lastModel, lastProvider };
 }
 
 export function useConversations() {
@@ -46,27 +58,33 @@ export function useConversations() {
       const storedMetas = JSON.parse(raw) as ConversationMeta[];
       const normalizedMetas = await Promise.all(
         storedMetas.map(async (meta) => {
-          if (meta.lastModel) {
-            return meta;
+          const normalizedMeta: ConversationMeta = {
+            ...meta,
+            lastProvider: meta.lastProvider ?? null,
+          };
+
+          if (normalizedMeta.lastModel && normalizedMeta.lastProvider) {
+            return normalizedMeta;
           }
 
           const conversationRaw = await AsyncStorage.getItem(conversationKey(meta.id));
 
           if (!conversationRaw) {
-            return meta;
+            return normalizedMeta;
           }
 
           const conversation = JSON.parse(conversationRaw) as Conversation;
-          const inferredLastModel = inferLastModel(conversation.messages);
+          const inferredState = inferLastAssistantState(conversation.messages);
 
-          if (!inferredLastModel) {
-            return meta;
+          if (!inferredState.lastModel && !inferredState.lastProvider) {
+            return normalizedMeta;
           }
 
           return {
-            ...meta,
+            ...normalizedMeta,
             updatedAt: conversation.updatedAt,
-            lastModel: inferredLastModel,
+            lastModel: inferredState.lastModel ?? normalizedMeta.lastModel,
+            lastProvider: inferredState.lastProvider ?? normalizedMeta.lastProvider,
           };
         })
       );
@@ -107,7 +125,11 @@ export function useConversations() {
     AsyncStorage.setItem(conversationKey(conv.id), JSON.stringify(conv));
   }, []);
 
-  const createConversation = useCallback((firstMessage: string, initialModel: string | null = null) => {
+  const createConversation = useCallback((
+    firstMessage: string,
+    initialModel: string | null = null,
+    initialProvider: Provider | null = null
+  ) => {
     const now = new Date().toISOString();
     const conv: Conversation = {
       id: uuid.v4() as string,
@@ -121,6 +143,7 @@ export function useConversations() {
       title: conv.title,
       updatedAt: now,
       lastModel: initialModel,
+      lastProvider: initialProvider,
     };
     setConversations((prev) => {
       const next = [meta, ...prev];
@@ -156,10 +179,16 @@ export function useConversations() {
     setActiveConversationValue(updated);
     saveConversation(updated);
     const lastModel = msg.model ?? undefined;
+    const lastProvider = msg.provider ?? undefined;
     setConversations((prev) => {
       const next = prev.map((m) =>
         m.id === updated.id
-          ? { ...m, updatedAt: updated.updatedAt, ...(lastModel !== undefined ? { lastModel } : {}) }
+          ? {
+              ...m,
+              updatedAt: updated.updatedAt,
+              ...(lastModel !== undefined ? { lastModel } : {}),
+              ...(lastProvider !== undefined ? { lastProvider } : {}),
+            }
           : m
       );
       AsyncStorage.setItem(META_KEY, JSON.stringify(next));

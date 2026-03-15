@@ -11,9 +11,11 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Swipeable } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { PROVIDER_LABELS } from "../constants/models";
 import { ConversationMeta } from "../types";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
+import { ProviderIcon } from "./ProviderIcon";
 
 interface ConversationDrawerProps {
   visible: boolean;
@@ -213,30 +215,65 @@ export function ConversationDrawer({
                       </Text>
                     </View>
                     <View style={styles.itemMeta}>
-                      <Text
-                        style={[styles.itemModel, { color: colors.textSecondary }]}
-                      >
-                        {item.lastModel || "No model yet"}
-                      </Text>
-                      <View
-                        style={[
-                          styles.statePill,
-                          {
-                            backgroundColor: active
-                              ? colors.accentSoft
-                              : colors.surfaceAlt,
-                            borderColor: colors.border,
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.stateText,
-                            { color: active ? colors.accent : colors.textSecondary },
-                          ]}
-                        >
-                          {active ? "Live" : "Saved"}
-                        </Text>
+                      <View style={styles.itemMetaCopy}>
+                        <View style={styles.itemProviderRow}>
+                          {item.lastProvider ? (
+                            <ProviderIcon
+                              provider={item.lastProvider}
+                              color={active ? colors.accent : colors.textSecondary}
+                            />
+                          ) : (
+                            <Feather
+                              name="cpu"
+                              size={16}
+                              color={colors.textMuted}
+                            />
+                          )}
+                          <Text
+                            style={[
+                              styles.itemProviderLabel,
+                              {
+                                color: item.lastProvider
+                                  ? active
+                                    ? colors.accent
+                                    : colors.textSecondary
+                                  : colors.textMuted,
+                              },
+                            ]}
+                          >
+                            {item.lastProvider
+                              ? PROVIDER_LABELS[item.lastProvider]
+                              : "No provider yet"}
+                          </Text>
+                        </View>
+                        <View style={styles.itemFooter}>
+                          <Text
+                            style={[styles.itemModel, { color: colors.textSecondary }]}
+                            numberOfLines={1}
+                          >
+                            {item.lastModel || "No model yet"}
+                          </Text>
+                          <View
+                            style={[
+                              styles.statePill,
+                              {
+                                backgroundColor: active
+                                  ? colors.accentSoft
+                                  : colors.surfaceAlt,
+                                borderColor: colors.border,
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.stateText,
+                                { color: active ? colors.accent : colors.textSecondary },
+                              ]}
+                            >
+                              {active ? "Live" : "Saved"}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -398,6 +435,23 @@ const styles = StyleSheet.create({
     fontFamily: fonts.mono,
   },
   itemMeta: {
+    gap: 10,
+  },
+  itemMetaCopy: {
+    gap: 8,
+  },
+  itemProviderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  itemProviderLabel: {
+    fontSize: 12,
+    fontFamily: fonts.mono,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  itemFooter: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

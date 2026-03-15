@@ -22,11 +22,12 @@ describe("useConversations", () => {
   it("creates a new conversation", async () => {
     const { result } = renderHook(() => useConversations());
     await act(async () => {
-      result.current.createConversation("Hello, how are you?", "gpt-5.4");
+      result.current.createConversation("Hello, how are you?", "gpt-5.4", "openai");
     });
     expect(result.current.conversations).toHaveLength(1);
     expect(result.current.conversations[0].title).toBe("Hello, how are you?");
     expect(result.current.conversations[0].lastModel).toBe("gpt-5.4");
+    expect(result.current.conversations[0].lastProvider).toBe("openai");
     expect(result.current.activeConversation).not.toBeNull();
   });
 
@@ -78,7 +79,7 @@ describe("useConversations", () => {
     const staleAddMessage = result.current.addMessage;
 
     await act(async () => {
-      result.current.createConversation("Test", "gpt-5.4");
+      result.current.createConversation("Test", "gpt-5.4", "openai");
     });
 
     await act(async () => {
@@ -92,6 +93,7 @@ describe("useConversations", () => {
 
     expect(result.current.activeConversation?.messages).toHaveLength(1);
     expect(result.current.conversations[0].lastModel).toBe("gpt-5.4");
+    expect(result.current.conversations[0].lastProvider).toBe("openai");
   });
 
   it("backfills missing model metadata from stored conversation messages", async () => {
@@ -150,6 +152,38 @@ describe("useConversations", () => {
     expect(result.current.conversations[0]?.lastModel).toBe(
       "claude-sonnet-4-20250514"
     );
+    expect(result.current.conversations[0]?.lastProvider).toBe("anthropic");
+  });
+
+  it("updates conversation metadata when assistant replies switch providers", async () => {
+    const { result } = renderHook(() => useConversations());
+
+    await act(async () => {
+      result.current.createConversation("Switch test", "gpt-5.4", "openai");
+    });
+
+    await act(async () => {
+      result.current.addMessage({
+        role: "assistant",
+        content: "OpenAI reply",
+        model: "gpt-5.4",
+        provider: "openai",
+      });
+    });
+
+    await act(async () => {
+      result.current.addMessage({
+        role: "assistant",
+        content: "Anthropic reply",
+        model: "claude-sonnet-4-20250514",
+        provider: "anthropic",
+      });
+    });
+
+    expect(result.current.conversations[0]?.lastModel).toBe(
+      "claude-sonnet-4-20250514"
+    );
+    expect(result.current.conversations[0]?.lastProvider).toBe("anthropic");
   });
 
   it("deletes a conversation", async () => {

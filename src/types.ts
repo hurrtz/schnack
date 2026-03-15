@@ -114,4 +114,5 @@ export interface ConversationMeta {
   title: string;
   updatedAt: string;
   lastModel: string | null;
+  lastProvider: Provider | null;
 }

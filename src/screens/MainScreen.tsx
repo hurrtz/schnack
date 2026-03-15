@@ -326,7 +326,7 @@ export function MainScreen() {
             onTranscription: (text) => {
               setPipelinePhase("thinking");
               if (!activeConversation) {
-                createConversation(text, model);
+                createConversation(text, model, provider);
               }
               setTimeout(() => {
                 addMessage({
@@ -629,7 +629,7 @@ export function MainScreen() {
         : "Ready for the next thought";
   const sessionTitle = activeConversation?.title || "Fresh session";
   const sessionMeta = activeConversation
-    ? `${messages.length} messages in progress`
+    ? `${messages.length} messages · ${providerLabel} · ${model}`
     : `${providerLabel} · ${model}`;
 
   const renderTopBar = (compact = false) => (
