@@ -20,12 +20,16 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  NATIVE_STT_LANGUAGE_NOTE,
+  NATIVE_TTS_LANGUAGE_NOTE,
   PROVIDER_API_KEY_HINTS,
   PROVIDER_API_KEY_PLACEHOLDERS,
   PROVIDER_API_KEY_URLS,
   PROVIDER_LABELS,
   PROVIDER_MODELS,
   PROVIDER_ORDER,
+  PROVIDER_STT_LANGUAGE_NOTES,
+  PROVIDER_TTS_LANGUAGE_NOTES,
   TTS_VOICES,
 } from "../constants/models";
 import {
@@ -748,6 +752,18 @@ export function SettingsModal({
     settings.ttsMode !== "provider" || enabledTtsProviders.length === 0;
   const supportsOpenAiVoicePicker =
     settings.ttsMode === "provider" && settings.ttsProvider === "openai";
+  const sttLanguageNote =
+    settings.sttMode === "native"
+      ? NATIVE_STT_LANGUAGE_NOTE
+      : settings.sttProvider
+        ? PROVIDER_STT_LANGUAGE_NOTES[settings.sttProvider] ?? null
+        : null;
+  const ttsLanguageNote =
+    settings.ttsMode === "native"
+      ? NATIVE_TTS_LANGUAGE_NOTE
+      : settings.ttsProvider
+        ? PROVIDER_TTS_LANGUAGE_NOTES[settings.ttsProvider] ?? null
+        : null;
 
   return (
     <Modal visible={visible} transparent animationType="none">
@@ -918,6 +934,11 @@ export function SettingsModal({
                         : "Enable a provider with STT support in the Providers tab to choose it here."
                       : "Native STT uses the device speech recognizer directly and works independently of your provider keys."}
                   </Text>
+                  {sttLanguageNote ? (
+                    <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+                      {`Language coverage: ${sttLanguageNote}`}
+                    </Text>
+                  ) : null}
                 </PickerSection>
               </>
             ) : null}
@@ -981,6 +1002,11 @@ export function SettingsModal({
                         : "Enable a provider with TTS support in the Providers tab to choose it here."
                       : "Native TTS uses the system voice stack and does not require a provider key."}
                   </Text>
+                  {ttsLanguageNote ? (
+                    <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+                      {`Language coverage: ${ttsLanguageNote}`}
+                    </Text>
+                  ) : null}
                 </PickerSection>
 
                 <TtsPreviewSection

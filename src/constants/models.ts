@@ -14,8 +14,16 @@ export interface ProviderConfig {
   apiKeyUrl: string;
   sttSupport: "none" | "provider";
   ttsSupport: "none" | "provider";
+  sttLanguageNote?: string;
+  ttsLanguageNote?: string;
   models: ModelInfo[];
 }
+
+export const NATIVE_STT_LANGUAGE_NOTE =
+  "Language support depends on the device OS, installed speech packs, and recognizer availability. German and English usually work well on current iOS and Android devices, but coverage and quality vary by device.";
+
+export const NATIVE_TTS_LANGUAGE_NOTE =
+  "Language support depends on the system voices installed on the device. German and English are usually available, but pronunciation quality, voice selection, and offline availability vary by OS and device.";
 
 export const PROVIDER_ORDER: Provider[] = [
   "openai",
@@ -188,6 +196,10 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyUrl: "https://platform.openai.com/settings/organization/api-keys",
     sttSupport: "provider",
     ttsSupport: "provider",
+    sttLanguageNote:
+      "whisper-1 is multilingual. OpenAI publishes 50+ well-supported languages, including German and English. The underlying model was trained on 98 languages overall, but accuracy drops outside OpenAI's published list.",
+    ttsLanguageNote:
+      "tts-1 supports multilingual output, so German, English, and many other languages work. OpenAI notes that the voices are optimized for English.",
     models: OPENAI_MODELS,
   },
   anthropic: {
@@ -228,6 +240,8 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyUrl: "https://console.groq.com/keys",
     sttSupport: "provider",
     ttsSupport: "none",
+    sttLanguageNote:
+      "The app uses whisper-large-v3-turbo here. Groq documents it as multilingual and suitable for German and English. If multilingual accuracy matters more than speed, Groq recommends whisper-large-v3 over the turbo variant.",
     models: GROQ_MODELS,
   },
   deepseek: {
@@ -268,6 +282,8 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     apiKeyUrl: "https://api.together.ai/settings/api-keys",
     sttSupport: "provider",
     ttsSupport: "none",
+    sttLanguageNote:
+      "The current integration uses openai/whisper-large-v3. It is multilingual and accepts ISO 639-1 language hints such as de for German and en for English.",
     models: TOGETHER_MODELS,
   },
   nvidia: {
@@ -319,6 +335,24 @@ export const PROVIDER_TTS_SUPPORT: Record<Provider, "none" | "provider"> =
   Object.fromEntries(
     PROVIDER_ORDER.map((provider) => [provider, PROVIDER_CONFIGS[provider].ttsSupport])
   ) as Record<Provider, "none" | "provider">;
+
+export const PROVIDER_STT_LANGUAGE_NOTES: Partial<Record<Provider, string>> =
+  Object.fromEntries(
+    PROVIDER_ORDER.flatMap((provider) =>
+      PROVIDER_CONFIGS[provider].sttLanguageNote
+        ? [[provider, PROVIDER_CONFIGS[provider].sttLanguageNote]]
+        : []
+    )
+  ) as Partial<Record<Provider, string>>;
+
+export const PROVIDER_TTS_LANGUAGE_NOTES: Partial<Record<Provider, string>> =
+  Object.fromEntries(
+    PROVIDER_ORDER.flatMap((provider) =>
+      PROVIDER_CONFIGS[provider].ttsLanguageNote
+        ? [[provider, PROVIDER_CONFIGS[provider].ttsLanguageNote]]
+        : []
+    )
+  ) as Partial<Record<Provider, string>>;
 
 export const TTS_VOICES = [
   "alloy", "ash", "ballad", "coral", "echo", "fable",
