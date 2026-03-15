@@ -42,9 +42,22 @@ const OPENAI_MODELS: ModelInfo[] = [
 
 const ANTHROPIC_MODELS: ModelInfo[] = [
   {
-    id: "claude-opus-4-1-20250805",
-    name: "Claude Opus 4.1",
-    releaseDate: "2025-08-05",
+    id: "claude-opus-4-6",
+    name: "Claude Opus 4.6",
+  },
+  {
+    id: "claude-sonnet-4-6",
+    name: "Claude Sonnet 4.6",
+  },
+  {
+    id: "claude-haiku-4-5-20251001",
+    name: "Claude Haiku 4.5",
+    releaseDate: "2025-10-01",
+  },
+  {
+    id: "claude-opus-4-20250514",
+    name: "Claude Opus 4",
+    releaseDate: "2025-05-14",
   },
   {
     id: "claude-sonnet-4-20250514",
@@ -52,8 +65,19 @@ const ANTHROPIC_MODELS: ModelInfo[] = [
     releaseDate: "2025-05-14",
   },
   {
-    id: "claude-3-5-haiku-latest",
+    id: "claude-3-7-sonnet-20250219",
+    name: "Claude 3.7 Sonnet",
+    releaseDate: "2025-02-19",
+  },
+  {
+    id: "claude-3-5-haiku-20241022",
     name: "Claude 3.5 Haiku",
+    releaseDate: "2024-10-22",
+  },
+  {
+    id: "claude-3-haiku-20240307",
+    name: "Claude 3 Haiku",
+    releaseDate: "2024-03-07",
   },
 ];
 
@@ -64,21 +88,32 @@ const GOOGLE_MODELS: ModelInfo[] = [
 ];
 
 const XAI_MODELS: ModelInfo[] = [
+  {
+    id: "grok-4.20-beta-latest-non-reasoning",
+    name: "Grok 4.20 Beta",
+  },
   { id: "grok-4", name: "Grok 4" },
-  { id: "grok-4-latest", name: "Grok 4 Latest" },
+  { id: "grok-4-fast-reasoning", name: "Grok 4 Fast Reasoning" },
+  { id: "grok-3", name: "Grok 3" },
+  { id: "grok-3-mini", name: "Grok 3 Mini" },
+];
+
+const GROQ_MODELS: ModelInfo[] = [
+  { id: "groq/compound", name: "Compound" },
+  { id: "groq/compound-mini", name: "Compound Mini" },
+  { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B Versatile" },
+  { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B Instant" },
+  { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B" },
+  { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B" },
   {
     id: "grok-4.20-beta-latest-non-reasoning",
     name: "Grok 4.20 Beta Non-Reasoning",
   },
-];
-
-const GROQ_MODELS: ModelInfo[] = [
-  { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B Versatile" },
-  { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B" },
   {
     id: "moonshotai/kimi-k2-instruct-0905",
     name: "Kimi K2 Instruct",
   },
+  { id: "qwen/qwen3-32b", name: "Qwen3 32B" },
 ];
 
 const DEEPSEEK_MODELS: ModelInfo[] = [
@@ -87,23 +122,45 @@ const DEEPSEEK_MODELS: ModelInfo[] = [
 ];
 
 const MISTRAL_MODELS: ModelInfo[] = [
-  { id: "mistral-large-latest", name: "Mistral Large Latest" },
-  { id: "mistral-medium-latest", name: "Mistral Medium Latest" },
-  { id: "mistral-small-latest", name: "Mistral Small Latest" },
+  { id: "mistral-large-2512", name: "Mistral Large 3" },
+  { id: "mistral-medium-2508", name: "Mistral Medium 3.1" },
+  { id: "mistral-small-2506", name: "Mistral Small 3.2" },
+  { id: "magistral-medium-2509", name: "Magistral Medium 1.2" },
+  { id: "magistral-small-2509", name: "Magistral Small 1.2" },
+  { id: "ministral-14b-2512", name: "Ministral 3 14B" },
+  { id: "ministral-8b-2512", name: "Ministral 3 8B" },
+  { id: "ministral-3b-2512", name: "Ministral 3 3B" },
 ];
 
 const COHERE_MODELS: ModelInfo[] = [
   { id: "command-a-03-2025", name: "Command A" },
+  { id: "command-a-reasoning-08-2025", name: "Command A Reasoning" },
+  { id: "command-a-vision-07-2025", name: "Command A Vision" },
+  { id: "command-r7b-12-2024", name: "Command R7B" },
   { id: "command-r-plus-08-2024", name: "Command R+" },
   { id: "command-r-08-2024", name: "Command R" },
 ];
 
 const TOGETHER_MODELS: ModelInfo[] = [
+  { id: "MiniMaxAI/MiniMax-M2.5", name: "MiniMax M2.5" },
+  { id: "Qwen/Qwen3.5-397B-A17B", name: "Qwen3.5 397B A17B" },
+  { id: "Qwen/Qwen3.5-9B", name: "Qwen3.5 9B" },
   { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B" },
+  { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B" },
   { id: "moonshotai/Kimi-K2.5", name: "Kimi K2.5" },
+  { id: "deepseek-ai/DeepSeek-V3.1", name: "DeepSeek V3.1" },
+  { id: "deepseek-ai/DeepSeek-R1", name: "DeepSeek R1" },
   {
-    id: "Qwen/Qwen3.5-397B-A17B",
-    name: "Qwen 3.5 397B A17B",
+    id: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+    name: "Llama 4 Maverick",
+  },
+  {
+    id: "Qwen/Qwen3-Next-80B-A3B-Instruct",
+    name: "Qwen3 Next 80B",
+  },
+  {
+    id: "Qwen/Qwen3-Coder-Next-FP8",
+    name: "Qwen3 Coder Next",
   },
 ];
 
