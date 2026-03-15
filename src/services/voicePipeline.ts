@@ -36,7 +36,8 @@ interface PipelineCallbacks {
 }
 
 export async function runVoicePipeline(params: {
-  audioUri: string;
+  audioUri?: string;
+  transcriptionOverride?: string;
   messages: Message[];
   model: string;
   provider: Provider;
@@ -59,6 +60,7 @@ export async function runVoicePipeline(params: {
 }): Promise<string | null> {
   const {
     audioUri,
+    transcriptionOverride,
     messages,
     model,
     provider,
@@ -80,12 +82,17 @@ export async function runVoicePipeline(params: {
     abortSignal,
   } = params;
 
-  const transcription = await transcribeAudio({
-    fileUri: audioUri,
-    mode: sttMode,
-    provider: sttProvider,
-    apiKey: sttApiKey,
-  });
+  const transcription =
+    transcriptionOverride?.trim() ||
+    (audioUri
+      ? await transcribeAudio({
+          fileUri: audioUri,
+          mode: sttMode,
+          provider: sttProvider,
+          apiKey: sttApiKey,
+        })
+      : null);
+
   if (!transcription) return null;
   callbacks.onTranscription(transcription);
   if (abortSignal?.aborted) return transcription;

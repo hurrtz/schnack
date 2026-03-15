@@ -127,7 +127,7 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     label: "OpenAI",
     shortLabel: "OPENAI",
     apiKeyPlaceholder: "sk-...",
-    apiKeyHint: "Required for voice transcription, voice previews, and spoken replies.",
+    apiKeyHint: "Unlocks OpenAI models and OpenAI-hosted speech when you choose provider STT or TTS.",
     apiKeyUrl: "https://platform.openai.com/settings/organization/api-keys",
     sttSupport: "provider",
     ttsSupport: "provider",

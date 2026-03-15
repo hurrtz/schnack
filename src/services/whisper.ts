@@ -35,7 +35,7 @@ export async function transcribeAudio(params: {
   const { fileUri, mode, provider, apiKey } = params;
 
   if (mode === "native") {
-    throw new Error("Native STT is planned but not wired in this build yet.");
+    throw new Error("Native STT is handled directly in the app.");
   }
 
   if (!provider) {

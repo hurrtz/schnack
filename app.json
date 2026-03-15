@@ -17,6 +17,13 @@
       "expo-router",
       "expo-secure-store",
       "expo-audio",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow VoxAI to use the microphone for native speech input.",
+          "speechRecognitionPermission": "Allow VoxAI to transcribe your voice with the system speech recognizer."
+        }
+      ],
       "./plugins/withBuildReactNativeFromSource"
     ],
     "scheme": "voxai",

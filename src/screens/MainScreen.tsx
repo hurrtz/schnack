@@ -24,6 +24,7 @@ import { PROVIDER_LABELS } from "../constants/models";
 import { useSharedSettings } from "../context/SettingsContext";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
+import { useNativeSpeechRecognizer } from "../hooks/useNativeSpeechRecognizer";
 import { useConversations } from "../hooks/useConversations";
 import { runVoicePipeline } from "../services/voicePipeline";
 import { synthesizeSpeech } from "../services/tts";
@@ -59,6 +60,7 @@ export function MainScreen() {
   } = useConversations();
 
   const recorder = useAudioRecorder();
+  const nativeStt = useNativeSpeechRecognizer();
   const player = useAudioPlayer();
 
   const [viewMode, setViewMode] = useState<ViewMode>("default");
@@ -90,7 +92,19 @@ export function MainScreen() {
   const ttsApiKey = ttsProvider ? settings.apiKeys[ttsProvider].trim() : "";
   const providerLabel = PROVIDER_LABELS[provider];
   const isBusy = pipelinePhase !== "idle";
-  const visualPhase: VoiceVisualPhase = recorder.isRecording
+  const isRecording =
+    settings.sttMode === "native" ? nativeStt.isRecording : recorder.isRecording;
+  const recordingMetering =
+    settings.sttMode === "native" ? nativeStt.meteringData : recorder.meteringData;
+  const recordingLevels =
+    settings.sttMode === "native" ? nativeStt.waveformData : recorder.waveformData;
+  const ttsStatusLabel =
+    settings.ttsMode === "native"
+      ? "System voice"
+      : ttsProvider
+        ? `${PROVIDER_LABELS[ttsProvider]} · ${settings.ttsVoice}`
+        : "No TTS provider";
+  const visualPhase: VoiceVisualPhase = isRecording
     ? "recording"
     : pipelinePhase === "transcribing"
       ? "transcribing"
@@ -100,13 +114,13 @@ export function MainScreen() {
           ? "thinking"
           : "idle";
   const isActive = visualPhase !== "idle";
-  const metering = recorder.isRecording
-    ? recorder.meteringData
+  const metering = isRecording
+    ? recordingMetering
     : player.isPlaying
       ? player.meteringData
       : -160;
-  const signalLevels = recorder.isRecording
-    ? recorder.waveformData
+  const signalLevels = isRecording
+    ? recordingLevels
     : player.isPlaying
       ? player.waveformData
       : undefined;
@@ -237,12 +251,15 @@ export function MainScreen() {
       return false;
     }
 
-    if (settings.sttMode === "native") {
-      showToast("Native STT is planned but not wired in this build yet.");
+    if (settings.sttMode === "native" && !nativeStt.isAvailable) {
+      showToast("Speech recognition is unavailable on this device.");
       return false;
     }
 
-    if (!sttProvider || !availableSttProviders.includes(sttProvider) || !sttApiKey) {
+    if (
+      settings.sttMode === "provider" &&
+      (!sttProvider || !availableSttProviders.includes(sttProvider) || !sttApiKey)
+    ) {
       showToast("Choose an enabled STT provider in Settings before starting a voice session.");
       return false;
     }
@@ -260,6 +277,7 @@ export function MainScreen() {
     availableTtsProviders,
     providerApiKey,
     providerLabel,
+    nativeStt.isAvailable,
     settings.sttMode,
     settings.ttsMode,
     showToast,
@@ -269,9 +287,15 @@ export function MainScreen() {
     ttsProvider,
   ]);
 
-  const handleRecordingDone = useCallback(
-    async (audioUri: string) => {
-      setPipelinePhase("transcribing");
+  const handleVoiceCaptureDone = useCallback(
+    async ({
+      audioUri,
+      transcriptionOverride,
+    }: {
+      audioUri?: string;
+      transcriptionOverride?: string;
+    }) => {
+      setPipelinePhase(transcriptionOverride ? "thinking" : "transcribing");
       setStreamingText("");
       abortRef.current = new AbortController();
       player.resetCancellation();
@@ -279,6 +303,7 @@ export function MainScreen() {
       try {
         const transcription = await runVoicePipeline({
           audioUri,
+          transcriptionOverride,
           messages: activeConversation?.messages || [],
           contextSummary: activeConversation?.contextSummary,
           summarizedMessageCount: activeConversation?.summarizedMessageCount,
@@ -336,7 +361,9 @@ export function MainScreen() {
             },
             onError: (error) => {
               setPipelinePhase("idle");
-              showToast(error.message, () => handleRecordingDone(audioUri));
+              showToast(error.message, () =>
+                handleVoiceCaptureDone({ audioUri, transcriptionOverride })
+              );
             },
           },
         });
@@ -390,24 +417,62 @@ export function MainScreen() {
       setPipelinePhase("idle");
       setStreamingText("");
     }
-    const startPromise = recorder.startRecording();
-    recordingStartedRef.current = startPromise;
-    await startPromise;
-  }, [ensureVoiceSessionReady, isBusy, player, recorder]);
+    try {
+      const startPromise =
+        settings.sttMode === "native"
+          ? nativeStt.startRecognition()
+          : recorder.startRecording();
+
+      recordingStartedRef.current = startPromise;
+      await startPromise;
+    } catch (error) {
+      recordingStartedRef.current = null;
+      const message =
+        error instanceof Error ? error.message : "Couldn't start voice input.";
+      showToast(message);
+    }
+  }, [
+    ensureVoiceSessionReady,
+    isBusy,
+    nativeStt,
+    player,
+    recorder,
+    settings.sttMode,
+    showToast,
+  ]);
 
   const handlePressOut = useCallback(async () => {
     if (recordingStartedRef.current) {
-      await recordingStartedRef.current;
-      recordingStartedRef.current = null;
+      try {
+        await recordingStartedRef.current;
+      } catch {
+        return;
+      } finally {
+        recordingStartedRef.current = null;
+      }
     }
-    const uri = await recorder.stopRecording();
-    if (uri) {
-      handleRecordingDone(uri);
+    try {
+      if (settings.sttMode === "native") {
+        const transcription = await nativeStt.stopRecognition();
+        if (transcription) {
+          handleVoiceCaptureDone({ transcriptionOverride: transcription });
+        }
+        return;
+      }
+
+      const uri = await recorder.stopRecording();
+      if (uri) {
+        handleVoiceCaptureDone({ audioUri: uri });
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Couldn't process voice input.";
+      showToast(message);
     }
-  }, [handleRecordingDone, recorder]);
+  }, [handleVoiceCaptureDone, nativeStt, recorder, settings.sttMode, showToast]);
 
   const handleTogglePress = useCallback(async () => {
-    if (!recorder.isRecording && !player.isPlaying && !isBusy && !ensureVoiceSessionReady()) {
+    if (!isRecording && !player.isPlaying && !isBusy && !ensureVoiceSessionReady()) {
       return;
     }
 
@@ -424,15 +489,50 @@ export function MainScreen() {
       setStreamingText("");
       return;
     }
-    if (recorder.isRecording) {
-      const uri = await recorder.stopRecording();
-      if (uri) {
-        handleRecordingDone(uri);
+    if (isRecording) {
+      try {
+        if (settings.sttMode === "native") {
+          const transcription = await nativeStt.stopRecognition();
+          if (transcription) {
+            handleVoiceCaptureDone({ transcriptionOverride: transcription });
+          }
+          return;
+        }
+
+        const uri = await recorder.stopRecording();
+        if (uri) {
+          handleVoiceCaptureDone({ audioUri: uri });
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Couldn't process voice input.";
+        showToast(message);
       }
       return;
     }
-    await recorder.startRecording();
-  }, [ensureVoiceSessionReady, handleRecordingDone, isBusy, player, recorder]);
+    try {
+      if (settings.sttMode === "native") {
+        await nativeStt.startRecognition();
+        return;
+      }
+
+      await recorder.startRecording();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Couldn't start voice input.";
+      showToast(message);
+    }
+  }, [
+    ensureVoiceSessionReady,
+    handleVoiceCaptureDone,
+    isBusy,
+    isRecording,
+    nativeStt,
+    player,
+    recorder,
+    settings.sttMode,
+    showToast,
+  ]);
 
   const handleProviderChange = useCallback(
     (nextProvider: Provider) => {
@@ -448,7 +548,7 @@ export function MainScreen() {
 
   const handlePreviewVoice = useCallback(
     async (text: string) => {
-      if (recorder.isRecording || isBusy) {
+      if (isRecording || isBusy) {
         showToast("Stop the active voice session before previewing a voice.");
         return;
       }
@@ -484,8 +584,8 @@ export function MainScreen() {
     },
     [
       isBusy,
+      isRecording,
       player,
-      recorder.isRecording,
       settings.ttsMode,
       settings.ttsVoice,
       showToast,
@@ -509,7 +609,7 @@ export function MainScreen() {
       ]
     : baseMessages;
 
-  const statusEyebrow = recorder.isRecording
+  const statusEyebrow = isRecording
       ? "Live Input"
       : pipelinePhase === "transcribing"
         ? "Parsing Input"
@@ -518,7 +618,7 @@ export function MainScreen() {
       : player.isPlaying
         ? "Voice Output"
         : "Control Room";
-  const statusTitle = recorder.isRecording
+  const statusTitle = isRecording
       ? "Listening to your voice"
       : pipelinePhase === "transcribing"
         ? "Parsing your voice input"
@@ -788,7 +888,7 @@ export function MainScreen() {
                     {sessionMeta}
                   </Text>
                   <Text style={[styles.statusMeta, { color: colors.textMuted }]}>
-                    {settings.ttsVoice}
+                    {ttsStatusLabel}
                   </Text>
                 </View>
               </View>

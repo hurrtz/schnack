@@ -43,12 +43,12 @@ describe("transcribeAudio", () => {
     expect(result).toBeNull();
   });
 
-  it("throws for native mode because it is not wired yet", async () => {
+  it("throws for native mode because native STT bypasses this service", async () => {
     await expect(
       transcribeAudio({
         fileUri: "/path/to/audio.m4a",
         mode: "native",
       })
-    ).rejects.toThrow("Native STT is planned");
+    ).rejects.toThrow("Native STT is handled directly");
   });
 });
