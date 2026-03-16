@@ -139,9 +139,11 @@ const translations = {
     nothingToCopyYet: "Nothing to copy yet.",
     couldntCopyText: "Couldn't copy that text.",
     couldntShareText: "Couldn't share that text.",
+    couldntReplayReply: "Couldn't replay that reply.",
     messageCopied: "Message copied.",
     noConversationToCopyYet: "No conversation to copy yet.",
     noConversationToShareYet: "No conversation to share yet.",
+    noReplyToRepeatYet: "No reply to replay yet.",
     threadCopied: "Thread copied.",
     addProviderKeyToUseProvider: ({ provider }) =>
       `Add your ${provider} API key in Settings to use this provider.`,
@@ -151,6 +153,8 @@ const translations = {
       "Choose an enabled STT provider in Settings before starting a voice session.",
     chooseTtsBeforeSpokenReplies:
       "Choose an enabled TTS provider in Settings before using spoken replies.",
+    stopSessionBeforeReplay:
+      "Stop the active voice session before replaying the last reply.",
     couldntCatchThatTryAgain: "Couldn't catch that, try again.",
     couldntStartVoiceInput: "Couldn't start voice input.",
     couldntProcessVoiceInput: "Couldn't process voice input.",
@@ -181,6 +185,7 @@ const translations = {
     open: "Open",
     copyThread: "Copy Thread",
     shareThread: "Share Thread",
+    repeatReply: "Repeat Reply",
     noTranscriptYet: "No transcript yet",
     previewTranscriptEmptyDescription:
       "Start with the voice stage above. Your messages and the model reply will land here instantly.",
@@ -235,6 +240,8 @@ const translations = {
     ttsNotSupportedYet: ({ provider }) => `${provider} TTS is not supported yet.`,
     ttsError: ({ provider, status, errorText }) =>
       `${provider} TTS error (${status}): ${errorText}`,
+    ttsReplyTooLong: ({ provider }) =>
+      `${provider} speech output rejected the reply because it was too long.`,
     ttsDidNotReturnAudio: ({ provider }) => `${provider} TTS did not return audio.`,
     nativeSttHandledInApp: "Native STT is handled directly in the app.",
     chooseSpeechToTextProviderInSettings:
@@ -398,9 +405,11 @@ const translations = {
     nothingToCopyYet: "Noch nichts zum Kopieren.",
     couldntCopyText: "Der Text konnte nicht kopiert werden.",
     couldntShareText: "Der Text konnte nicht geteilt werden.",
+    couldntReplayReply: "Die Antwort konnte nicht erneut abgespielt werden.",
     messageCopied: "Nachricht kopiert.",
     noConversationToCopyYet: "Noch keine Konversation zum Kopieren.",
     noConversationToShareYet: "Noch keine Konversation zum Teilen.",
+    noReplyToRepeatYet: "Noch keine Antwort zum erneuten Abspielen.",
     threadCopied: "Verlauf kopiert.",
     addProviderKeyToUseProvider: ({ provider }) =>
       `Fuege in den Einstellungen deinen API-Schluessel fuer ${provider} hinzu, um diesen Anbieter zu nutzen.`,
@@ -410,6 +419,8 @@ const translations = {
       "Waehle in den Einstellungen einen aktivierten STT-Anbieter, bevor du eine Sprachsitzung startest.",
     chooseTtsBeforeSpokenReplies:
       "Waehle in den Einstellungen einen aktivierten TTS-Anbieter, bevor du gesprochene Antworten nutzt.",
+    stopSessionBeforeReplay:
+      "Beende zuerst die laufende Sprachsitzung, bevor du die letzte Antwort erneut abspielst.",
     couldntCatchThatTryAgain:
       "Das konnte nicht sauber erkannt werden. Versuch es noch einmal.",
     couldntStartVoiceInput: "Spracheingabe konnte nicht gestartet werden.",
@@ -442,6 +453,7 @@ const translations = {
     open: "Oeffnen",
     copyThread: "Verlauf kopieren",
     shareThread: "Verlauf teilen",
+    repeatReply: "Antwort erneut",
     noTranscriptYet: "Noch kein Transkript",
     previewTranscriptEmptyDescription:
       "Starte oben mit der Sprachbuehne. Deine Nachrichten und die Modellantwort erscheinen hier sofort.",
@@ -498,6 +510,8 @@ const translations = {
       `TTS wird fuer ${provider} noch nicht unterstuetzt.`,
     ttsError: ({ provider, status, errorText }) =>
       `TTS-Fehler bei ${provider} (${status}): ${errorText}`,
+    ttsReplyTooLong: ({ provider }) =>
+      `${provider} hat die Sprachausgabe abgelehnt, weil die Antwort zu lang war.`,
     ttsDidNotReturnAudio: ({ provider }) =>
       `${provider} hat kein Audio zurueckgegeben.`,
     nativeSttHandledInApp:

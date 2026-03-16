@@ -34,7 +34,11 @@ import { useNativeSpeechRecognizer } from "../hooks/useNativeSpeechRecognizer";
 import { useConversations } from "../hooks/useConversations";
 import { useLocalization } from "../i18n";
 import { runVoicePipeline } from "../services/voicePipeline";
-import { synthesizeSpeech } from "../services/tts";
+import {
+  synthesizeSpeech,
+  synthesizeSpeechSequence,
+  TtsRequestError,
+} from "../services/tts";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Provider, VoiceVisualPhase } from "../types";
@@ -91,6 +95,7 @@ export function MainScreen() {
 
   const abortRef = useRef<AbortController | null>(null);
   const recordingStartedRef = useRef<Promise<void> | null>(null);
+  const lastCompletedReplyRef = useRef("");
   const expandedDrawerTranslateY = useRef(new Animated.Value(0)).current;
 
   const provider = settings.lastProvider;
@@ -232,6 +237,82 @@ export function MainScreen() {
       }
     },
     [activeConversation, getConversationById, language, showToast, t]
+  );
+
+  const playReplyText = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+
+      if (!trimmed) {
+        return;
+      }
+
+      if (player.isPlaying) {
+        await player.stopPlayback();
+      }
+
+      player.resetCancellation();
+
+      if (settings.ttsMode === "native") {
+        player.speakText(trimmed);
+        return;
+      }
+
+      if (!ttsProvider || !ttsApiKey) {
+        showToast(t("chooseTtsBeforeSpokenReplies"));
+        return;
+      }
+
+      const audioUris = await synthesizeSpeechSequence({
+        text: trimmed,
+        voice: selectedTtsVoice,
+        mode: settings.ttsMode,
+        provider: ttsProvider,
+        apiKey: ttsApiKey,
+        language,
+      });
+
+      audioUris.forEach((audioUri) => {
+        player.enqueueAudio(audioUri);
+      });
+    },
+    [
+      player,
+      settings.ttsMode,
+      selectedTtsVoice,
+      showToast,
+      t,
+      ttsApiKey,
+      language,
+      ttsProvider,
+    ]
+  );
+
+  const handleRepeatLastReply = useCallback(
+    async (textOverride?: string) => {
+      const replyText =
+        textOverride?.trim() ||
+        lastCompletedReplyRef.current.trim();
+
+      if (!replyText) {
+        showToast(t("noReplyToRepeatYet"));
+        return;
+      }
+
+      if (isRecording || isBusy) {
+        showToast(t("stopSessionBeforeReplay"));
+        return;
+      }
+
+      try {
+        await playReplyText(replyText);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : t("couldntReplayReply");
+        showToast(message);
+      }
+    },
+    [isBusy, isRecording, playReplyText, showToast, t]
   );
 
   const resetExpandedDrawer = useCallback(() => {
@@ -461,6 +542,7 @@ export function MainScreen() {
             },
             onResponseDone: (fullText) => {
               setStreamingText("");
+              lastCompletedReplyRef.current = fullText;
               addMessage({
                 role: "assistant",
                 content: fullText,
@@ -476,9 +558,20 @@ export function MainScreen() {
             },
             onError: (error) => {
               setPipelinePhase("idle");
-              showToast(error.message, () =>
-                handleVoiceCaptureDone({ audioUri, transcriptionOverride })
-              );
+              const retryAction =
+                error instanceof TtsRequestError &&
+                lastCompletedReplyRef.current.trim()
+                  ? () => {
+                      void handleRepeatLastReply(lastCompletedReplyRef.current);
+                    }
+                  : () => {
+                      void handleVoiceCaptureDone({
+                        audioUri,
+                        transcriptionOverride,
+                      });
+                    };
+
+              showToast(error.message, retryAction);
             },
           },
         });
@@ -508,6 +601,7 @@ export function MainScreen() {
       settings.responseLength,
       settings.responseTone,
       language,
+      handleRepeatLastReply,
       showToast,
       sttApiKey,
       sttProvider,
@@ -721,6 +815,16 @@ export function MainScreen() {
   );
 
   const baseMessages = activeConversation?.messages || [];
+  const lastAssistantReply =
+    [...baseMessages]
+      .reverse()
+      .find((message) => message.role === "assistant" && message.content.trim())
+      ?.content.trim() || "";
+
+  useEffect(() => {
+    lastCompletedReplyRef.current = lastAssistantReply;
+  }, [lastAssistantReply]);
+
   const messages = streamingText
     ? [
         ...baseMessages,
@@ -1074,6 +1178,27 @@ export function MainScreen() {
 
               <View style={styles.transcriptHeaderActions}>
                 <TouchableOpacity
+                  disabled={!lastAssistantReply}
+                  style={[
+                    styles.copyButton,
+                    !lastAssistantReply && styles.actionButtonDisabled,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    void handleRepeatLastReply();
+                  }}
+                >
+                  <Feather name="volume-2" size={14} color={colors.accent} />
+                  <Text
+                    style={[styles.copyButtonText, { color: colors.text }]}
+                  >
+                    {t("repeatReply")}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={[
                     styles.copyButton,
                     {
@@ -1203,6 +1328,27 @@ export function MainScreen() {
             </View>
 
             <View style={styles.transcriptHeaderActions}>
+              <TouchableOpacity
+                disabled={!lastAssistantReply}
+                style={[
+                  styles.copyButton,
+                  !lastAssistantReply && styles.actionButtonDisabled,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+                onPress={() => {
+                  void handleRepeatLastReply();
+                }}
+              >
+                <Feather name="volume-2" size={14} color={colors.accent} />
+                <Text
+                  style={[styles.copyButtonText, { color: colors.text }]}
+                >
+                  {t("repeatReply")}
+                </Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.copyButton,
@@ -1572,6 +1718,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 9,
+  },
+  actionButtonDisabled: {
+    opacity: 0.48,
   },
   copyButtonText: {
     fontSize: 12,

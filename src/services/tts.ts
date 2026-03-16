@@ -5,6 +5,26 @@ import { AppLanguage, Provider, VoiceBackendMode } from "../types";
 import { getTogetherTtsLanguageCode } from "../utils/speechLanguage";
 
 let ttsCounter = 0;
+export const PROVIDER_TTS_MAX_INPUT_CHARS = 3500;
+
+export class TtsRequestError extends Error {
+  readonly provider: Provider;
+  readonly status: number;
+  readonly inputTooLong: boolean;
+
+  constructor(params: {
+    message: string;
+    provider: Provider;
+    status: number;
+    inputTooLong: boolean;
+  }) {
+    super(params.message);
+    this.name = "TtsRequestError";
+    this.provider = params.provider;
+    this.status = params.status;
+    this.inputTooLong = params.inputTooLong;
+  }
+}
 
 type BinaryTtsConfig = {
   kind: "binary";
@@ -115,6 +135,141 @@ function base64ToBytes(base64: string, language: AppLanguage) {
   throw new Error(translate(language, "noBase64DecoderAvailable"));
 }
 
+function splitIntoSentences(text: string): string[] {
+  const result: string[] = [];
+  let current = "";
+
+  for (const char of text) {
+    current += char;
+
+    if (char === "." || char === "!" || char === "?" || char === "\n") {
+      result.push(current);
+      current = "";
+    }
+  }
+
+  if (current) {
+    result.push(current);
+  }
+
+  return result;
+}
+
+function splitLongTtsSegment(text: string, maxChars: number): string[] {
+  const normalized = text.replace(/\s+/g, " ").trim();
+
+  if (!normalized) {
+    return [];
+  }
+
+  if (normalized.length <= maxChars) {
+    return [normalized];
+  }
+
+  const chunks: string[] = [];
+  const words = normalized.split(/\s+/);
+  let current = "";
+
+  const pushCurrent = () => {
+    if (current) {
+      chunks.push(current);
+      current = "";
+    }
+  };
+
+  for (const word of words) {
+    if (!word) {
+      continue;
+    }
+
+    if (!current) {
+      if (word.length <= maxChars) {
+        current = word;
+      } else {
+        for (let index = 0; index < word.length; index += maxChars) {
+          chunks.push(word.slice(index, index + maxChars));
+        }
+      }
+      continue;
+    }
+
+    const next = `${current} ${word}`;
+
+    if (next.length <= maxChars) {
+      current = next;
+      continue;
+    }
+
+    pushCurrent();
+
+    if (word.length <= maxChars) {
+      current = word;
+    } else {
+      for (let index = 0; index < word.length; index += maxChars) {
+        chunks.push(word.slice(index, index + maxChars));
+      }
+    }
+  }
+
+  pushCurrent();
+  return chunks;
+}
+
+export function splitTextForTts(
+  text: string,
+  maxChars = PROVIDER_TTS_MAX_INPUT_CHARS
+): string[] {
+  const normalized = text.trim();
+
+  if (!normalized) {
+    return [];
+  }
+
+  const sentenceSegments = splitIntoSentences(normalized);
+  const chunks: string[] = [];
+  let current = "";
+
+  const pushCurrent = () => {
+    if (current) {
+      chunks.push(current);
+      current = "";
+    }
+  };
+
+  const appendSegment = (segment: string) => {
+    const normalizedSegment = segment.replace(/\s+/g, " ").trim();
+
+    if (!normalizedSegment) {
+      return;
+    }
+
+    if (normalizedSegment.length > maxChars) {
+      pushCurrent();
+      chunks.push(...splitLongTtsSegment(normalizedSegment, maxChars));
+      return;
+    }
+
+    if (!current) {
+      current = normalizedSegment;
+      return;
+    }
+
+    const next = `${current} ${normalizedSegment}`;
+
+    if (next.length <= maxChars) {
+      current = next;
+      return;
+    }
+
+    pushCurrent();
+    current = normalizedSegment;
+  };
+
+  sentenceSegments.forEach(appendSegment);
+  pushCurrent();
+  return chunks;
+}
+
 function buildWavBase64FromPcm(params: {
   pcmBase64: string;
   sampleRate: number;
@@ -172,6 +327,85 @@ function getGeminiAudioPart(data: any) {
   return (
     parts.find((part) => typeof part?.inlineData?.data === "string")?.inlineData ?? null
   );
+}
+
+function safeJsonParse(text: string) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function extractProviderErrorMessage(errorText: string) {
+  const parsed = safeJsonParse(errorText);
+
+  if (!parsed) {
+    return errorText.replace(/\s+/g, " ").trim();
+  }
+
+  if (typeof parsed === "string") {
+    return parsed.trim();
+  }
+
+  if (typeof parsed?.error?.message === "string") {
+    return parsed.error.message.trim();
+  }
+
+  if (typeof parsed?.message === "string") {
+    return parsed.message.trim();
+  }
+
+  if (Array.isArray(parsed?.errors)) {
+    const firstMessage = parsed.errors.find(
+      (entry: any) => typeof entry?.message === "string"
+    )?.message;
+
+    if (typeof firstMessage === "string") {
+      return firstMessage.trim();
+    }
+  }
+
+  return errorText.replace(/\s+/g, " ").trim();
+}
+
+function isInputTooLongError(errorText: string) {
+  const normalized = errorText.toLowerCase();
+
+  return (
+    normalized.includes("string_too_long") ||
+    normalized.includes("max_length") ||
+    normalized.includes("input string should have at most") ||
+    normalized.includes("too long") ||
+    normalized.includes("too many characters")
+  );
+}
+
+function buildTtsRequestError(params: {
+  provider: Provider;
+  status: number;
+  errorText: string;
+  language: AppLanguage;
+}) {
+  const normalizedMessage = extractProviderErrorMessage(params.errorText);
+  const inputTooLong = isInputTooLongError(
+    `${normalizedMessage} ${params.errorText}`
+  );
+
+  return new TtsRequestError({
+    provider: params.provider,
+    status: params.status,
+    inputTooLong,
+    message: inputTooLong
+      ? translate(params.language, "ttsReplyTooLong", {
+          provider: PROVIDER_LABELS[params.provider],
+        })
+      : translate(params.language, "ttsError", {
+          provider: PROVIDER_LABELS[params.provider],
+          status: params.status,
+          errorText: normalizedMessage,
+        }),
+  });
 }
 
 export async function synthesizeSpeech(params: {
@@ -237,13 +471,12 @@ export async function synthesizeSpeech(params: {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(
-        translate(language, "ttsError", {
-          provider: PROVIDER_LABELS[provider],
-          status: response.status,
-          errorText,
-        })
-      );
+      throw buildTtsRequestError({
+        provider,
+        status: response.status,
+        errorText,
+        language,
+      });
     }
 
     const data = await response.json();
@@ -308,16 +541,46 @@ export async function synthesizeSpeech(params: {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      translate(language, "ttsError", {
-        provider: PROVIDER_LABELS[provider],
-        status: response.status,
-        errorText,
-      })
-    );
+    throw buildTtsRequestError({
+      provider,
+      status: response.status,
+      errorText,
+      language,
+    });
   }
 
   const blob = await response.blob();
   const base64 = await blobToBase64(blob);
   return writeBase64AudioFile(base64, "mp3");
+}
+
+export async function synthesizeSpeechSequence(params: {
+  text: string;
+  voice: string;
+  mode: VoiceBackendMode;
+  provider?: Provider | null;
+  apiKey?: string;
+  language: AppLanguage;
+}) {
+  if (params.mode !== "provider") {
+    return [await synthesizeSpeech(params)];
+  }
+
+  const segments = splitTextForTts(params.text, PROVIDER_TTS_MAX_INPUT_CHARS);
+
+  if (segments.length === 0) {
+    return [];
+  }
+
+  const audioFiles: string[] = [];
+
+  for (const segment of segments) {
+    const audioFile = await synthesizeSpeech({
+      ...params,
+      text: segment,
+    });
+    audioFiles.push(audioFile);
+  }
+
+  return audioFiles;
 }

@@ -1,4 +1,8 @@
-import { synthesizeSpeech } from "../../src/services/tts";
+import {
+  synthesizeSpeech,
+  synthesizeSpeechSequence,
+  TtsRequestError,
+} from "../../src/services/tts";
 
 global.fetch = jest.fn();
 
@@ -153,5 +157,60 @@ describe("synthesizeSpeech", () => {
     expect(body.model).toBe("grok-tts-mini");
     expect(body.voice_id).toBe("leo");
     expect(body.output_format.codec).toBe("mp3");
+  });
+
+  it("splits long provider speech into multiple synthesis requests", async () => {
+    (fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(["fake-audio"])),
+    });
+
+    const segments = await synthesizeSpeechSequence({
+      text: `${"Sentence one. ".repeat(400)}Sentence two.`,
+      voice: "alloy",
+      mode: "provider",
+      provider: "openai",
+      apiKey: "sk-test",
+      language: "en",
+    });
+
+    expect(segments.length).toBeGreaterThan(1);
+    expect((fetch as jest.Mock).mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("surfaces a readable long-input TTS error", async () => {
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            error: {
+              message:
+                "String should have at most 4096 characters",
+              type: "invalid_request_error",
+              code: "string_too_long",
+            },
+          })
+        ),
+    });
+
+    await expect(
+      synthesizeSpeech({
+        text: "Hello world",
+        voice: "alloy",
+        mode: "provider",
+        provider: "openai",
+        apiKey: "sk-test",
+        language: "en",
+      })
+    ).rejects.toEqual(
+      expect.objectContaining<TtsRequestError>({
+        name: "TtsRequestError",
+        inputTooLong: true,
+        message:
+          "OpenAI speech output rejected the reply because it was too long.",
+      })
+    );
   });
 });

@@ -13,6 +13,39 @@ jest.mock("../../src/services/llm", () => ({
 }));
 
 jest.mock("../../src/services/tts", () => ({
+  PROVIDER_TTS_MAX_INPUT_CHARS: 3500,
+  splitTextForTts: (text: string, maxChars = 3500) => {
+    const normalized = text.trim();
+
+    if (!normalized) {
+      return [];
+    }
+
+    const words = normalized.split(/\s+/);
+    const chunks: string[] = [];
+    let current = "";
+
+    for (const word of words) {
+      const next = current ? `${current} ${word}` : word;
+
+      if (next.length <= maxChars) {
+        current = next;
+        continue;
+      }
+
+      if (current) {
+        chunks.push(current);
+      }
+
+      current = word;
+    }
+
+    if (current) {
+      chunks.push(current);
+    }
+
+    return chunks;
+  },
   synthesizeSpeech: jest.fn(),
 }));
 
