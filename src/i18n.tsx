@@ -183,7 +183,7 @@ const translations = {
     idle: "Idle",
     yourConversationAppearsHere: "Your conversation appears here",
     defaultTranscriptEmptyDescription:
-      "Press and hold the voice control, then speak naturally. schnack will keep the thread and speak back.",
+      "Press and hold the voice control, then speak naturally. SchnackAI will keep the thread and speak back.",
     delete: "Delete",
     memory: "Memory",
     conversations: "Conversations",
@@ -191,7 +191,7 @@ const translations = {
     newSession: "New Session",
     noSavedConversationsYet: "No saved conversations yet",
     drawerEmptyDescription:
-      "Start speaking from the main view and schnack will build a session automatically.",
+      "Start speaking from the main view and SchnackAI will build a session automatically.",
     yesterday: "Yesterday",
     noProviderYet: "No provider yet",
     noModelYet: "No model yet",
@@ -429,7 +429,7 @@ const translations = {
     idle: "Bereit",
     yourConversationAppearsHere: "Deine Konversation erscheint hier",
     defaultTranscriptEmptyDescription:
-      "Halte die Sprachsteuerung gedrueckt und sprich ganz natuerlich. schnack behaelt den Verlauf und antwortet dir per Stimme.",
+      "Halte die Sprachsteuerung gedrueckt und sprich ganz natuerlich. SchnackAI behaelt den Verlauf und antwortet dir per Stimme.",
     delete: "Loeschen",
     memory: "Speicher",
     conversations: "Konversationen",
@@ -438,7 +438,7 @@ const translations = {
     newSession: "Neue Sitzung",
     noSavedConversationsYet: "Noch keine gespeicherten Konversationen",
     drawerEmptyDescription:
-      "Sprich in der Hauptansicht los und schnack erstellt automatisch eine Sitzung.",
+      "Sprich in der Hauptansicht los und SchnackAI erstellt automatisch eine Sitzung.",
     yesterday: "Gestern",
     noProviderYet: "Noch kein Anbieter",
     noModelYet: "Noch kein Modell",

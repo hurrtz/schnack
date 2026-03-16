@@ -747,13 +747,13 @@ export function MainScreen() {
           ]}
         >
           <Text style={[styles.compactBrandText, { color: colors.text }]}>
-            Schnack
+            SchnackAI
           </Text>
         </View>
       ) : (
         <View style={styles.wordmark}>
           <Text style={[styles.wordmarkText, { color: colors.text }]}>
-            Schnack
+            SchnackAI
           </Text>
         </View>
       )}

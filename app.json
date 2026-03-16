@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "schnack",
-    "slug": "schnack",
+    "name": "SchnackAI",
+    "slug": "schnackai",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.tobiaswinkler.app.schnack",
+      "bundleIdentifier": "com.tobiaswinkler.app.schnackai",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "schnack needs microphone access to record your voice for conversations."
+        "NSMicrophoneUsageDescription": "SchnackAI needs microphone access to record your voice for conversations."
       },
       "appleTeamId": "X7H939KJR7"
     },
@@ -20,16 +20,16 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "Allow schnack to use the microphone for native speech input.",
-          "speechRecognitionPermission": "Allow schnack to transcribe your voice with the system speech recognizer."
+          "microphonePermission": "Allow SchnackAI to use the microphone for native speech input.",
+          "speechRecognitionPermission": "Allow SchnackAI to transcribe your voice with the system speech recognizer."
         }
       ],
       "./plugins/withBuildReactNativeFromSource"
     ],
-    "scheme": "schnack",
+    "scheme": "schnackai",
     "icon": "./assets/branding/appIcon.png",
     "android": {
-      "package": "com.tobiaswinkler.schnack"
+      "package": "com.tobiaswinkler.schnackai"
     }
   }
 }

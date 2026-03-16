@@ -1,6 +1,6 @@
-# schnack
+# SchnackAI
 
-schnack is a voice-first mobile chat app built with Expo and React Native. It is designed around fast spoken interaction: hold or tap to record, transcribe speech, send the result to the selected LLM provider, and play the reply back with OpenAI TTS.
+SchnackAI is a voice-first mobile chat app built with Expo and React Native. It is designed around fast spoken interaction: hold or tap to record, transcribe speech, send the result to the selected LLM provider, and play the reply back with OpenAI TTS.
 
 The app is intentionally user-key driven. No provider API keys are shipped in the app bundle. Each user adds their own keys in Settings, and providers stay disabled until configured.
 
@@ -103,8 +103,8 @@ __tests__/              Focused hook and service tests
 ## Notes
 
 - Home screen icons and launcher assets require a new native build. OTA updates alone will not change them.
-- The current tracked iOS bundle identifier is `com.tobiaswinkler.app.schnack`.
-- The current tracked Android package remains `com.tobiaswinkler.schnack`.
+- The current tracked iOS bundle identifier is `com.tobiaswinkler.app.schnackai`.
+- The current tracked Android package remains `com.tobiaswinkler.schnackai`.
 
 ## License
 
