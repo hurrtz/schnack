@@ -263,6 +263,35 @@ export function useConversations() {
     [saveConversation, setActiveConversationValue]
   );
 
+  const clearConversationMemory = useCallback(
+    async (id: string) => {
+      const currentConversation =
+        activeConversationRef.current?.id === id
+          ? activeConversationRef.current
+          : await getConversationById(id);
+
+      if (!currentConversation) {
+        return null;
+      }
+
+      const updatedConversation: Conversation = {
+        ...currentConversation,
+      };
+
+      delete updatedConversation.contextSummary;
+      delete updatedConversation.summarizedMessageCount;
+
+      saveConversation(updatedConversation);
+
+      if (activeConversationRef.current?.id === id) {
+        setActiveConversationValue(updatedConversation);
+      }
+
+      return updatedConversation;
+    },
+    [getConversationById, saveConversation, setActiveConversationValue]
+  );
+
   const deleteConversation = useCallback((id: string) => {
     AsyncStorage.removeItem(conversationKey(id));
     setConversations((prev) => {
@@ -407,6 +436,7 @@ export function useConversations() {
     getConversationById,
     addMessage,
     updateConversationContextSummary,
+    clearConversationMemory,
     renameConversation,
     toggleConversationPinned,
     searchConversations,

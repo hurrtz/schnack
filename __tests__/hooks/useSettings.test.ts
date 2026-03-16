@@ -23,7 +23,24 @@ async function flushSettingsLoad() {
 }
 
 describe("useSettings", () => {
-  beforeEach(() => { jest.clearAllMocks(); });
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (AsyncStorage.getItem as jest.Mock).mockImplementation(() =>
+      Promise.resolve(null)
+    );
+    (AsyncStorage.setItem as jest.Mock).mockImplementation(() =>
+      Promise.resolve()
+    );
+    (SecureStore.getItemAsync as jest.Mock).mockImplementation(() =>
+      Promise.resolve(null)
+    );
+    (SecureStore.setItemAsync as jest.Mock).mockImplementation(() =>
+      Promise.resolve()
+    );
+    (SecureStore.deleteItemAsync as jest.Mock).mockImplementation(() =>
+      Promise.resolve()
+    );
+  });
 
   it("returns default settings when nothing is stored", async () => {
     const { result } = renderHook(() => useSettings());
@@ -33,6 +50,7 @@ describe("useSettings", () => {
 
   it("loads saved settings from AsyncStorage", async () => {
     const saved = { ...DEFAULT_SETTINGS, lastProvider: "anthropic" as const };
+    delete (saved as Partial<typeof saved>).setupGuideDismissed;
     (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify(saved));
     (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) => {
       const values: Record<string, string | null> = {
@@ -59,6 +77,7 @@ describe("useSettings", () => {
       together: "",
       xai: "",
     });
+    expect(result.current.settings.setupGuideDismissed).toBe(true);
   });
 
   it("migrates legacy ttsPlayback into replyPlayback", async () => {
@@ -90,6 +109,13 @@ describe("useSettings", () => {
       "@schnackai/settings",
       expect.stringContaining('"lastProvider":"anthropic"')
     );
+  });
+
+  it("keeps the setup guide visible for brand-new installs without keys", async () => {
+    const { result } = renderHook(() => useSettings());
+    await flushSettingsLoad();
+
+    expect(result.current.settings.setupGuideDismissed).toBe(false);
   });
 
   it("switches built-in assistant instructions when the language changes", async () => {

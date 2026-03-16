@@ -14,6 +14,7 @@ const translations = {
     selection: "Selection",
     chooseCompatibleProviderFirst: "Choose a compatible provider first",
     settings: "Settings",
+    firstRun: "First Run",
     instructions: "Instructions",
     providers: "Providers",
     stt: "STT",
@@ -215,7 +216,7 @@ const translations = {
     expandedTranscriptEmptyDescription:
       "Speak with the control above. Pull the drawer handle down when you want to return to the main stage.",
     transcriptSelectionHint:
-      "Select any message text directly in this transcript.",
+      "Select any message text directly, or share and copy individual messages below.",
     startWithGroq: "Start with Groq",
     groqStarterDescription:
       "Groq offers a free tier, so it is the fastest way to unlock the app. Add its API key in Settings and the provider switcher will appear here right away.",
@@ -232,10 +233,36 @@ const translations = {
     noSavedConversationsYet: "No saved conversations yet",
     drawerEmptyDescription:
       "Start speaking from the main view and SchnackAI will build a session automatically.",
+    setupGuideTitle: "Choose a starting setup",
+    setupGuideSubtitle:
+      "Pick the stack you want first. You can change every route later in Settings.",
+    fastestStartPreset: "Fastest start",
+    fastestStartDescription:
+      "Groq handles replies, while the device handles listening and speaking. Lowest setup friction.",
+    fullVoicePreset: "Full provider voice",
+    fullVoiceDescription:
+      "OpenAI handles replies, transcription, and spoken output. Best if you want one provider stack.",
+    setupGuideNote:
+      "We will open Settings next so you can paste and validate the provider key.",
+    useThisSetup: "Use this setup",
+    notNow: "Not now",
     searchConversationsPlaceholder: "Search titles, models, and message text",
     noMatchingConversations: "No matching conversations",
     noMatchingConversationsDescription:
       "Try a different title, provider, model, or phrase from the transcript.",
+    memoryModalTitle: "Conversation memory",
+    memoryModalDescription:
+      "This is the compact summary SchnackAI carries forward once a thread gets long enough to compress older turns.",
+    memorySummary: "Saved summary",
+    memorySummaryEmpty:
+      "No compact memory yet. Once this thread gets longer, older turns will be summarized here.",
+    summarizedTurnsCount: ({ count }) =>
+      Number(count) === 1 ? "1 summarized turn" : `${count} summarized turns`,
+    copyMemory: "Copy memory",
+    forgetMemory: "Forget memory",
+    memoryCopied: "Memory copied.",
+    memoryCleared: "Conversation memory cleared.",
+    noConversationToManageYet: "No conversation memory available yet.",
     yesterday: "Yesterday",
     noProviderYet: "No provider yet",
     noModelYet: "No model yet",
@@ -325,6 +352,7 @@ const translations = {
     chooseCompatibleProviderFirst:
       "Waehle zuerst einen kompatiblen Anbieter",
     settings: "Einstellungen",
+    firstRun: "Erster Start",
     instructions: "Anweisungen",
     providers: "Anbieter",
     stt: "STT",
@@ -532,7 +560,7 @@ const translations = {
     expandedTranscriptEmptyDescription:
       "Sprich ueber die Steuerung oben. Ziehe den Griff des Drawers nach unten, um zur Hauptansicht zurueckzukehren.",
     transcriptSelectionHint:
-      "Du kannst Text in diesem Transkript direkt markieren und kopieren.",
+      "Du kannst Text direkt markieren oder einzelne Nachrichten unten teilen und kopieren.",
     startWithGroq: "Mit Groq starten",
     groqStarterDescription:
       "Groq bietet einen kostenlosen Tarif und ist damit der schnellste Weg, die App freizuschalten. Fuege in den Einstellungen den API-Schluessel hinzu, dann erscheint der Anbieter-Umschalter sofort hier.",
@@ -550,11 +578,37 @@ const translations = {
     noSavedConversationsYet: "Noch keine gespeicherten Konversationen",
     drawerEmptyDescription:
       "Sprich in der Hauptansicht los und SchnackAI erstellt automatisch eine Sitzung.",
+    setupGuideTitle: "Waehle ein Start-Setup",
+    setupGuideSubtitle:
+      "Suche dir zuerst einen Stack aus. Spaeter kannst du jede Route in den Einstellungen aendern.",
+    fastestStartPreset: "Schnellster Start",
+    fastestStartDescription:
+      "Groq uebernimmt Antworten, waehrend das Geraet Hoeren und Sprechen erledigt. So startest du mit dem wenigsten Aufwand.",
+    fullVoicePreset: "Kompletter Anbieter-Stack",
+    fullVoiceDescription:
+      "OpenAI uebernimmt Antworten, Transkription und Sprachausgabe. Gut, wenn du einen einzigen Anbieter-Stack willst.",
+    setupGuideNote:
+      "Danach oeffnen wir die Einstellungen, damit du den Anbieter-Schluessel einfuegen und pruefen kannst.",
+    useThisSetup: "Dieses Setup nutzen",
+    notNow: "Jetzt nicht",
     searchConversationsPlaceholder:
       "Suche nach Titeln, Modellen und Nachrichtentext",
     noMatchingConversations: "Keine passenden Konversationen",
     noMatchingConversationsDescription:
       "Versuche es mit einem anderen Titel, Anbieter, Modell oder Satz aus dem Transkript.",
+    memoryModalTitle: "Konversationsspeicher",
+    memoryModalDescription:
+      "Das ist die kompakte Zusammenfassung, die SchnackAI weitertraegt, sobald ein Verlauf lang genug wird und aeltere Zuege verdichtet werden.",
+    memorySummary: "Gespeicherte Zusammenfassung",
+    memorySummaryEmpty:
+      "Noch kein kompakter Speicher. Sobald dieser Verlauf laenger wird, erscheinen hier verdichtete aeltere Zuege.",
+    summarizedTurnsCount: ({ count }) =>
+      Number(count) === 1 ? "1 verdichteter Zug" : `${count} verdichtete Zuege`,
+    copyMemory: "Speicher kopieren",
+    forgetMemory: "Speicher vergessen",
+    memoryCopied: "Speicher kopiert.",
+    memoryCleared: "Konversationsspeicher geloescht.",
+    noConversationToManageYet: "Noch kein Konversationsspeicher verfuegbar.",
     yesterday: "Gestern",
     noProviderYet: "Noch kein Anbieter",
     noModelYet: "Noch kein Modell",

@@ -15,9 +15,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChatTranscript } from "../components/ChatTranscript";
+import { ConversationMemoryModal } from "../components/ConversationMemoryModal";
 import { ConversationDrawer } from "../components/ConversationDrawer";
 import { ProviderToggle } from "../components/ProviderToggle";
 import { SettingsModal } from "../components/SettingsModal";
+import { SetupGuideModal } from "../components/SetupGuideModal";
 import { Toast } from "../components/Toast";
 import { ProviderIcon } from "../components/ProviderIcon";
 import { WaveformBar } from "../components/WaveformBar";
@@ -42,7 +44,7 @@ import {
 } from "../services/tts";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
-import { Provider, VoiceVisualPhase } from "../types";
+import { Conversation, Provider, VoiceVisualPhase } from "../types";
 import {
   formatConversationForCopy,
 } from "../utils/conversationExport";
@@ -73,6 +75,7 @@ export function MainScreen() {
     getConversationById,
     addMessage,
     updateConversationContextSummary,
+    clearConversationMemory,
     renameConversation,
     toggleConversationPinned,
     searchConversations,
@@ -88,6 +91,11 @@ export function MainScreen() {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [settingsFocusProvider, setSettingsFocusProvider] = useState<Provider | undefined>();
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [setupGuideVisible, setSetupGuideVisible] = useState(false);
+  const [memoryConversation, setMemoryConversation] = useState<Conversation | null>(
+    null
+  );
+  const [memoryVisible, setMemoryVisible] = useState(false);
   const [pipelinePhase, setPipelinePhase] = useState<
     "idle" | "transcribing" | "thinking"
   >("idle");
@@ -480,6 +488,14 @@ export function MainScreen() {
   }, [expandedDrawerTranslateY, viewMode]);
 
   useEffect(() => {
+    if (!loaded) {
+      return;
+    }
+
+    setSetupGuideVisible(!settings.setupGuideDismissed);
+  }, [loaded, settings.setupGuideDismissed]);
+
+  useEffect(() => {
     if (!nativeStt.lastError) {
       return;
     }
@@ -823,6 +839,41 @@ export function MainScreen() {
     [settings.apiKeys, showToast, t, updateSettings]
   );
 
+  const handleDismissSetupGuide = useCallback(() => {
+    setSetupGuideVisible(false);
+    updateSettings({ setupGuideDismissed: true });
+  }, [updateSettings]);
+
+  const handleChooseSetupPreset = useCallback(
+    (preset: "fastest" | "full-voice") => {
+      if (preset === "fastest") {
+        updateSettings({
+          setupGuideDismissed: true,
+          lastProvider: "groq",
+          sttMode: "native",
+          sttProvider: null,
+          ttsMode: "native",
+          ttsProvider: null,
+        });
+        setSetupGuideVisible(false);
+        openSettings("groq");
+        return;
+      }
+
+      updateSettings({
+        setupGuideDismissed: true,
+        lastProvider: "openai",
+        sttMode: "provider",
+        sttProvider: "openai",
+        ttsMode: "provider",
+        ttsProvider: "openai",
+      });
+      setSetupGuideVisible(false);
+      openSettings("openai");
+    },
+    [openSettings, updateSettings]
+  );
+
   const handlePreviewVoice = useCallback(
     async (text: string) => {
       if (isRecording || isBusy) {
@@ -949,6 +1000,50 @@ export function MainScreen() {
     ? `${t("messageCount", { count: messages.length })} · ${providerLabel} · ${model}`
     : `${providerLabel} · ${model}`;
   const routeModelLabel = `${providerLabel} · ${model}`;
+
+  const openMemory = useCallback(
+    async (conversationId?: string) => {
+      const conversation = conversationId
+        ? await getConversationById(conversationId)
+        : activeConversation;
+
+      if (!conversation) {
+        showToast(t("noConversationToManageYet"));
+        return;
+      }
+
+      setMemoryConversation(conversation);
+      setMemoryVisible(true);
+    },
+    [activeConversation, getConversationById, showToast, t]
+  );
+
+  const closeMemory = useCallback(() => {
+    setMemoryVisible(false);
+    setMemoryConversation(null);
+  }, []);
+
+  const handleCopyMemory = useCallback(async () => {
+    const summary = memoryConversation?.contextSummary?.trim() ?? "";
+
+    if (!summary) {
+      showToast(t("noConversationToManageYet"));
+      return;
+    }
+
+    await copyText(summary, t("memoryCopied"));
+  }, [copyText, memoryConversation?.contextSummary, showToast, t]);
+
+  const handleClearMemory = useCallback(async () => {
+    if (!memoryConversation) {
+      return;
+    }
+
+    const updatedConversation = await clearConversationMemory(memoryConversation.id);
+
+    setMemoryConversation(updatedConversation);
+    showToast(t("memoryCleared"));
+  }, [clearConversationMemory, memoryConversation, showToast, t]);
 
   const renderTopBar = (compact = false) => (
     <View style={styles.topBar}>
@@ -1265,6 +1360,27 @@ export function MainScreen() {
 
               <View style={styles.transcriptHeaderActions}>
                 <TouchableOpacity
+                  disabled={!activeConversation}
+                  style={[
+                    styles.copyButton,
+                    !activeConversation && styles.actionButtonDisabled,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    void openMemory();
+                  }}
+                >
+                  <Feather name="archive" size={14} color={colors.accent} />
+                  <Text
+                    style={[styles.copyButtonText, { color: colors.text }]}
+                  >
+                    {t("memory")}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   disabled={!lastAssistantReply}
                   style={[
                     styles.copyButton,
@@ -1416,6 +1532,27 @@ export function MainScreen() {
 
             <View style={styles.transcriptHeaderActions}>
               <TouchableOpacity
+                disabled={!activeConversation}
+                style={[
+                  styles.copyButton,
+                  !activeConversation && styles.actionButtonDisabled,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+                onPress={() => {
+                  void openMemory();
+                }}
+              >
+                <Feather name="archive" size={14} color={colors.accent} />
+                <Text
+                  style={[styles.copyButtonText, { color: colors.text }]}
+                >
+                  {t("memory")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 disabled={!lastAssistantReply}
                 style={[
                   styles.copyButton,
@@ -1505,6 +1642,24 @@ export function MainScreen() {
         onValidateProvider={handleValidateProvider}
         onClose={closeSettings}
       />
+      <SetupGuideModal
+        visible={setupGuideVisible}
+        onChoosePreset={handleChooseSetupPreset}
+        onDismiss={handleDismissSetupGuide}
+      />
+      <ConversationMemoryModal
+        visible={memoryVisible}
+        title={memoryConversation?.title ?? t("freshSession")}
+        summary={memoryConversation?.contextSummary}
+        summarizedMessageCount={memoryConversation?.summarizedMessageCount}
+        onCopy={() => {
+          void handleCopyMemory();
+        }}
+        onClear={() => {
+          void handleClearMemory();
+        }}
+        onClose={closeMemory}
+      />
       <ConversationDrawer
         visible={drawerVisible}
         conversations={conversations}
@@ -1516,6 +1671,9 @@ export function MainScreen() {
         }}
         onShareThread={(id) => {
           void handleShareThread(id);
+        }}
+        onManageMemory={(id) => {
+          void openMemory(id);
         }}
         onRenameThread={(id, title) => {
           void handleRenameThread(id, title);

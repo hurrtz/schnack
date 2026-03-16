@@ -124,12 +124,24 @@ function mergeSettings(
     storedSettings.assistantInstructions.trim()
       ? storedSettings.assistantInstructions
       : getDefaultAssistantInstructions(language);
+  const mergedApiKeys = {
+    ...DEFAULT_SETTINGS.apiKeys,
+    ...(storedSettings?.apiKeys ?? {}),
+    ...storedApiKeys,
+  };
+  const hasConfiguredKeys = Object.values(mergedApiKeys).some(
+    (apiKey) => apiKey.trim().length > 0
+  );
 
   return {
     ...DEFAULT_SETTINGS,
     ...storedSettings,
     language,
     replyPlayback,
+    setupGuideDismissed:
+      typeof storedSettings?.setupGuideDismissed === "boolean"
+        ? storedSettings.setupGuideDismissed
+        : hasConfiguredKeys,
     assistantInstructions,
     providerModels: {
       ...DEFAULT_SETTINGS.providerModels,
@@ -139,11 +151,7 @@ function mergeSettings(
       ...DEFAULT_SETTINGS.providerTtsVoices,
       ...extractStoredProviderTtsVoices(storedSettings),
     },
-    apiKeys: {
-      ...DEFAULT_SETTINGS.apiKeys,
-      ...(storedSettings?.apiKeys ?? {}),
-      ...storedApiKeys,
-    },
+    apiKeys: mergedApiKeys,
   };
 }
 

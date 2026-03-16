@@ -40,6 +40,7 @@ export interface Settings {
   providerTtsVoices: ProviderTtsVoiceSelections;
   language: AppLanguage;
   theme: ThemeMode;
+  setupGuideDismissed: boolean;
   lastProvider: Provider;
   sttMode: VoiceBackendMode;
   sttProvider: Provider | null;
@@ -98,6 +99,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   language: "en",
   theme: "system",
+  setupGuideDismissed: false,
   lastProvider: "openai",
   sttMode: "provider",
   sttProvider: "openai",

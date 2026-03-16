@@ -27,6 +27,7 @@ interface ConversationDrawerProps {
   onSelect: (id: string) => void;
   onCopyThread: (id: string) => void;
   onShareThread: (id: string) => void;
+  onManageMemory: (id: string) => void;
   onRenameThread: (id: string, title: string) => void;
   onTogglePinned: (id: string) => void;
   onNewSession: () => void;
@@ -42,6 +43,7 @@ export function ConversationDrawer({
   onSelect,
   onCopyThread,
   onShareThread,
+  onManageMemory,
   onRenameThread,
   onTogglePinned,
   onNewSession,
@@ -451,6 +453,31 @@ export function ConversationDrawer({
                                 ]}
                               >
                                 {t("rename")}
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[
+                                styles.threadAction,
+                                {
+                                  backgroundColor: colors.surfaceAlt,
+                                  borderColor: colors.border,
+                                },
+                              ]}
+                              onPress={() => onManageMemory(item.id)}
+                              activeOpacity={0.88}
+                            >
+                              <Feather
+                                name="archive"
+                                size={13}
+                                color={colors.textSecondary}
+                              />
+                              <Text
+                                style={[
+                                  styles.copyActionText,
+                                  { color: colors.textSecondary },
+                                ]}
+                              >
+                                {t("memory")}
                               </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
