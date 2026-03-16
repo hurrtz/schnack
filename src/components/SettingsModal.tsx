@@ -337,6 +337,50 @@ function ProviderSection({
     setApiKeyVisible(false);
   }, [selectedProvider]);
 
+  const replyRouteLabel = t("replyModelRoute", {
+    route: PROVIDER_LABELS[settings.lastProvider],
+  });
+  const speechInputRouteLabel = t("speechInputRoute", {
+    route:
+      settings.sttMode === "native"
+        ? t("appNative")
+        : settings.sttProvider
+          ? PROVIDER_LABELS[settings.sttProvider]
+          : t("noProviderYet"),
+  });
+  const voiceOutputRouteLabel = t("voiceOutputRoute", {
+    route:
+      settings.ttsMode === "native"
+        ? t("systemVoice")
+        : settings.ttsProvider
+          ? PROVIDER_LABELS[settings.ttsProvider]
+          : t("noTtsProvider"),
+  });
+  const setupChecklistItems = [
+    {
+      id: "reply",
+      label: replyRouteLabel,
+      ready: settings.apiKeys[settings.lastProvider].trim().length > 0,
+    },
+    {
+      id: "stt",
+      label: speechInputRouteLabel,
+      ready:
+        settings.sttMode === "native" ||
+        (!!settings.sttProvider &&
+          settings.apiKeys[settings.sttProvider].trim().length > 0),
+    },
+    {
+      id: "tts",
+      label: voiceOutputRouteLabel,
+      ready:
+        settings.ttsMode === "native" ||
+        (!!settings.ttsProvider &&
+          settings.apiKeys[settings.ttsProvider].trim().length > 0),
+    },
+  ];
+  const setupChecklistReady = setupChecklistItems.every((item) => item.ready);
+
   const handleOpenProviderPortal = React.useCallback(() => {
     void Linking.openURL(PROVIDER_API_KEY_URLS[selectedProvider]);
   }, [selectedProvider]);
@@ -356,6 +400,93 @@ function ProviderSection({
       <Text style={[styles.sectionIntro, { color: colors.textMuted }]}>
         {t("providersTabDescription")}
       </Text>
+
+      <View
+        style={[
+          styles.setupChecklistCard,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <View style={styles.setupChecklistHeader}>
+          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+            {t("setupChecklist")}
+          </Text>
+          <View
+            style={[
+              styles.providerStatusPill,
+              styles.setupChecklistStatusPill,
+              {
+                backgroundColor: setupChecklistReady
+                  ? colors.accentSoft
+                  : colors.surfaceElevated,
+                borderColor: setupChecklistReady
+                  ? colors.borderStrong
+                  : colors.border,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.providerStatusText,
+                {
+                  color: setupChecklistReady
+                    ? colors.accent
+                    : colors.textSecondary,
+                },
+              ]}
+            >
+              {setupChecklistReady ? t("configured") : t("missing")}
+            </Text>
+          </View>
+        </View>
+        <Text style={[styles.sectionHint, styles.setupChecklistHint, { color: colors.textMuted }]}>
+          {setupChecklistReady
+            ? t("setupChecklistReady")
+            : t("setupChecklistNeedsWork")}
+        </Text>
+
+        <View style={styles.setupChecklistList}>
+          {setupChecklistItems.map((item) => (
+            <View key={item.id} style={styles.setupChecklistItem}>
+              <View
+                style={[
+                  styles.setupChecklistIcon,
+                  {
+                    backgroundColor: item.ready
+                      ? colors.accentSoft
+                      : colors.surfaceElevated,
+                    borderColor: item.ready ? colors.borderStrong : colors.border,
+                  },
+                ]}
+              >
+                <Feather
+                  name={item.ready ? "check" : "minus"}
+                  size={14}
+                  color={item.ready ? colors.accent : colors.textMuted}
+                />
+              </View>
+              <View style={styles.setupChecklistCopy}>
+                <Text style={[styles.setupChecklistLabel, { color: colors.text }]}>
+                  {item.label}
+                </Text>
+                <Text
+                  style={[
+                    styles.setupChecklistState,
+                    {
+                      color: item.ready ? colors.accent : colors.textSecondary,
+                    },
+                  ]}
+                >
+                  {item.ready ? t("configured") : t("missing")}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
 
       <View style={styles.providerButtonGrid}>
         {PROVIDER_ORDER.map((provider) => {
@@ -1409,6 +1540,56 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
     marginBottom: 12,
+  },
+  setupChecklistCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 14,
+  },
+  setupChecklistHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  setupChecklistStatusPill: {
+    marginTop: 0,
+  },
+  setupChecklistHint: {
+    marginTop: 0,
+  },
+  setupChecklistList: {
+    marginTop: 12,
+    gap: 10,
+  },
+  setupChecklistItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  setupChecklistIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  setupChecklistCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  setupChecklistLabel: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fonts.body,
+  },
+  setupChecklistState: {
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    fontFamily: fonts.mono,
   },
   providerButton: {
     width: 48,

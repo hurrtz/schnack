@@ -31,6 +31,11 @@ const translations = {
       "Shape the hidden guidance that steers the assistant before any provider sees the request.",
     providersTabDescription:
       "Connect providers, store keys on-device, and decide which model each provider should use.",
+    setupChecklist: "Voice Setup Checklist",
+    setupChecklistReady:
+      "This setup is ready for reply generation, speech input, and spoken playback.",
+    setupChecklistNeedsWork:
+      "Finish these three routes first for a reliable voice session.",
     sttTabDescription:
       "Control how speech is captured and which backend turns audio into text before it reaches the model.",
     ttsTabDescription:
@@ -294,6 +299,11 @@ const translations = {
       "Lege die verborgene Anleitung fest, die den Assistenten steuert, bevor ein Anbieter die Anfrage sieht.",
     providersTabDescription:
       "Verbinde Anbieter, speichere Schluessel lokal auf dem Geraet und bestimme, welches Modell pro Anbieter verwendet wird.",
+    setupChecklist: "Sprach-Checkliste",
+    setupChecklistReady:
+      "Dieses Setup ist fuer Antworten, Spracheingabe und Sprachausgabe bereit.",
+    setupChecklistNeedsWork:
+      "Schliesse zuerst diese drei Routen ab, damit Sprachsitzungen zuverlaessig laufen.",
     sttTabDescription:
       "Steuere, wie Sprache aufgenommen wird und welches Backend Audio in Text umwandelt, bevor es das Modell erreicht.",
     ttsTabDescription:
