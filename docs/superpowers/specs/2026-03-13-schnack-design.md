@@ -1,4 +1,4 @@
-# Schnack — Design Spec
+# SchnackAI — Design Spec
 
 **Date:** 2026-03-13
 **Platform:** React Native (Expo), iOS priority, Android supported
@@ -6,7 +6,7 @@
 
 ## Overview
 
-Schnack is a mobile voice conversation app that lets the user speak to any OpenAI or Anthropic model. It solves the problem of existing apps (Claude iOS, ChatGPT iOS) being locked to outdated models for voice conversations.
+SchnackAI is a mobile voice conversation app that lets the user speak to any OpenAI or Anthropic model. It solves the problem of existing apps (Claude iOS, ChatGPT iOS) being locked to outdated models for voice conversations.
 
 The voice pipeline: record audio → OpenAI Whisper STT → selected LLM → OpenAI TTS → speaker playback. The user controls the conversation through a single large button that doubles as a live waveform visualizer.
 
@@ -52,7 +52,7 @@ The voice pipeline: record audio → OpenAI Whisper STT → selected LLM → Ope
 
 From top to bottom:
 
-1. **Top bar:** Drawer button (☰, top-left), app title "Schnack" (center), settings cog (⚙, top-right)
+1. **Top bar:** Drawer button (☰, top-left), app title "SchnackAI" (center), settings cog (⚙, top-right)
 2. **Provider toggle:** Two full-width buttons side by side — "OpenAI" and "Anthropic" — acting as radio buttons. Default: OpenAI (or last-used provider on subsequent launches)
 3. **Talk button:** Large circle in the center of the screen, doubling as a live waveform visualizer. Shows audio waveform for both voice input and TTS output.
 4. **Chat preview:** Bottom section showing the conversation in WhatsApp-style bubbles. User messages on the right, AI messages on the left. AI messages show the model name (e.g. "gpt-4o") as a small label above the bubble text.
@@ -142,9 +142,9 @@ interface Message {
 
 Using `AsyncStorage`:
 
-- `@schnack/settings` — Settings object
-- `@schnack/conversations` — Array of conversation metadata (id, title, updatedAt, last model) for fast drawer loading
-- `@schnack/conversation/{id}` — Full conversation with messages
+- `@schnackai/settings` — Settings object
+- `@schnackai/conversations` — Array of conversation metadata (id, title, updatedAt, last model) for fast drawer loading
+- `@schnackai/conversation/{id}` — Full conversation with messages
 
 ### Persistence
 

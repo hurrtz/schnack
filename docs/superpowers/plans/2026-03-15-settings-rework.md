@@ -1,4 +1,4 @@
-# Schnack Settings Rework Plan
+# SchnackAI Settings Rework Plan
 
 > **For agentic workers:** Implement this in small checkpoints. Treat the UI shell, settings schema, and voice backend routing as separate commits. Use checkbox tracking as work proceeds.
 

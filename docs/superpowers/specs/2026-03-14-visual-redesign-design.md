@@ -1,4 +1,4 @@
-# Schnack Visual Redesign — Cohesive Glow Aesthetic
+# SchnackAI Visual Redesign — Cohesive Glow Aesthetic
 
 ## Overview
 

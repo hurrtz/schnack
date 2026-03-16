@@ -1,4 +1,4 @@
-# Schnack Implementation Plan
+# SchnackAI Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -136,7 +136,7 @@ import { View, Text } from "react-native";
 export default function Index() {
   return (
     <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <Text>Schnack</Text>
+      <Text>SchnackAI</Text>
     </View>
   );
 }
@@ -148,7 +148,7 @@ export default function Index() {
 npx expo start
 ```
 
-Scan QR code on phone or press `i` for iOS simulator. Confirm "Schnack" text appears.
+Scan QR code on phone or press `i` for iOS simulator. Confirm "SchnackAI" text appears.
 
 - [ ] **Step 8: Commit**
 
@@ -397,7 +397,7 @@ describe("useSettings", () => {
       result.current.updateSettings({ lastProvider: "anthropic" });
     });
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-      "@schnack/settings",
+      "@schnackai/settings",
       expect.stringContaining('"lastProvider":"anthropic"')
     );
   });
@@ -420,7 +420,7 @@ import { useState, useEffect, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Settings, DEFAULT_SETTINGS } from "../types";
 
-const STORAGE_KEY = "@schnack/settings";
+const STORAGE_KEY = "@schnackai/settings";
 
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -576,8 +576,8 @@ import {
   Provider,
 } from "../types";
 
-const META_KEY = "@schnack/conversations";
-const conversationKey = (id: string) => `@schnack/conversation/${id}`;
+const META_KEY = "@schnackai/conversations";
+const conversationKey = (id: string) => `@schnackai/conversation/${id}`;
 
 function truncateTitle(text: string, max = 40): string {
   if (text.length <= max) return text;
@@ -3080,7 +3080,7 @@ export function MainScreen() {
             >
               <Text style={{ color: colors.text }}>☰</Text>
             </TouchableOpacity>
-            <Text style={[styles.title, { color: colors.text }]}>Schnack</Text>
+            <Text style={[styles.title, { color: colors.text }]}>SchnackAI</Text>
             <TouchableOpacity
               style={[styles.iconButton, { backgroundColor: colors.surface }]}
               onPress={() => setSettingsVisible(true)}
@@ -3262,7 +3262,7 @@ npx expo start
 ```
 
 Open on device/simulator. Verify:
-- Title "Schnack" visible
+- Title "SchnackAI" visible
 - Provider toggle shows OpenAI / Anthropic
 - Circular button visible
 - Settings modal opens via ⚙
