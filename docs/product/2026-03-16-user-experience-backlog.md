@@ -28,3 +28,5 @@
   Expose what the app remembers, allow forgetting a session or summary, and make long-session compaction more legible to the user.
 - Deeper sharing flows
   Add richer export targets such as Markdown, plain text snippets, and structured summaries.
+- Dismissible in-app messages
+  Let users manually dismiss toasts, errors, and other transient notices so the interface never gets stuck behind a message until the app restarts.
