@@ -72,6 +72,8 @@ export function MainScreen() {
     getConversationById,
     addMessage,
     updateConversationContextSummary,
+    renameConversation,
+    toggleConversationPinned,
     deleteConversation,
     clearActiveConversation,
   } = useConversations();
@@ -237,6 +239,22 @@ export function MainScreen() {
       }
     },
     [activeConversation, getConversationById, language, showToast, t]
+  );
+
+  const handleRenameThread = useCallback(
+    async (conversationId: string, nextTitle: string) => {
+      await renameConversation(conversationId, nextTitle);
+      showToast(t("threadRenamed"));
+    },
+    [renameConversation, showToast, t]
+  );
+
+  const handleTogglePinned = useCallback(
+    (conversationId: string) => {
+      const pinned = toggleConversationPinned(conversationId);
+      showToast(pinned ? t("threadPinned") : t("threadUnpinned"));
+    },
+    [showToast, t, toggleConversationPinned]
   );
 
   const playReplyText = useCallback(
@@ -1422,6 +1440,10 @@ export function MainScreen() {
         onShareThread={(id) => {
           void handleShareThread(id);
         }}
+        onRenameThread={(id, title) => {
+          void handleRenameThread(id, title);
+        }}
+        onTogglePinned={handleTogglePinned}
         onNewSession={clearActiveConversation}
         onDelete={deleteConversation}
         onClose={() => setDrawerVisible(false)}

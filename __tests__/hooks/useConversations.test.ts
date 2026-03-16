@@ -2,16 +2,32 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { renderHook, act } from "@testing-library/react-native";
 import { useConversations } from "../../src/hooks/useConversations";
 
+let mockUuidCounter = 0;
+
 jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn(() => Promise.resolve(null)),
   setItem: jest.fn(() => Promise.resolve()),
   removeItem: jest.fn(() => Promise.resolve()),
 }));
 
-jest.mock("react-native-uuid", () => ({ v4: () => "test-uuid-123" }));
+jest.mock("react-native-uuid", () => ({
+  v4: () => `test-uuid-${++mockUuidCounter}`,
+}));
 
 describe("useConversations", () => {
-  beforeEach(() => { jest.clearAllMocks(); });
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUuidCounter = 0;
+    (AsyncStorage.getItem as jest.Mock).mockImplementation(() =>
+      Promise.resolve(null)
+    );
+    (AsyncStorage.setItem as jest.Mock).mockImplementation(() =>
+      Promise.resolve()
+    );
+    (AsyncStorage.removeItem as jest.Mock).mockImplementation(() =>
+      Promise.resolve()
+    );
+  });
 
   it("starts with empty conversation list", () => {
     const { result } = renderHook(() => useConversations());
@@ -28,6 +44,7 @@ describe("useConversations", () => {
     expect(result.current.conversations[0].title).toBe("Hello, how are you?");
     expect(result.current.conversations[0].lastModel).toBe("gpt-5.4");
     expect(result.current.conversations[0].lastProvider).toBe("openai");
+    expect(result.current.conversations[0].pinned).toBe(false);
     expect(result.current.activeConversation).not.toBeNull();
   });
 
@@ -69,7 +86,7 @@ describe("useConversations", () => {
     );
     expect(result.current.activeConversation?.summarizedMessageCount).toBe(4);
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-      "@schnackai/conversation/test-uuid-123",
+      "@schnackai/conversation/test-uuid-1",
       expect.stringContaining('"summarizedMessageCount":4')
     );
   });
@@ -193,5 +210,49 @@ describe("useConversations", () => {
     await act(async () => { result.current.deleteConversation(id); });
     expect(result.current.conversations).toHaveLength(0);
     expect(result.current.activeConversation).toBeNull();
+  });
+
+  it("renames a conversation and keeps the active conversation in sync", async () => {
+    const { result } = renderHook(() => useConversations());
+
+    await act(async () => {
+      result.current.createConversation("Original title");
+    });
+
+    const id = result.current.conversations[0].id;
+
+    await act(async () => {
+      await result.current.renameConversation(id, "A much better title");
+    });
+
+    expect(result.current.conversations[0]?.title).toBe("A much better title");
+    expect(result.current.activeConversation?.title).toBe("A much better title");
+  });
+
+  it("pins a conversation and sorts pinned items before recent unpinned ones", async () => {
+    const { result } = renderHook(() => useConversations());
+
+    await act(async () => {
+      result.current.createConversation("First");
+    });
+
+    await act(async () => {
+      result.current.clearActiveConversation();
+      result.current.createConversation("Second");
+    });
+
+    const firstConversationId = result.current.conversations.find(
+      (conversation) => conversation.title === "First"
+    )?.id;
+
+    expect(firstConversationId).toBeTruthy();
+
+    await act(async () => {
+      result.current.toggleConversationPinned(firstConversationId!);
+    });
+
+    expect(result.current.conversations[0]?.title).toBe("First");
+    expect(result.current.conversations[0]?.pinned).toBe(true);
+    expect(result.current.conversations[1]?.title).toBe("Second");
   });
 });

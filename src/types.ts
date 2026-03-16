@@ -145,4 +145,5 @@ export interface ConversationMeta {
   updatedAt: string;
   lastModel: string | null;
   lastProvider: Provider | null;
+  pinned: boolean;
 }

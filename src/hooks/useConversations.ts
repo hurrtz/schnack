@@ -36,6 +36,41 @@ function inferLastAssistantState(messages: Message[]) {
   return { lastModel, lastProvider };
 }
 
+function compareConversationMeta(
+  left: ConversationMeta,
+  right: ConversationMeta
+) {
+  if (left.pinned !== right.pinned) {
+    return left.pinned ? -1 : 1;
+  }
+
+  return (
+    new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+  );
+}
+
+function sortConversationMeta(conversations: ConversationMeta[]) {
+  return [...conversations].sort(compareConversationMeta);
+}
+
+function normalizeConversationMeta(meta: ConversationMeta) {
+  return {
+    ...meta,
+    lastProvider: meta.lastProvider ?? null,
+    pinned: meta.pinned ?? false,
+  };
+}
+
+function normalizeConversationTitle(title: string, fallback: string) {
+  const trimmed = title.trim();
+
+  if (!trimmed) {
+    return fallback;
+  }
+
+  return truncateTitle(trimmed, 60);
+}
+
 export function useConversations() {
   const [conversations, setConversations] = useState<ConversationMeta[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
@@ -58,10 +93,7 @@ export function useConversations() {
       const storedMetas = JSON.parse(raw) as ConversationMeta[];
       const normalizedMetas = await Promise.all(
         storedMetas.map(async (meta) => {
-          const normalizedMeta: ConversationMeta = {
-            ...meta,
-            lastProvider: meta.lastProvider ?? null,
-          };
+          const normalizedMeta = normalizeConversationMeta(meta);
 
           if (normalizedMeta.lastModel && normalizedMeta.lastProvider) {
             return normalizedMeta;
@@ -93,10 +125,11 @@ export function useConversations() {
         return;
       }
 
-      setConversations(normalizedMetas);
+      const sortedMetas = sortConversationMeta(normalizedMetas);
+      setConversations(sortedMetas);
 
-      if (JSON.stringify(normalizedMetas) !== JSON.stringify(storedMetas)) {
-        AsyncStorage.setItem(META_KEY, JSON.stringify(normalizedMetas));
+      if (JSON.stringify(sortedMetas) !== JSON.stringify(storedMetas)) {
+        AsyncStorage.setItem(META_KEY, JSON.stringify(sortedMetas));
       }
     };
 
@@ -108,7 +141,7 @@ export function useConversations() {
   }, []);
 
   useEffect(() => {
-    if (!activeConversation) {
+    if (!activeConversation || conversations.length === 0) {
       return;
     }
 
@@ -123,6 +156,12 @@ export function useConversations() {
 
   const saveConversation = useCallback((conv: Conversation) => {
     AsyncStorage.setItem(conversationKey(conv.id), JSON.stringify(conv));
+  }, []);
+
+  const persistConversationMeta = useCallback((metas: ConversationMeta[]) => {
+    const sortedMetas = sortConversationMeta(metas.map(normalizeConversationMeta));
+    AsyncStorage.setItem(META_KEY, JSON.stringify(sortedMetas));
+    return sortedMetas;
   }, []);
 
   const createConversation = useCallback((
@@ -144,15 +183,14 @@ export function useConversations() {
       updatedAt: now,
       lastModel: initialModel,
       lastProvider: initialProvider,
+      pinned: false,
     };
     setConversations((prev) => {
-      const next = [meta, ...prev];
-      AsyncStorage.setItem(META_KEY, JSON.stringify(next));
-      return next;
+      return persistConversationMeta([meta, ...prev]);
     });
     saveConversation(conv);
     setActiveConversationValue(conv);
-  }, [saveConversation, setActiveConversationValue]);
+  }, [persistConversationMeta, saveConversation, setActiveConversationValue]);
 
   const selectConversation = useCallback(async (id: string) => {
     const raw = await AsyncStorage.getItem(conversationKey(id));
@@ -200,10 +238,9 @@ export function useConversations() {
             }
           : m
       );
-      AsyncStorage.setItem(META_KEY, JSON.stringify(next));
-      return next;
+      return persistConversationMeta(next);
     });
-  }, [saveConversation, setActiveConversationValue]);
+  }, [persistConversationMeta, saveConversation, setActiveConversationValue]);
 
   const updateConversationContextSummary = useCallback(
     (contextSummary: string, summarizedMessageCount: number) => {
@@ -228,14 +265,81 @@ export function useConversations() {
   const deleteConversation = useCallback((id: string) => {
     AsyncStorage.removeItem(conversationKey(id));
     setConversations((prev) => {
-      const next = prev.filter((c) => c.id !== id);
-      AsyncStorage.setItem(META_KEY, JSON.stringify(next));
-      return next;
+      return persistConversationMeta(prev.filter((c) => c.id !== id));
     });
     if (activeConversation?.id === id || activeConversationRef.current?.id === id) {
       setActiveConversationValue(null);
     }
-  }, [activeConversation?.id, setActiveConversationValue]);
+  }, [activeConversation?.id, persistConversationMeta, setActiveConversationValue]);
+
+  const renameConversation = useCallback(
+    async (id: string, nextTitle: string) => {
+      const currentConversation =
+        activeConversationRef.current?.id === id
+          ? activeConversationRef.current
+          : await getConversationById(id);
+
+      if (!currentConversation) {
+        return;
+      }
+
+      const title = normalizeConversationTitle(nextTitle, currentConversation.title);
+      const updatedConversation: Conversation = {
+        ...currentConversation,
+        title,
+      };
+
+      saveConversation(updatedConversation);
+
+      if (activeConversationRef.current?.id === id) {
+        setActiveConversationValue(updatedConversation);
+      }
+
+      setConversations((prev) =>
+        persistConversationMeta(
+          prev.map((conversation) =>
+            conversation.id === id
+              ? {
+                  ...conversation,
+                  title,
+                }
+              : conversation
+          )
+        )
+      );
+    },
+    [
+      getConversationById,
+      persistConversationMeta,
+      saveConversation,
+      setActiveConversationValue,
+    ]
+  );
+
+  const toggleConversationPinned = useCallback(
+    (id: string) => {
+      let nextPinned = false;
+
+      setConversations((prev) =>
+        persistConversationMeta(
+          prev.map((conversation) => {
+            if (conversation.id !== id) {
+              return conversation;
+            }
+
+            nextPinned = !conversation.pinned;
+            return {
+              ...conversation,
+              pinned: nextPinned,
+            };
+          })
+        )
+      );
+
+      return nextPinned;
+    },
+    [persistConversationMeta]
+  );
 
   const clearActiveConversation = useCallback(() => {
     setActiveConversationValue(null);
@@ -249,6 +353,8 @@ export function useConversations() {
     getConversationById,
     addMessage,
     updateConversationContextSummary,
+    renameConversation,
+    toggleConversationPinned,
     deleteConversation,
     clearActiveConversation,
   };

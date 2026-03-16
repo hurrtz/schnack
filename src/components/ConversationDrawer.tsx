@@ -4,6 +4,7 @@ import {
   Modal,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -25,6 +26,8 @@ interface ConversationDrawerProps {
   onSelect: (id: string) => void;
   onCopyThread: (id: string) => void;
   onShareThread: (id: string) => void;
+  onRenameThread: (id: string, title: string) => void;
+  onTogglePinned: (id: string) => void;
   onNewSession: () => void;
   onDelete: (id: string) => void;
   onClose: () => void;
@@ -37,6 +40,8 @@ export function ConversationDrawer({
   onSelect,
   onCopyThread,
   onShareThread,
+  onRenameThread,
+  onTogglePinned,
   onNewSession,
   onDelete,
   onClose,
@@ -44,6 +49,10 @@ export function ConversationDrawer({
   const { colors } = useTheme();
   const { t, locale } = useLocalization();
   const insets = useSafeAreaInsets();
+  const [editingConversationId, setEditingConversationId] = React.useState<
+    string | null
+  >(null);
+  const [editingTitle, setEditingTitle] = React.useState("");
 
   const renderRightActions = (id: string) => (
     <TouchableOpacity
@@ -75,19 +84,34 @@ export function ConversationDrawer({
     return date.toLocaleDateString(locale, { month: "short", day: "numeric" });
   };
 
+  const closeRenameModal = () => {
+    setEditingConversationId(null);
+    setEditingTitle("");
+  };
+
+  const submitRename = () => {
+    if (!editingConversationId || !editingTitle.trim()) {
+      return;
+    }
+
+    onRenameThread(editingConversationId, editingTitle);
+    closeRenameModal();
+  };
+
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.container}>
-        <View
-          style={[
-            styles.drawer,
-            {
-              backgroundColor: colors.surface,
-              borderRightColor: colors.border,
-              paddingTop: Math.max(insets.top, 12) + 8,
-            },
-          ]}
-        >
+    <>
+      <Modal visible={visible} transparent animationType="fade">
+        <View style={styles.container}>
+          <View
+            style={[
+              styles.drawer,
+              {
+                backgroundColor: colors.surface,
+                borderRightColor: colors.border,
+                paddingTop: Math.max(insets.top, 12) + 8,
+              },
+            ]}
+          >
           <LinearGradient
             colors={[colors.accentSoft, "rgba(255,255,255,0)"]}
             start={{ x: 0, y: 0 }}
@@ -144,60 +168,60 @@ export function ConversationDrawer({
             </LinearGradient>
           </TouchableOpacity>
 
-          <FlatList
-            data={conversations}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.list}
-            ListEmptyComponent={
-              <View
-                style={[
-                  styles.emptyState,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
+            <FlatList
+              data={conversations}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.list}
+              ListEmptyComponent={
                 <View
                   style={[
-                    styles.emptyIcon,
-                    { backgroundColor: colors.accentSoft, borderColor: colors.border },
+                    styles.emptyState,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
                   ]}
                 >
-                  <Feather name="message-circle" size={18} color={colors.accent} />
-                </View>
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                  {t("noSavedConversationsYet")}
-                </Text>
-                <Text
-                  style={[styles.emptyDescription, { color: colors.textSecondary }]}
-                >
-                  {t("drawerEmptyDescription")}
-                </Text>
-              </View>
-            }
-            renderItem={({ item }) => {
-              const active = item.id === activeId;
-
-              return (
-                <Swipeable renderRightActions={() => renderRightActions(item.id)}>
-                  <TouchableOpacity
+                  <View
                     style={[
-                      styles.item,
-                      {
-                        borderColor: active ? colors.borderStrong : colors.border,
-                        backgroundColor: active
-                          ? colors.surfaceElevated
-                          : colors.surface,
-                        shadowColor: active ? colors.glow : "transparent",
-                      },
+                      styles.emptyIcon,
+                      { backgroundColor: colors.accentSoft, borderColor: colors.border },
                     ]}
-                    onPress={() => {
-                      onSelect(item.id);
-                      onClose();
-                    }}
-                    activeOpacity={0.9}
                   >
+                    <Feather name="message-circle" size={18} color={colors.accent} />
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                    {t("noSavedConversationsYet")}
+                  </Text>
+                  <Text
+                    style={[styles.emptyDescription, { color: colors.textSecondary }]}
+                  >
+                    {t("drawerEmptyDescription")}
+                  </Text>
+                </View>
+              }
+              renderItem={({ item }) => {
+                const active = item.id === activeId;
+
+                return (
+                  <Swipeable renderRightActions={() => renderRightActions(item.id)}>
+                    <TouchableOpacity
+                      style={[
+                        styles.item,
+                        {
+                          borderColor: active ? colors.borderStrong : colors.border,
+                          backgroundColor: active
+                            ? colors.surfaceElevated
+                            : colors.surface,
+                          shadowColor: active ? colors.glow : "transparent",
+                        },
+                      ]}
+                      onPress={() => {
+                        onSelect(item.id);
+                        onClose();
+                      }}
+                      activeOpacity={0.9}
+                    >
                     {active ? (
                       <LinearGradient
                         colors={[colors.accentGradientStart, colors.accentGradientEnd]}
@@ -207,12 +231,39 @@ export function ConversationDrawer({
                       />
                     ) : null}
                     <View style={styles.itemHeader}>
-                      <Text
-                        style={[styles.itemTitle, { color: colors.text }]}
-                        numberOfLines={1}
-                      >
-                        {item.title}
-                      </Text>
+                      <View style={styles.itemTitleRow}>
+                        {item.pinned ? (
+                          <View
+                            style={[
+                              styles.pinnedBadge,
+                              {
+                                backgroundColor: colors.accentSoft,
+                                borderColor: colors.borderStrong,
+                              },
+                            ]}
+                          >
+                            <Feather
+                              name="bookmark"
+                              size={12}
+                              color={colors.accent}
+                            />
+                            <Text
+                              style={[
+                                styles.pinnedBadgeText,
+                                { color: colors.accent },
+                              ]}
+                            >
+                              {t("pinned")}
+                            </Text>
+                          </View>
+                        ) : null}
+                        <Text
+                          style={[styles.itemTitle, { color: colors.text }]}
+                          numberOfLines={1}
+                        >
+                          {item.title}
+                        </Text>
+                      </View>
                       <Text
                         style={[styles.itemDate, { color: colors.textMuted }]}
                       >
@@ -291,6 +342,59 @@ export function ConversationDrawer({
                                   borderColor: colors.border,
                                 },
                               ]}
+                              onPress={() => onTogglePinned(item.id)}
+                              activeOpacity={0.88}
+                            >
+                              <Feather
+                                name="bookmark"
+                                size={13}
+                                color={colors.textSecondary}
+                              />
+                              <Text
+                                style={[
+                                  styles.copyActionText,
+                                  { color: colors.textSecondary },
+                                ]}
+                              >
+                                {item.pinned ? t("unpin") : t("pin")}
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[
+                                styles.threadAction,
+                                {
+                                  backgroundColor: colors.surfaceAlt,
+                                  borderColor: colors.border,
+                                },
+                              ]}
+                              onPress={() => {
+                                setEditingConversationId(item.id);
+                                setEditingTitle(item.title);
+                              }}
+                              activeOpacity={0.88}
+                            >
+                              <Feather
+                                name="edit-3"
+                                size={13}
+                                color={colors.textSecondary}
+                              />
+                              <Text
+                                style={[
+                                  styles.copyActionText,
+                                  { color: colors.textSecondary },
+                                ]}
+                              >
+                                {t("rename")}
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[
+                                styles.threadAction,
+                                {
+                                  backgroundColor: colors.surfaceAlt,
+                                  borderColor: colors.border,
+                                },
+                              ]}
                               onPress={() => onShareThread(item.id)}
                               activeOpacity={0.88}
                             >
@@ -337,20 +441,110 @@ export function ConversationDrawer({
                         </View>
                       </View>
                     </View>
-                  </TouchableOpacity>
-                </Swipeable>
-              );
-            }}
+                    </TouchableOpacity>
+                  </Swipeable>
+                );
+              }}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.backdrop, { backgroundColor: colors.overlay }]}
+            activeOpacity={1}
+            onPress={onClose}
           />
         </View>
+      </Modal>
 
-        <TouchableOpacity
-          style={[styles.backdrop, { backgroundColor: colors.overlay }]}
-          activeOpacity={1}
-          onPress={onClose}
-        />
-      </View>
-    </Modal>
+      <Modal
+        visible={!!editingConversationId}
+        transparent
+        animationType="fade"
+        onRequestClose={closeRenameModal}
+      >
+        <View style={styles.renameOverlay}>
+          <TouchableOpacity
+            style={[styles.renameBackdrop, { backgroundColor: colors.overlay }]}
+            activeOpacity={1}
+            onPress={closeRenameModal}
+          />
+          <View
+            style={[
+              styles.renameCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                shadowColor: colors.glow,
+              },
+            ]}
+          >
+            <Text style={[styles.renameTitle, { color: colors.text }]}>
+              {t("renameThread")}
+            </Text>
+            <Text style={[styles.renameHint, { color: colors.textSecondary }]}>
+              {t("renameThreadHint")}
+            </Text>
+            <TextInput
+              value={editingTitle}
+              onChangeText={setEditingTitle}
+              autoFocus
+              placeholder={t("threadTitle")}
+              placeholderTextColor={colors.textMuted}
+              selectionColor={colors.accent}
+              style={[
+                styles.renameInput,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
+              ]}
+            />
+            <View style={styles.renameActions}>
+              <TouchableOpacity
+                style={[
+                  styles.renameAction,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+                onPress={closeRenameModal}
+                activeOpacity={0.88}
+              >
+                <Text
+                  style={[
+                    styles.renameActionText,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {t("cancel")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.renameAction,
+                  {
+                    backgroundColor: colors.accentSoft,
+                    borderColor: colors.borderStrong,
+                    opacity: editingTitle.trim() ? 1 : 0.5,
+                  },
+                ]}
+                onPress={submitRename}
+                activeOpacity={0.88}
+                disabled={!editingTitle.trim()}
+              >
+                <Text
+                  style={[styles.renameActionText, { color: colors.accent }]}
+                >
+                  {t("save")}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -369,6 +563,63 @@ const styles = StyleSheet.create({
     height: 180,
   },
   backdrop: { flex: 1 },
+  renameOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  renameBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  renameCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 18,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.16,
+    shadowRadius: 30,
+    elevation: 10,
+  },
+  renameTitle: {
+    fontSize: 20,
+    lineHeight: 24,
+    fontFamily: fonts.display,
+  },
+  renameHint: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: fonts.body,
+  },
+  renameInput: {
+    minHeight: 48,
+    marginTop: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontFamily: fonts.body,
+  },
+  renameActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+    marginTop: 16,
+  },
+  renameAction: {
+    minWidth: 92,
+    minHeight: 42,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  renameActionText: {
+    fontSize: 13,
+    fontFamily: fonts.display,
+  },
   header: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -481,15 +732,34 @@ const styles = StyleSheet.create({
   },
   itemHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 10,
     marginBottom: 12,
   },
-  itemTitle: {
+  itemTitleRow: {
     flex: 1,
+    gap: 8,
+  },
+  itemTitle: {
     fontSize: 16,
     fontFamily: fonts.display,
+  },
+  pinnedBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  pinnedBadgeText: {
+    fontSize: 10,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    fontFamily: fonts.mono,
   },
   itemDate: {
     fontSize: 11,
