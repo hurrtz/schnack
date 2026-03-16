@@ -24,6 +24,7 @@ interface ConversationDrawerProps {
   activeId: string | null;
   onSelect: (id: string) => void;
   onCopyThread: (id: string) => void;
+  onShareThread: (id: string) => void;
   onNewSession: () => void;
   onDelete: (id: string) => void;
   onClose: () => void;
@@ -35,6 +36,7 @@ export function ConversationDrawer({
   activeId,
   onSelect,
   onCopyThread,
+  onShareThread,
   onNewSession,
   onDelete,
   onClose,
@@ -256,51 +258,82 @@ export function ConversationDrawer({
                           >
                             {item.lastModel || t("noModelYet")}
                           </Text>
-                        <View
-                          style={[
-                            styles.statePill,
-                            {
-                              backgroundColor: active
-                                  ? colors.accentSoft
-                                  : colors.surfaceAlt,
-                                borderColor: colors.border,
-                              },
-                            ]}
-                          >
-                            <Text
+                          <View style={styles.itemFooterActions}>
+                            <View
                               style={[
-                                styles.stateText,
-                                { color: active ? colors.accent : colors.textSecondary },
+                                styles.statePill,
+                                {
+                                  backgroundColor: active
+                                    ? colors.accentSoft
+                                    : colors.surfaceAlt,
+                                  borderColor: colors.border,
+                                },
                               ]}
                             >
-                              {active ? t("live") : t("saved")}
-                            </Text>
+                              <Text
+                                style={[
+                                  styles.stateText,
+                                  {
+                                    color: active
+                                      ? colors.accent
+                                      : colors.textSecondary,
+                                  },
+                                ]}
+                              >
+                                {active ? t("live") : t("saved")}
+                              </Text>
+                            </View>
+                            <TouchableOpacity
+                              style={[
+                                styles.threadAction,
+                                {
+                                  backgroundColor: colors.surfaceAlt,
+                                  borderColor: colors.border,
+                                },
+                              ]}
+                              onPress={() => onShareThread(item.id)}
+                              activeOpacity={0.88}
+                            >
+                              <Feather
+                                name="share"
+                                size={13}
+                                color={colors.textSecondary}
+                              />
+                              <Text
+                                style={[
+                                  styles.copyActionText,
+                                  { color: colors.textSecondary },
+                                ]}
+                              >
+                                {t("share")}
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[
+                                styles.threadAction,
+                                {
+                                  backgroundColor: colors.surfaceAlt,
+                                  borderColor: colors.border,
+                                },
+                              ]}
+                              onPress={() => onCopyThread(item.id)}
+                              activeOpacity={0.88}
+                            >
+                              <Feather
+                                name="copy"
+                                size={13}
+                                color={colors.textSecondary}
+                              />
+                              <Text
+                                style={[
+                                  styles.copyActionText,
+                                  { color: colors.textSecondary },
+                                ]}
+                              >
+                                {t("copy")}
+                              </Text>
+                            </TouchableOpacity>
                           </View>
-                          <TouchableOpacity
-                            style={[
-                              styles.copyAction,
-                              {
-                                backgroundColor: colors.surfaceAlt,
-                                borderColor: colors.border,
-                              },
-                            ]}
-                            onPress={() => onCopyThread(item.id)}
-                            activeOpacity={0.88}
-                          >
-                            <Feather
-                              name="copy"
-                              size={13}
-                              color={colors.textSecondary}
-                            />
-                            <Text
-                              style={[
-                                styles.copyActionText,
-                                { color: colors.textSecondary },
-                              ]}
-                            >
-                              {t("copy")}
-                            </Text>
-                          </TouchableOpacity>
                         </View>
                       </View>
                     </View>
@@ -481,9 +514,16 @@ const styles = StyleSheet.create({
   },
   itemFooter: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12,
+  },
+  itemFooterActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    flexWrap: "wrap",
+    gap: 8,
   },
   itemModel: {
     flex: 1,
@@ -496,7 +536,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  copyAction: {
+  threadAction: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,

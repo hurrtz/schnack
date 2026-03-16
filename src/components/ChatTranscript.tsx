@@ -22,6 +22,7 @@ interface ChatTranscriptProps {
   contentContainerStyle?: StyleProp<ViewStyle>;
   scrollEnabled?: boolean;
   onCopyMessage?: (message: Message) => void;
+  messageSelectionEnabled?: boolean;
 }
 
 export function ChatTranscript({
@@ -32,6 +33,7 @@ export function ChatTranscript({
   contentContainerStyle,
   scrollEnabled = true,
   onCopyMessage,
+  messageSelectionEnabled = false,
 }: ChatTranscriptProps) {
   const { colors } = useTheme();
   const { t } = useLocalization();
@@ -54,7 +56,11 @@ export function ChatTranscript({
       data={messages}
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
-        <ChatBubble message={item} onCopy={onCopyMessage} />
+        <ChatBubble
+          message={item}
+          onCopy={onCopyMessage}
+          selectable={messageSelectionEnabled}
+        />
       )}
       contentContainerStyle={[
         styles.list,

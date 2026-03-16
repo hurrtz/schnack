@@ -138,8 +138,10 @@ const translations = {
     noTtsProvider: "No TTS provider",
     nothingToCopyYet: "Nothing to copy yet.",
     couldntCopyText: "Couldn't copy that text.",
+    couldntShareText: "Couldn't share that text.",
     messageCopied: "Message copied.",
     noConversationToCopyYet: "No conversation to copy yet.",
+    noConversationToShareYet: "No conversation to share yet.",
     threadCopied: "Thread copied.",
     addProviderKeyToUseProvider: ({ provider }) =>
       `Add your ${provider} API key in Settings to use this provider.`,
@@ -178,6 +180,7 @@ const translations = {
     conversation: "Conversation",
     open: "Open",
     copyThread: "Copy Thread",
+    shareThread: "Share Thread",
     noTranscriptYet: "No transcript yet",
     previewTranscriptEmptyDescription:
       "Start with the voice stage above. Your messages and the model reply will land here instantly.",
@@ -185,6 +188,8 @@ const translations = {
     noConversationYet: "No conversation yet",
     expandedTranscriptEmptyDescription:
       "Speak with the control above. Pull the drawer handle down when you want to return to the main stage.",
+    transcriptSelectionHint:
+      "Select any message text directly in this transcript.",
     startWithGroq: "Start with Groq",
     groqStarterDescription:
       "Groq offers a free tier, so it is the fastest way to unlock the app. Add its API key in Settings and the provider switcher will appear here right away.",
@@ -206,6 +211,7 @@ const translations = {
     noModelYet: "No model yet",
     saved: "Saved",
     copy: "Copy",
+    share: "Share",
     listening: "Listening",
     parsing: "Parsing",
     thinking: "Thinking",
@@ -391,8 +397,10 @@ const translations = {
     noTtsProvider: "Kein TTS-Anbieter",
     nothingToCopyYet: "Noch nichts zum Kopieren.",
     couldntCopyText: "Der Text konnte nicht kopiert werden.",
+    couldntShareText: "Der Text konnte nicht geteilt werden.",
     messageCopied: "Nachricht kopiert.",
     noConversationToCopyYet: "Noch keine Konversation zum Kopieren.",
+    noConversationToShareYet: "Noch keine Konversation zum Teilen.",
     threadCopied: "Verlauf kopiert.",
     addProviderKeyToUseProvider: ({ provider }) =>
       `Fuege in den Einstellungen deinen API-Schluessel fuer ${provider} hinzu, um diesen Anbieter zu nutzen.`,
@@ -433,6 +441,7 @@ const translations = {
     conversation: "Konversation",
     open: "Oeffnen",
     copyThread: "Verlauf kopieren",
+    shareThread: "Verlauf teilen",
     noTranscriptYet: "Noch kein Transkript",
     previewTranscriptEmptyDescription:
       "Starte oben mit der Sprachbuehne. Deine Nachrichten und die Modellantwort erscheinen hier sofort.",
@@ -440,6 +449,8 @@ const translations = {
     noConversationYet: "Noch keine Konversation",
     expandedTranscriptEmptyDescription:
       "Sprich ueber die Steuerung oben. Ziehe den Griff des Drawers nach unten, um zur Hauptansicht zurueckzukehren.",
+    transcriptSelectionHint:
+      "Du kannst Text in diesem Transkript direkt markieren und kopieren.",
     startWithGroq: "Mit Groq starten",
     groqStarterDescription:
       "Groq bietet einen kostenlosen Tarif und ist damit der schnellste Weg, die App freizuschalten. Fuege in den Einstellungen den API-Schluessel hinzu, dann erscheint der Anbieter-Umschalter sofort hier.",
@@ -462,6 +473,7 @@ const translations = {
     noModelYet: "Noch kein Modell",
     saved: "Gespeichert",
     copy: "Kopieren",
+    share: "Teilen",
     listening: "Hoert",
     parsing: "Verarbeitet",
     thinking: "Denkt",

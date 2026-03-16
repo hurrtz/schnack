@@ -3,6 +3,7 @@ import {
   Animated,
   PanResponder,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -200,6 +201,37 @@ export function MainScreen() {
       );
     },
     [activeConversation, copyText, getConversationById, language, showToast, t]
+  );
+
+  const handleShareThread = useCallback(
+    async (conversationId?: string) => {
+      const conversation = conversationId
+        ? await getConversationById(conversationId)
+        : activeConversation;
+
+      if (!conversation || conversation.messages.length === 0) {
+        showToast(t("noConversationToShareYet"));
+        return;
+      }
+
+      const title = conversation.title.trim() || t("untitledConversation");
+      const message = formatConversationForCopy(conversation, language);
+
+      try {
+        await Share.share(
+          {
+            title,
+            message,
+          },
+          {
+            dialogTitle: title,
+          }
+        );
+      } catch {
+        showToast(t("couldntShareText"));
+      }
+    },
+    [activeConversation, getConversationById, language, showToast, t]
   );
 
   const resetExpandedDrawer = useCallback(() => {
@@ -1060,6 +1092,25 @@ export function MainScreen() {
                     {t("copyThread")}
                   </Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.copyButton,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    void handleShareThread();
+                  }}
+                >
+                  <Feather name="share" size={14} color={colors.accent} />
+                  <Text
+                    style={[styles.copyButtonText, { color: colors.text }]}
+                  >
+                    {t("shareThread")}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               <View
@@ -1140,7 +1191,18 @@ export function MainScreen() {
                 >
                   {providerLabel} · {model}
                 </Text>
+                <Text
+                  style={[
+                    styles.expandedTranscriptHint,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {t("transcriptSelectionHint")}
+                </Text>
               </View>
+            </View>
+
+            <View style={styles.transcriptHeaderActions}>
               <TouchableOpacity
                 style={[
                   styles.copyButton,
@@ -1160,6 +1222,25 @@ export function MainScreen() {
                   {t("copyThread")}
                 </Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.copyButton,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+                onPress={() => {
+                  void handleShareThread();
+                }}
+              >
+                <Feather name="share" size={14} color={colors.accent} />
+                <Text
+                  style={[styles.copyButtonText, { color: colors.text }]}
+                >
+                  {t("shareThread")}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             <ChatTranscript
@@ -1167,9 +1248,7 @@ export function MainScreen() {
               emptyTitle={t("noConversationYet")}
               emptyDescription={t("expandedTranscriptEmptyDescription")}
               contentContainerStyle={styles.expandedTranscriptContent}
-              onCopyMessage={(message) => {
-                void handleCopyMessage(message.content);
-              }}
+              messageSelectionEnabled
             />
           </Animated.View>
         </View>
@@ -1193,6 +1272,9 @@ export function MainScreen() {
         onSelect={selectConversation}
         onCopyThread={(id) => {
           void handleCopyThread(id);
+        }}
+        onShareThread={(id) => {
+          void handleShareThread(id);
         }}
         onNewSession={clearActiveConversation}
         onDelete={deleteConversation}
@@ -1474,6 +1556,8 @@ const styles = StyleSheet.create({
   transcriptHeaderActions: {
     flexDirection: "row",
     justifyContent: "flex-end",
+    flexWrap: "wrap",
+    gap: 8,
     marginBottom: 10,
   },
   transcriptHeaderCopy: {
@@ -1534,5 +1618,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: "uppercase",
     fontFamily: fonts.mono,
+  },
+  expandedTranscriptHint: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: fonts.body,
   },
 });
