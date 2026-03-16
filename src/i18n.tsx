@@ -28,6 +28,8 @@ const translations = {
     dark: "Dark",
     system: "System",
     languageCoverage: ({ note }) => `Language coverage: ${note}`,
+    replyGenerationAction: "reply generation",
+    speechTranscriptionAction: "speech transcription",
     instructionsTabDescription:
       "Shape the hidden guidance that steers the assistant before any provider sees the request.",
     providersTabDescription:
@@ -255,6 +257,20 @@ const translations = {
     parsingYourVoice: "Parsing your voice",
     providerConfiguredInSettings: ({ provider }) =>
       `${provider} is not configured in Settings.`,
+    providerNetworkError: ({ provider, action }) =>
+      `Couldn't reach ${provider} for ${action}. Check the connection and try again.`,
+    providerAuthError: ({ provider, action }) =>
+      `${provider} rejected the credentials for ${action}. Check the API key and permissions.`,
+    providerRateLimitError: ({ provider, action }) =>
+      `${provider} is rate limiting ${action} right now. Try again in a moment.`,
+    providerTemporaryError: ({ provider, action }) =>
+      `${provider} had a temporary problem during ${action}. Try again shortly.`,
+    providerContextTooLong: ({ provider }) =>
+      `${provider} rejected the reply because the conversation got too long. Start a fresh thread or shorten the request.`,
+    providerRequestRejected: ({ provider, action, detail }) =>
+      detail
+        ? `${provider} rejected the ${action} request: ${detail}`
+        : `${provider} rejected the ${action} request.`,
     providerValidationSuccess: ({ provider }) =>
       `${provider} is ready to use.`,
     providerValidationFailed: "Provider validation failed.",
@@ -318,6 +334,8 @@ const translations = {
     dark: "Dunkel",
     system: "System",
     languageCoverage: ({ note }) => `Sprachabdeckung: ${note}`,
+    replyGenerationAction: "Antwortgenerierung",
+    speechTranscriptionAction: "Sprachtranskription",
     instructionsTabDescription:
       "Lege die verborgene Anleitung fest, die den Assistenten steuert, bevor ein Anbieter die Anfrage sieht.",
     providersTabDescription:
@@ -552,6 +570,20 @@ const translations = {
     parsingYourVoice: "Deine Sprache wird verarbeitet",
     providerConfiguredInSettings: ({ provider }) =>
       `${provider} ist in den Einstellungen nicht konfiguriert.`,
+    providerNetworkError: ({ provider, action }) =>
+      `${provider} konnte fuer ${action} nicht erreicht werden. Pruefe die Verbindung und versuche es erneut.`,
+    providerAuthError: ({ provider, action }) =>
+      `${provider} hat die Zugangsdaten fuer ${action} abgelehnt. Pruefe API-Schluessel und Berechtigungen.`,
+    providerRateLimitError: ({ provider, action }) =>
+      `${provider} begrenzt ${action} gerade. Versuche es gleich noch einmal.`,
+    providerTemporaryError: ({ provider, action }) =>
+      `${provider} hatte waehrend ${action} ein temporaeres Problem. Versuche es in kuerze erneut.`,
+    providerContextTooLong: ({ provider }) =>
+      `${provider} hat die Antwort abgelehnt, weil die Konversation zu lang geworden ist. Starte einen neuen Verlauf oder kuerze die Anfrage.`,
+    providerRequestRejected: ({ provider, action, detail }) =>
+      detail
+        ? `${provider} hat die Anfrage fuer ${action} abgelehnt: ${detail}`
+        : `${provider} hat die Anfrage fuer ${action} abgelehnt.`,
     providerValidationSuccess: ({ provider }) =>
       `${provider} ist einsatzbereit.`,
     providerValidationFailed: "Anbieter-Pruefung fehlgeschlagen.",

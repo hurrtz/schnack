@@ -1,6 +1,10 @@
 import { PROVIDER_LABELS } from "../constants/models";
 import { networkFetch } from "./networkFetch";
 import {
+  buildProviderHttpError,
+  normalizeProviderTransportError,
+} from "./providerErrors";
+import {
   AppLanguage,
   AssistantResponseLength,
   AssistantResponseTone,
@@ -168,31 +172,42 @@ async function requestOpenAICompatibleChat(params: {
     systemPrompt,
     abortSignal,
   } = params;
-  const response = await networkFetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${requireProviderKey(provider, apiKey, language)}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...toAPIMessages(messages),
-      ],
-    }),
-    signal: abortSignal,
-  });
+  let response: Awaited<ReturnType<typeof networkFetch>>;
+
+  try {
+    response = await networkFetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${requireProviderKey(provider, apiKey, language)}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...toAPIMessages(messages),
+        ],
+      }),
+      signal: abortSignal,
+    });
+  } catch (error) {
+    throw normalizeProviderTransportError({
+      provider,
+      language,
+      error,
+      action: "reply",
+    });
+  }
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(
-      translate(language, "apiError", {
-        provider: PROVIDER_LABELS[provider],
-        status: response.status,
-        errorText: errText,
-      })
-    );
+    throw buildProviderHttpError({
+      provider,
+      language,
+      status: response.status,
+      errorText: errText,
+      action: "reply",
+    });
   }
 
   const data = await response.json();
@@ -274,32 +289,43 @@ async function requestOpenAICompatibleChatStream(params: {
     onChunk,
     abortSignal,
   } = params;
-  const response = await networkFetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${requireProviderKey(provider, apiKey, language)}`,
-    },
-    body: JSON.stringify({
-      model,
-      stream: true,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...toAPIMessages(messages),
-      ],
-    }),
-    signal: abortSignal,
-  });
+  let response: Awaited<ReturnType<typeof networkFetch>>;
+
+  try {
+    response = await networkFetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${requireProviderKey(provider, apiKey, language)}`,
+      },
+      body: JSON.stringify({
+        model,
+        stream: true,
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...toAPIMessages(messages),
+        ],
+      }),
+      signal: abortSignal,
+    });
+  } catch (error) {
+    throw normalizeProviderTransportError({
+      provider,
+      language,
+      error,
+      action: "reply",
+    });
+  }
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(
-      translate(language, "apiError", {
-        provider: PROVIDER_LABELS[provider],
-        status: response.status,
-        errorText: errText,
-      })
-    );
+    throw buildProviderHttpError({
+      provider,
+      language,
+      status: response.status,
+      errorText: errText,
+      action: "reply",
+    });
   }
 
   if (!response.body) {
@@ -353,31 +379,42 @@ async function requestAnthropicChat(params: {
   abortSignal?: AbortSignal;
 }) {
   const { model, messages, apiKey, systemPrompt, abortSignal } = params;
-  const response = await networkFetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": requireProviderKey("anthropic", apiKey, params.language),
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages: toAPIMessages(messages),
-    }),
-    signal: abortSignal,
-  });
+  let response: Awaited<ReturnType<typeof networkFetch>>;
+
+  try {
+    response = await networkFetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": requireProviderKey("anthropic", apiKey, params.language),
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: toAPIMessages(messages),
+      }),
+      signal: abortSignal,
+    });
+  } catch (error) {
+    throw normalizeProviderTransportError({
+      provider: "anthropic",
+      language: params.language,
+      error,
+      action: "reply",
+    });
+  }
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(
-      translate(params.language, "apiError", {
-        provider: PROVIDER_LABELS.anthropic,
-        status: response.status,
-        errorText: errText,
-      })
-    );
+    throw buildProviderHttpError({
+      provider: "anthropic",
+      language: params.language,
+      status: response.status,
+      errorText: errText,
+      action: "reply",
+    });
   }
 
   const data = await response.json();
@@ -396,32 +433,43 @@ async function requestAnthropicChatStream(params: {
   abortSignal?: AbortSignal;
 }) {
   const { model, messages, apiKey, systemPrompt, onChunk, abortSignal } = params;
-  const response = await networkFetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": requireProviderKey("anthropic", apiKey, params.language),
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 4096,
-      system: systemPrompt,
-      stream: true,
-      messages: toAPIMessages(messages),
-    }),
-    signal: abortSignal,
-  });
+  let response: Awaited<ReturnType<typeof networkFetch>>;
+
+  try {
+    response = await networkFetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": requireProviderKey("anthropic", apiKey, params.language),
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 4096,
+        system: systemPrompt,
+        stream: true,
+        messages: toAPIMessages(messages),
+      }),
+      signal: abortSignal,
+    });
+  } catch (error) {
+    throw normalizeProviderTransportError({
+      provider: "anthropic",
+      language: params.language,
+      error,
+      action: "reply",
+    });
+  }
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(
-      translate(params.language, "apiError", {
-        provider: PROVIDER_LABELS.anthropic,
-        status: response.status,
-        errorText: errText,
-      })
-    );
+    throw buildProviderHttpError({
+      provider: "anthropic",
+      language: params.language,
+      status: response.status,
+      errorText: errText,
+      action: "reply",
+    });
   }
 
   if (!response.body) {
@@ -501,31 +549,42 @@ async function requestCohereChat(params: {
   abortSignal?: AbortSignal;
 }) {
   const { model, messages, apiKey, systemPrompt, abortSignal } = params;
-  const response = await networkFetch("https://api.cohere.com/v2/chat", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${requireProviderKey("cohere", apiKey, params.language)}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...toAPIMessages(messages),
-      ],
-    }),
-    signal: abortSignal,
-  });
+  let response: Awaited<ReturnType<typeof networkFetch>>;
+
+  try {
+    response = await networkFetch("https://api.cohere.com/v2/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${requireProviderKey("cohere", apiKey, params.language)}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...toAPIMessages(messages),
+        ],
+      }),
+      signal: abortSignal,
+    });
+  } catch (error) {
+    throw normalizeProviderTransportError({
+      provider: "cohere",
+      language: params.language,
+      error,
+      action: "reply",
+    });
+  }
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(
-      translate(params.language, "apiError", {
-        provider: PROVIDER_LABELS.cohere,
-        status: response.status,
-        errorText: errText,
-      })
-    );
+    throw buildProviderHttpError({
+      provider: "cohere",
+      language: params.language,
+      status: response.status,
+      errorText: errText,
+      action: "reply",
+    });
   }
 
   const data = await response.json();

@@ -114,4 +114,28 @@ describe("validateProviderConnection", () => {
     expect(body.messages[0].role).toBe("system");
     expect(body.messages[1].content).toBe("Reply with OK only.");
   });
+
+  it("returns a human-readable auth error when the provider rejects credentials", async () => {
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      text: async () =>
+        JSON.stringify({
+          error: {
+            message: "Incorrect API key provided.",
+          },
+        }),
+    });
+
+    await expect(
+      validateProviderConnection({
+        provider: "openai",
+        model: "gpt-5.4",
+        apiKey: "sk-test-key",
+        language: "en",
+      })
+    ).rejects.toThrow(
+      "OpenAI rejected the credentials for reply generation. Check the API key and permissions."
+    );
+  });
 });

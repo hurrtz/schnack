@@ -1,6 +1,10 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { PROVIDER_LABELS } from "../constants/models";
 import { translate } from "../i18n";
+import {
+  buildProviderHttpError,
+  normalizeProviderTransportError,
+} from "./providerErrors";
 import { AppLanguage, Provider, VoiceBackendMode } from "../types";
 import {
   getDeviceLocale,
@@ -114,43 +118,54 @@ export async function transcribeAudio(params: {
       encoding: "base64",
     });
 
-    const response = await fetch(config.endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": requireProviderKey(provider, apiKey, language),
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: `Transcribe this audio exactly. Return only the transcription text in the original spoken language. Do not translate, summarize, or add commentary. Current locale hint: ${getDeviceLocale()}.`,
-              },
-              {
-                inlineData: {
-                  mimeType: getFileAudioMimeType(fileUri),
-                  data: base64,
-                },
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0,
+    let response: Awaited<ReturnType<typeof fetch>>;
+
+    try {
+      response = await fetch(config.endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": requireProviderKey(provider, apiKey, language),
         },
-      }),
-    });
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `Transcribe this audio exactly. Return only the transcription text in the original spoken language. Do not translate, summarize, or add commentary. Current locale hint: ${getDeviceLocale()}.`,
+                },
+                {
+                  inlineData: {
+                    mimeType: getFileAudioMimeType(fileUri),
+                    data: base64,
+                  },
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0,
+          },
+        }),
+      });
+    } catch (error) {
+      throw normalizeProviderTransportError({
+        provider,
+        language,
+        error,
+        action: "transcription",
+      });
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(
-        translate(language, "sttError", {
-          provider: PROVIDER_LABELS[provider],
-          status: response.status,
-          errorText,
-        })
-      );
+      throw buildProviderHttpError({
+        provider,
+        language,
+        status: response.status,
+        errorText,
+        action: "transcription",
+      });
     }
 
     const data = await response.json();
@@ -173,23 +188,34 @@ export async function transcribeAudio(params: {
     formData.append("language", languageHint);
   }
 
-  const response = await fetch(config.endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${requireProviderKey(provider, apiKey, language)}`,
-    },
-    body: formData,
-  });
+  let response: Awaited<ReturnType<typeof fetch>>;
+
+  try {
+    response = await fetch(config.endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${requireProviderKey(provider, apiKey, language)}`,
+      },
+      body: formData,
+    });
+  } catch (error) {
+    throw normalizeProviderTransportError({
+      provider,
+      language,
+      error,
+      action: "transcription",
+    });
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      translate(language, "sttError", {
-        provider: PROVIDER_LABELS[provider],
-        status: response.status,
-        errorText,
-      })
-    );
+    throw buildProviderHttpError({
+      provider,
+      language,
+      status: response.status,
+      errorText,
+      action: "transcription",
+    });
   }
 
   const data = await response.json();
