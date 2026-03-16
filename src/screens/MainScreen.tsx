@@ -99,6 +99,7 @@ export function MainScreen() {
   const abortRef = useRef<AbortController | null>(null);
   const recordingStartedRef = useRef<Promise<void> | null>(null);
   const lastCompletedReplyRef = useRef("");
+  const ttsFallbackToastShownRef = useRef(false);
   const expandedDrawerTranslateY = useRef(new Animated.Value(0)).current;
 
   const provider = settings.lastProvider;
@@ -289,7 +290,19 @@ export function MainScreen() {
         provider: ttsProvider,
         apiKey: ttsApiKey,
         language,
+      }).catch(async (error) => {
+        if (!(error instanceof TtsRequestError)) {
+          throw error;
+        }
+
+        player.speakText(trimmed);
+        showToast(t("providerVoiceFallback"));
+        return null;
       });
+
+      if (!audioUris) {
+        return;
+      }
 
       audioUris.forEach((audioUri) => {
         player.enqueueAudio(audioUri);
@@ -511,6 +524,7 @@ export function MainScreen() {
     }) => {
       setPipelinePhase(transcriptionOverride ? "thinking" : "transcribing");
       setStreamingText("");
+      ttsFallbackToastShownRef.current = false;
       abortRef.current = new AbortController();
       player.resetCancellation();
 
@@ -574,6 +588,14 @@ export function MainScreen() {
             },
             onSpeechTextReady: (text) => {
               player.speakText(text);
+            },
+            onTtsFallback: () => {
+              if (ttsFallbackToastShownRef.current) {
+                return;
+              }
+
+              ttsFallbackToastShownRef.current = true;
+              showToast(t("providerVoiceFallback"));
             },
             onError: (error) => {
               setPipelinePhase("idle");
@@ -811,7 +833,20 @@ export function MainScreen() {
           provider: ttsProvider,
           apiKey: ttsApiKey,
           language,
+        }).catch((error) => {
+          if (!(error instanceof TtsRequestError)) {
+            throw error;
+          }
+
+          player.speakText(text);
+          showToast(t("providerVoicePreviewFallback"));
+          return null;
         });
+
+        if (!audioUri) {
+          return;
+        }
+
         player.enqueueAudio(audioUri);
       } catch (error) {
         const message =

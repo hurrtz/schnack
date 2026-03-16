@@ -176,6 +176,10 @@ const translations = {
     chooseTtsToPreviewVoices:
       "Choose an enabled TTS provider in Settings to preview voices.",
     couldntPreviewVoice: "Couldn't preview voice.",
+    providerVoiceFallback:
+      "Provider voice failed. Switched this reply to the system voice.",
+    providerVoicePreviewFallback:
+      "Provider voice failed. Preview switched to the system voice.",
     liveInput: "Live Input",
     parsingInput: "Parsing Input",
     awaitingModel: "Awaiting Model",
@@ -467,6 +471,10 @@ const translations = {
     chooseTtsToPreviewVoices:
       "Waehle in den Einstellungen einen aktivierten TTS-Anbieter, um Stimmen zu testen.",
     couldntPreviewVoice: "Die Stimmvorschau konnte nicht abgespielt werden.",
+    providerVoiceFallback:
+      "Die Anbieter-Stimme ist ausgefallen. Diese Antwort wird mit der Systemstimme abgespielt.",
+    providerVoicePreviewFallback:
+      "Die Anbieter-Stimme ist ausgefallen. Die Vorschau nutzt jetzt die Systemstimme.",
     liveInput: "Live-Eingabe",
     parsingInput: "Eingabe wird verarbeitet",
     awaitingModel: "Modell wartet",

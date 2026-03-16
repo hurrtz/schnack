@@ -60,6 +60,7 @@ interface PipelineCallbacks {
   onResponseDone: (fullText: string) => void;
   onAudioReady: (audioUri: string) => void;
   onSpeechTextReady: (text: string, voice?: string) => void;
+  onTtsFallback?: (error: Error) => void;
   onError: (error: Error) => void;
 }
 
@@ -203,17 +204,28 @@ export async function runVoicePipeline(params: {
         return;
       }
 
-      const audio = await synthesizeSpeech({
-        text: trimmed,
-        voice: ttsVoice,
-        mode: ttsMode,
-        provider: ttsProvider,
-        apiKey: ttsApiKey,
-        language,
-      });
+      try {
+        const audio = await synthesizeSpeech({
+          text: trimmed,
+          voice: ttsVoice,
+          mode: ttsMode,
+          provider: ttsProvider,
+          apiKey: ttsApiKey,
+          language,
+        });
 
-      if (!abortSignal?.aborted) {
-        callbacks.onAudioReady(audio);
+        if (!abortSignal?.aborted) {
+          callbacks.onAudioReady(audio);
+        }
+      } catch (error) {
+        const normalizedError =
+          error instanceof Error ? error : new Error(String(error));
+
+        callbacks.onTtsFallback?.(normalizedError);
+
+        if (!abortSignal?.aborted) {
+          callbacks.onSpeechTextReady(trimmed, undefined);
+        }
       }
     });
 
