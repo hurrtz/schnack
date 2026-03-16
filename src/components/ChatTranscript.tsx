@@ -22,6 +22,7 @@ interface ChatTranscriptProps {
   contentContainerStyle?: StyleProp<ViewStyle>;
   scrollEnabled?: boolean;
   onCopyMessage?: (message: Message) => void;
+  onShareMessage?: (message: Message) => void;
   messageSelectionEnabled?: boolean;
 }
 
@@ -33,6 +34,7 @@ export function ChatTranscript({
   contentContainerStyle,
   scrollEnabled = true,
   onCopyMessage,
+  onShareMessage,
   messageSelectionEnabled = false,
 }: ChatTranscriptProps) {
   const { colors } = useTheme();
@@ -59,6 +61,7 @@ export function ChatTranscript({
         <ChatBubble
           message={item}
           onCopy={onCopyMessage}
+          onShare={onShareMessage}
           selectable={messageSelectionEnabled}
         />
       )}

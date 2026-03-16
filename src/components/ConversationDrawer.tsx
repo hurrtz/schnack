@@ -23,6 +23,7 @@ interface ConversationDrawerProps {
   visible: boolean;
   conversations: ConversationMeta[];
   activeId: string | null;
+  onSearchConversations: (query: string) => Promise<ConversationMeta[]>;
   onSelect: (id: string) => void;
   onCopyThread: (id: string) => void;
   onShareThread: (id: string) => void;
@@ -37,6 +38,7 @@ export function ConversationDrawer({
   visible,
   conversations,
   activeId,
+  onSearchConversations,
   onSelect,
   onCopyThread,
   onShareThread,
@@ -53,6 +55,37 @@ export function ConversationDrawer({
     string | null
   >(null);
   const [editingTitle, setEditingTitle] = React.useState("");
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [filteredConversations, setFilteredConversations] = React.useState<
+    ConversationMeta[]
+  >(conversations);
+
+  React.useEffect(() => {
+    if (!visible) {
+      setSearchQuery("");
+      setFilteredConversations(conversations);
+      return;
+    }
+
+    const normalizedQuery = searchQuery.trim();
+
+    if (!normalizedQuery) {
+      setFilteredConversations(conversations);
+      return;
+    }
+
+    let cancelled = false;
+
+    void onSearchConversations(normalizedQuery).then((results) => {
+      if (!cancelled) {
+        setFilteredConversations(results);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [conversations, onSearchConversations, searchQuery, visible]);
 
   const renderRightActions = (id: string) => (
     <TouchableOpacity
@@ -168,8 +201,37 @@ export function ConversationDrawer({
             </LinearGradient>
           </TouchableOpacity>
 
+          <View
+            style={[
+              styles.searchShell,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Feather name="search" size={16} color={colors.textMuted} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder={t("searchConversationsPlaceholder")}
+              placeholderTextColor={colors.textMuted}
+              selectionColor={colors.accent}
+              style={[styles.searchInput, { color: colors.text }]}
+            />
+            {searchQuery.trim() ? (
+              <TouchableOpacity
+                onPress={() => setSearchQuery("")}
+                style={styles.searchClearButton}
+                activeOpacity={0.82}
+              >
+                <Feather name="x" size={15} color={colors.textSecondary} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
             <FlatList
-              data={conversations}
+              data={searchQuery.trim() ? filteredConversations : conversations}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.list}
               ListEmptyComponent={
@@ -191,12 +253,16 @@ export function ConversationDrawer({
                     <Feather name="message-circle" size={18} color={colors.accent} />
                   </View>
                   <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                    {t("noSavedConversationsYet")}
+                    {searchQuery.trim()
+                      ? t("noMatchingConversations")
+                      : t("noSavedConversationsYet")}
                   </Text>
                   <Text
                     style={[styles.emptyDescription, { color: colors.textSecondary }]}
                   >
-                    {t("drawerEmptyDescription")}
+                    {searchQuery.trim()
+                      ? t("noMatchingConversationsDescription")
+                      : t("drawerEmptyDescription")}
                   </Text>
                 </View>
               }
@@ -676,6 +742,30 @@ const styles = StyleSheet.create({
     color: "#F4F8FF",
     fontSize: 15,
     fontFamily: fonts.display,
+  },
+  searchShell: {
+    marginHorizontal: 18,
+    marginBottom: 14,
+    minHeight: 46,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingLeft: 14,
+    paddingRight: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    minHeight: 42,
+    fontSize: 14,
+    fontFamily: fonts.body,
+  },
+  searchClearButton: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
   },
   list: {
     paddingHorizontal: 18,

@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { PROVIDER_LABELS } from "../constants/models";
+import { useLocalization } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Message } from "../types";
@@ -9,15 +10,18 @@ import { Message } from "../types";
 interface ChatBubbleProps {
   message: Message;
   onCopy?: (message: Message) => void;
+  onShare?: (message: Message) => void;
   selectable?: boolean;
 }
 
 export function ChatBubble({
   message,
   onCopy,
+  onShare,
   selectable = false,
 }: ChatBubbleProps) {
   const { colors, isDark } = useTheme();
+  const { t } = useLocalization();
   const isUser = message.role === "user";
   const providerLabel = message.provider
     ? PROVIDER_LABELS[message.provider]
@@ -52,6 +56,44 @@ export function ChatBubble({
       >
         {message.content}
       </Text>
+      {selectable && (onCopy || onShare) ? (
+        <View style={styles.actionRow}>
+          {onCopy ? (
+            <TouchableOpacity
+              style={[
+                styles.messageAction,
+                {
+                  backgroundColor: colors.surfaceAlt,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => onCopy(message)}
+              activeOpacity={0.88}
+            >
+              <Text style={[styles.messageActionText, { color: colors.textSecondary }]}>
+                {t("copy")}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+          {onShare ? (
+            <TouchableOpacity
+              style={[
+                styles.messageAction,
+                {
+                  backgroundColor: colors.surfaceAlt,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => onShare(message)}
+              activeOpacity={0.88}
+            >
+              <Text style={[styles.messageActionText, { color: colors.textSecondary }]}>
+                {t("share")}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
     </>
   );
 
@@ -181,5 +223,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     fontFamily: fonts.body,
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  messageAction: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  messageActionText: {
+    fontSize: 11,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    fontFamily: fonts.mono,
   },
 });

@@ -148,6 +148,7 @@ const translations = {
     noTtsProvider: "No TTS provider",
     nothingToCopyYet: "Nothing to copy yet.",
     couldntCopyText: "Couldn't copy that text.",
+    nothingToShareYet: "Nothing to share yet.",
     couldntShareText: "Couldn't share that text.",
     couldntReplayReply: "Couldn't replay that reply.",
     messageCopied: "Message copied.",
@@ -231,6 +232,10 @@ const translations = {
     noSavedConversationsYet: "No saved conversations yet",
     drawerEmptyDescription:
       "Start speaking from the main view and SchnackAI will build a session automatically.",
+    searchConversationsPlaceholder: "Search titles, models, and message text",
+    noMatchingConversations: "No matching conversations",
+    noMatchingConversationsDescription:
+      "Try a different title, provider, model, or phrase from the transcript.",
     yesterday: "Yesterday",
     noProviderYet: "No provider yet",
     noModelYet: "No model yet",
@@ -457,6 +462,7 @@ const translations = {
     noTtsProvider: "Kein TTS-Anbieter",
     nothingToCopyYet: "Noch nichts zum Kopieren.",
     couldntCopyText: "Der Text konnte nicht kopiert werden.",
+    nothingToShareYet: "Noch nichts zum Teilen.",
     couldntShareText: "Der Text konnte nicht geteilt werden.",
     couldntReplayReply: "Die Antwort konnte nicht erneut abgespielt werden.",
     messageCopied: "Nachricht kopiert.",
@@ -544,6 +550,11 @@ const translations = {
     noSavedConversationsYet: "Noch keine gespeicherten Konversationen",
     drawerEmptyDescription:
       "Sprich in der Hauptansicht los und SchnackAI erstellt automatisch eine Sitzung.",
+    searchConversationsPlaceholder:
+      "Suche nach Titeln, Modellen und Nachrichtentext",
+    noMatchingConversations: "Keine passenden Konversationen",
+    noMatchingConversationsDescription:
+      "Versuche es mit einem anderen Titel, Anbieter, Modell oder Satz aus dem Transkript.",
     yesterday: "Gestern",
     noProviderYet: "Noch kein Anbieter",
     noModelYet: "Noch kein Modell",

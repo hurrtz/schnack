@@ -255,4 +255,32 @@ describe("useConversations", () => {
     expect(result.current.conversations[0]?.pinned).toBe(true);
     expect(result.current.conversations[1]?.title).toBe("Second");
   });
+
+  it("searches saved conversations by transcript content", async () => {
+    const { result } = renderHook(() => useConversations());
+
+    await act(async () => {
+      result.current.createConversation("Trip planning", "gpt-5.4", "openai");
+    });
+
+    await act(async () => {
+      result.current.addMessage({
+        role: "assistant",
+        content: "Remember to compare Berlin and Hamburg routes.",
+        model: "gpt-5.4",
+        provider: "openai",
+      });
+    });
+
+    let matches = [] as Awaited<
+      ReturnType<typeof result.current.searchConversations>
+    >;
+
+    await act(async () => {
+      matches = await result.current.searchConversations("hamburg");
+    });
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.title).toBe("Trip planning");
+  });
 });

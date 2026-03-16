@@ -75,6 +75,7 @@ export function MainScreen() {
     updateConversationContextSummary,
     renameConversation,
     toggleConversationPinned,
+    searchConversations,
     deleteConversation,
     clearActiveConversation,
   } = useConversations();
@@ -241,6 +242,24 @@ export function MainScreen() {
       }
     },
     [activeConversation, getConversationById, language, showToast, t]
+  );
+
+  const handleShareMessage = useCallback(
+    async (content: string) => {
+      const trimmed = content.trim();
+
+      if (!trimmed) {
+        showToast(t("nothingToShareYet"));
+        return;
+      }
+
+      try {
+        await Share.share({ message: trimmed });
+      } catch {
+        showToast(t("couldntShareText"));
+      }
+    },
+    [showToast, t]
   );
 
   const handleRenameThread = useCallback(
@@ -1462,6 +1481,12 @@ export function MainScreen() {
               emptyTitle={t("noConversationYet")}
               emptyDescription={t("expandedTranscriptEmptyDescription")}
               contentContainerStyle={styles.expandedTranscriptContent}
+              onCopyMessage={(message) => {
+                void handleCopyMessage(message.content);
+              }}
+              onShareMessage={(message) => {
+                void handleShareMessage(message.content);
+              }}
               messageSelectionEnabled
             />
           </Animated.View>
@@ -1484,6 +1509,7 @@ export function MainScreen() {
         visible={drawerVisible}
         conversations={conversations}
         activeId={activeConversation?.id || null}
+        onSearchConversations={searchConversations}
         onSelect={selectConversation}
         onCopyThread={(id) => {
           void handleCopyThread(id);

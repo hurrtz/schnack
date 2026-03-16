@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import uuid from "react-native-uuid";
+import { PROVIDER_LABELS } from "../constants/models";
 import { Conversation, ConversationMeta, Message, Provider } from "../types";
 
 const META_KEY = "@schnackai/conversations";
@@ -341,6 +342,59 @@ export function useConversations() {
     [persistConversationMeta]
   );
 
+  const searchConversations = useCallback(
+    async (query: string) => {
+      const normalizedQuery = query.trim().toLowerCase();
+
+      if (!normalizedQuery) {
+        return conversations;
+      }
+
+      const matches = await Promise.all(
+        conversations.map(async (conversationMeta) => {
+          const providerLabel = conversationMeta.lastProvider
+            ? PROVIDER_LABELS[conversationMeta.lastProvider]
+            : "";
+          const metadataHaystack = [
+            conversationMeta.title,
+            conversationMeta.lastModel ?? "",
+            providerLabel,
+          ]
+            .join(" ")
+            .toLowerCase();
+
+          if (metadataHaystack.includes(normalizedQuery)) {
+            return conversationMeta;
+          }
+
+          const conversation = await getConversationById(conversationMeta.id);
+
+          if (!conversation) {
+            return null;
+          }
+
+          const conversationHaystack = [
+            conversation.contextSummary ?? "",
+            ...conversation.messages.map((message) => message.content),
+          ]
+            .join(" ")
+            .toLowerCase();
+
+          return conversationHaystack.includes(normalizedQuery)
+            ? conversationMeta
+            : null;
+        })
+      );
+
+      return sortConversationMeta(
+        matches.filter(
+          (conversation): conversation is ConversationMeta => conversation !== null
+        )
+      );
+    },
+    [conversations, getConversationById]
+  );
+
   const clearActiveConversation = useCallback(() => {
     setActiveConversationValue(null);
   }, [setActiveConversationValue]);
@@ -355,6 +409,7 @@ export function useConversations() {
     updateConversationContextSummary,
     renameConversation,
     toggleConversationPinned,
+    searchConversations,
     deleteConversation,
     clearActiveConversation,
   };
