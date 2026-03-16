@@ -36,10 +36,10 @@ describe("useSettings", () => {
     (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify(saved));
     (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) => {
       const values: Record<string, string | null> = {
-        "schnack.provider_key.openai": "sk-openai",
-        "schnack.provider_key.anthropic": "sk-anthropic",
-        "schnack.provider_key.gemini": "AIza-test",
-        "schnack.provider_key.nvidia": "nvapi-test",
+        "schnackai.provider_key.openai": "sk-openai",
+        "schnackai.provider_key.anthropic": "sk-anthropic",
+        "schnackai.provider_key.gemini": "AIza-test",
+        "schnackai.provider_key.nvidia": "nvapi-test",
       };
 
       return Promise.resolve(values[key] ?? null);
@@ -87,7 +87,7 @@ describe("useSettings", () => {
     await flushSettingsLoad();
     await act(async () => { result.current.updateSettings({ lastProvider: "anthropic" }); });
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-      "@schnack/settings",
+      "@schnackai/settings",
       expect.stringContaining('"lastProvider":"anthropic"')
     );
   });
@@ -105,7 +105,7 @@ describe("useSettings", () => {
       DEFAULT_ASSISTANT_INSTRUCTIONS_BY_LANGUAGE.de
     );
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-      "@schnack/settings",
+      "@schnackai/settings",
       expect.stringContaining('"language":"de"')
     );
   });
@@ -139,7 +139,7 @@ describe("useSettings", () => {
     });
 
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-      "@schnack/settings",
+      "@schnackai/settings",
       expect.stringContaining('"groq":"openai/gpt-oss-120b"')
     );
     expect(result.current.settings.providerModels.groq).toBe("openai/gpt-oss-120b");
@@ -154,7 +154,7 @@ describe("useSettings", () => {
     });
 
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-      "@schnack/settings",
+      "@schnackai/settings",
       expect.stringContaining('"gemini":"Aoede"')
     );
     expect(result.current.settings.providerTtsVoices.gemini).toBe("Aoede");
@@ -169,7 +169,7 @@ describe("useSettings", () => {
     });
 
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
-      "schnack.provider_key.gemini",
+      "schnackai.provider_key.gemini",
       "AIza-live-key"
     );
     expect(result.current.settings.apiKeys.gemini).toBe("AIza-live-key");
@@ -184,7 +184,7 @@ describe("useSettings", () => {
     });
 
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(
-      "schnack.provider_key.nvidia"
+      "schnackai.provider_key.nvidia"
     );
   });
 });

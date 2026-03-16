@@ -14,8 +14,8 @@ import {
   isDefaultAssistantInstructions,
 } from "../types";
 
-const STORAGE_KEY = "@schnack/settings";
-const API_KEY_STORAGE_PREFIX = "schnack.provider_key";
+const STORAGE_KEY = "@schnackai/settings";
+const API_KEY_STORAGE_PREFIX = "schnackai.provider_key";
 
 type PublicSettings = Omit<Settings, "apiKeys">;
 type SettingsUpdate = Partial<Omit<Settings, "apiKeys" | "providerModels">>;
