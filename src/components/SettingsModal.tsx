@@ -62,6 +62,7 @@ interface SettingsModalProps {
   onUpdateProviderTtsVoice: (provider: Provider, voice: string) => void;
   onUpdateApiKey: (provider: Provider, apiKey: string) => void;
   onPreviewVoice: (text: string) => Promise<void>;
+  onValidateProvider: (provider: Provider) => Promise<void>;
   onClose: () => void;
 }
 
@@ -315,12 +316,14 @@ function ProviderSection({
   onUpdateProviderModel,
   onUpdateApiKey,
   onTextInputFocus,
+  onValidateProvider,
 }: {
   settings: Settings;
   focusProvider?: Provider;
   onUpdateProviderModel: (provider: Provider, model: string) => void;
   onUpdateApiKey: (provider: Provider, apiKey: string) => void;
   onTextInputFocus: TextInputFocusHandler;
+  onValidateProvider: (provider: Provider) => Promise<void>;
 }) {
   const { colors } = useTheme();
   const { t, language } = useLocalization();
@@ -328,6 +331,14 @@ function ProviderSection({
     focusProvider ?? settings.lastProvider
   );
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const [validationStateByProvider, setValidationStateByProvider] = useState<
+    Partial<
+      Record<
+        Provider,
+        { status: "idle" | "validating" | "success" | "error"; message?: string }
+      >
+    >
+  >({});
 
   useEffect(() => {
     setSelectedProvider(focusProvider ?? settings.lastProvider);
@@ -336,6 +347,16 @@ function ProviderSection({
   useEffect(() => {
     setApiKeyVisible(false);
   }, [selectedProvider]);
+
+  const selectedProviderApiKey = settings.apiKeys[selectedProvider];
+  const selectedProviderModel = settings.providerModels[selectedProvider];
+
+  useEffect(() => {
+    setValidationStateByProvider((previous) => ({
+      ...previous,
+      [selectedProvider]: { status: "idle" },
+    }));
+  }, [selectedProvider, selectedProviderApiKey, selectedProviderModel]);
 
   const replyRouteLabel = t("replyModelRoute", {
     route: PROVIDER_LABELS[settings.lastProvider],
@@ -384,8 +405,43 @@ function ProviderSection({
   const handleOpenProviderPortal = React.useCallback(() => {
     void Linking.openURL(PROVIDER_API_KEY_URLS[selectedProvider]);
   }, [selectedProvider]);
-  const hasApiKey = settings.apiKeys[selectedProvider].trim().length > 0;
+  const validationState =
+    validationStateByProvider[selectedProvider] ?? { status: "idle" as const };
+  const hasApiKey = selectedProviderApiKey.trim().length > 0;
   const secureApiKey = hasApiKey && !apiKeyVisible;
+
+  const handleValidateProviderKey = async () => {
+    setValidationStateByProvider((previous) => ({
+      ...previous,
+      [selectedProvider]: {
+        status: "validating",
+      },
+    }));
+
+    try {
+      await onValidateProvider(selectedProvider);
+      setValidationStateByProvider((previous) => ({
+        ...previous,
+        [selectedProvider]: {
+          status: "success",
+          message: t("providerValidationSuccess", {
+            provider: PROVIDER_LABELS[selectedProvider],
+          }),
+        },
+      }));
+    } catch (error) {
+      setValidationStateByProvider((previous) => ({
+        ...previous,
+        [selectedProvider]: {
+          status: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : t("providerValidationFailed"),
+        },
+      }));
+    }
+  };
 
   return (
     <View
@@ -554,26 +610,57 @@ function ProviderSection({
         <Text style={[styles.apiKeyHint, { color: colors.textMuted }]}>
           {getProviderApiKeyHint(selectedProvider, language)}
         </Text>
-        <TouchableOpacity
-          style={[
-            styles.apiKeyLinkButton,
-            {
-              backgroundColor: colors.surfaceElevated,
-              borderColor: colors.border,
-            },
-          ]}
-          onPress={handleOpenProviderPortal}
-          accessibilityRole="link"
-          accessibilityLabel={t("createProviderApiKey", {
-            provider: PROVIDER_LABELS[selectedProvider],
-          })}
-          activeOpacity={0.85}
-        >
-          <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
-            {t("createApiKey")}
-          </Text>
-          <Feather name="external-link" size={14} color={colors.accent} />
-        </TouchableOpacity>
+        <View style={styles.apiKeyActionRow}>
+          <TouchableOpacity
+            style={[
+              styles.apiKeyLinkButton,
+              styles.apiKeyActionButton,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+              },
+            ]}
+            onPress={handleOpenProviderPortal}
+            accessibilityRole="link"
+            accessibilityLabel={t("createProviderApiKey", {
+              provider: PROVIDER_LABELS[selectedProvider],
+            })}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
+              {t("createApiKey")}
+            </Text>
+            <Feather name="external-link" size={14} color={colors.accent} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.apiKeyLinkButton,
+              styles.apiKeyActionButton,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+                opacity:
+                  hasApiKey && validationState.status !== "validating" ? 1 : 0.5,
+              },
+            ]}
+            onPress={() => {
+              void handleValidateProviderKey();
+            }}
+            activeOpacity={0.85}
+            disabled={!hasApiKey || validationState.status === "validating"}
+          >
+            <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
+              {validationState.status === "validating"
+                ? t("validatingKey")
+                : t("validateKey")}
+            </Text>
+            <Feather
+              name={validationState.status === "validating" ? "loader" : "check-circle"}
+              size={14}
+              color={colors.accent}
+            />
+          </TouchableOpacity>
+        </View>
         <View style={styles.apiKeyInputRow}>
           <TextInput
             value={settings.apiKeys[selectedProvider]}
@@ -621,6 +708,41 @@ function ProviderSection({
         <Text style={[styles.sectionHint, { color: colors.textMuted, marginTop: 8 }]}>
           {t("apiKeyProtectedHint")}
         </Text>
+        {validationState.status !== "idle" && validationState.message ? (
+          <View
+            style={[
+              styles.validationCard,
+              {
+                backgroundColor:
+                  validationState.status === "success"
+                    ? colors.accentSoft
+                    : colors.surfaceElevated,
+                borderColor:
+                  validationState.status === "success"
+                    ? colors.borderStrong
+                    : validationState.status === "error"
+                      ? colors.danger
+                      : colors.border,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.validationText,
+                {
+                  color:
+                    validationState.status === "success"
+                      ? colors.accent
+                      : validationState.status === "error"
+                        ? colors.danger
+                        : colors.textSecondary,
+                },
+              ]}
+            >
+              {validationState.message}
+            </Text>
+          </View>
+        ) : null}
         <Picker
           label={`${PROVIDER_LABELS[selectedProvider]} ${t("model")}`}
           value={settings.providerModels[selectedProvider]}
@@ -878,6 +1000,7 @@ export function SettingsModal({
   onUpdateProviderTtsVoice,
   onUpdateApiKey,
   onPreviewVoice,
+  onValidateProvider,
   onClose,
 }: SettingsModalProps) {
   const { colors } = useTheme();
@@ -1238,6 +1361,7 @@ export function SettingsModal({
                 onUpdateProviderModel={onUpdateProviderModel}
                 onUpdateApiKey={onUpdateApiKey}
                 onTextInputFocus={handleTextInputFocus}
+                onValidateProvider={onValidateProvider}
               />
             ) : null}
 
@@ -1667,9 +1791,28 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 10,
   },
+  apiKeyActionRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  apiKeyActionButton: {
+    flex: 1,
+  },
   apiKeyLinkText: {
     fontSize: 13,
     fontFamily: fonts.display,
+  },
+  validationCard: {
+    marginTop: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  validationText: {
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: fonts.body,
   },
   promptCard: {
     borderRadius: 18,

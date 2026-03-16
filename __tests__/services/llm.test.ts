@@ -1,4 +1,4 @@
-import { streamChat } from "../../src/services/llm";
+import { streamChat, validateProviderConnection } from "../../src/services/llm";
 import { Message } from "../../src/types";
 global.fetch = jest.fn();
 
@@ -23,7 +23,7 @@ describe("streamChat", () => {
     });
     (fetch as jest.Mock).mockResolvedValueOnce({ ok: true, body: stream });
     const chunks: string[] = [];
-    await streamChat({ messages: mockMessages, model: "gpt-4o", provider: "openai", apiKey: "sk-test-key", assistantInstructions: "", responseLength: "normal", responseTone: "professional", onChunk: (text) => chunks.push(text), onDone: () => {}, onError: () => {} });
+    await streamChat({ messages: mockMessages, model: "gpt-4o", provider: "openai", apiKey: "sk-test-key", assistantInstructions: "", responseLength: "normal", responseTone: "professional", language: "en", onChunk: (text) => chunks.push(text), onDone: () => {}, onError: () => {} });
     expect(chunks).toEqual(["Hi"]);
     expect((fetch as jest.Mock).mock.calls[0][0]).toBe("https://api.openai.com/v1/chat/completions");
   });
@@ -39,7 +39,7 @@ describe("streamChat", () => {
     });
     (fetch as jest.Mock).mockResolvedValueOnce({ ok: true, body: stream });
     const chunks: string[] = [];
-    await streamChat({ messages: mockMessages, model: "claude-sonnet-4-6", provider: "anthropic", apiKey: "sk-ant-test-key", assistantInstructions: "", responseLength: "normal", responseTone: "professional", onChunk: (text) => chunks.push(text), onDone: () => {}, onError: () => {} });
+    await streamChat({ messages: mockMessages, model: "claude-sonnet-4-6", provider: "anthropic", apiKey: "sk-ant-test-key", assistantInstructions: "", responseLength: "normal", responseTone: "professional", language: "en", onChunk: (text) => chunks.push(text), onDone: () => {}, onError: () => {} });
     expect(chunks).toEqual(["Hi"]);
     expect((fetch as jest.Mock).mock.calls[0][0]).toBe("https://api.anthropic.com/v1/messages");
   });
@@ -71,11 +71,47 @@ describe("streamChat", () => {
       assistantInstructions: "",
       responseLength: "normal",
       responseTone: "professional",
+      language: "en",
       onChunk: (text) => chunks.push(text),
       onDone: () => {},
       onError: () => {},
     });
 
     expect(chunks).toEqual(["Hi there."]);
+  });
+});
+
+describe("validateProviderConnection", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("checks the selected provider and model with a lightweight chat request", async () => {
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: "OK",
+            },
+          },
+        ],
+      }),
+    });
+
+    await validateProviderConnection({
+      provider: "openai",
+      model: "gpt-5.4",
+      apiKey: "sk-test-key",
+      language: "en",
+    });
+
+    const [url, options] = (fetch as jest.Mock).mock.calls[0];
+    expect(url).toBe("https://api.openai.com/v1/chat/completions");
+    const body = JSON.parse(options.body);
+    expect(body.model).toBe("gpt-5.4");
+    expect(body.messages[0].role).toBe("system");
+    expect(body.messages[1].content).toBe("Reply with OK only.");
   });
 });

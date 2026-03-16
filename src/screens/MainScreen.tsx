@@ -33,6 +33,7 @@ import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useNativeSpeechRecognizer } from "../hooks/useNativeSpeechRecognizer";
 import { useConversations } from "../hooks/useConversations";
 import { useLocalization } from "../i18n";
+import { validateProviderConnection } from "../services/llm";
 import { runVoicePipeline } from "../services/voicePipeline";
 import {
   synthesizeSpeech,
@@ -832,6 +833,20 @@ export function MainScreen() {
     ]
   );
 
+  const handleValidateProvider = useCallback(
+    async (nextProvider: Provider) => {
+      const apiKey = settings.apiKeys[nextProvider].trim();
+
+      await validateProviderConnection({
+        provider: nextProvider,
+        model: settings.providerModels[nextProvider],
+        apiKey,
+        language,
+      });
+    },
+    [language, settings.apiKeys, settings.providerModels]
+  );
+
   const baseMessages = activeConversation?.messages || [];
   const lastAssistantReply =
     [...baseMessages]
@@ -1427,6 +1442,7 @@ export function MainScreen() {
         onUpdateProviderTtsVoice={updateProviderTtsVoice}
         onUpdateApiKey={updateApiKey}
         onPreviewVoice={handlePreviewVoice}
+        onValidateProvider={handleValidateProvider}
         onClose={closeSettings}
       />
       <ConversationDrawer

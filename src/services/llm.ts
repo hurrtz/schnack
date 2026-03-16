@@ -638,6 +638,30 @@ export async function summarizeConversationContext(params: {
   return summary.trim();
 }
 
+export async function validateProviderConnection(params: {
+  provider: Provider;
+  model: string;
+  apiKey: string;
+  language: AppLanguage;
+  abortSignal?: AbortSignal;
+}) {
+  await requestChatText({
+    messages: [
+      {
+        role: "user",
+        content: "Reply with OK only.",
+      },
+    ],
+    model: params.model,
+    provider: params.provider,
+    apiKey: params.apiKey,
+    language: params.language,
+    systemPrompt:
+      "You are validating a provider connection for a voice assistant app. Reply with exactly OK.",
+    abortSignal: params.abortSignal,
+  });
+}
+
 export async function streamChat({
   messages,
   model,

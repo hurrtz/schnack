@@ -72,6 +72,8 @@ const translations = {
     createProviderApiKey: ({ provider }) => `Create ${provider} API key`,
     useProvider: ({ provider }) => `Use ${provider}`,
     createApiKey: "Create API key",
+    validateKey: "Validate key",
+    validatingKey: "Validating...",
     configured: "Configured",
     missing: "Missing",
     showKey: "Show key",
@@ -249,6 +251,9 @@ const translations = {
     parsingYourVoice: "Parsing your voice",
     providerConfiguredInSettings: ({ provider }) =>
       `${provider} is not configured in Settings.`,
+    providerValidationSuccess: ({ provider }) =>
+      `${provider} is ready to use.`,
+    providerValidationFailed: "Provider validation failed.",
     noBase64EncoderAvailable: "No base64 encoder available.",
     noBase64DecoderAvailable: "No base64 decoder available.",
     nativeTtsDoesNotSynthesizeAudioFiles:
@@ -355,6 +360,8 @@ const translations = {
       `API-Schluessel fuer ${provider} erstellen`,
     useProvider: ({ provider }) => `${provider} verwenden`,
     createApiKey: "API-Schluessel erstellen",
+    validateKey: "Schluessel pruefen",
+    validatingKey: "Pruefe...",
     configured: "Konfiguriert",
     missing: "Fehlt",
     showKey: "Schluessel zeigen",
@@ -537,6 +544,9 @@ const translations = {
     parsingYourVoice: "Deine Sprache wird verarbeitet",
     providerConfiguredInSettings: ({ provider }) =>
       `${provider} ist in den Einstellungen nicht konfiguriert.`,
+    providerValidationSuccess: ({ provider }) =>
+      `${provider} ist einsatzbereit.`,
+    providerValidationFailed: "Anbieter-Pruefung fehlgeschlagen.",
     noBase64EncoderAvailable: "Kein Base64-Encoder verfuegbar.",
     noBase64DecoderAvailable: "Kein Base64-Decoder verfuegbar.",
     nativeTtsDoesNotSynthesizeAudioFiles:
