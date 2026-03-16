@@ -66,6 +66,12 @@ const translations = {
     createProviderApiKey: ({ provider }) => `Create ${provider} API key`,
     useProvider: ({ provider }) => `Use ${provider}`,
     createApiKey: "Create API key",
+    configured: "Configured",
+    missing: "Missing",
+    showKey: "Show key",
+    hideKey: "Hide key",
+    apiKeyProtectedHint:
+      "Stored keys stay hidden by default. Reveal them only when you need to verify or edit a value.",
     assistantInstructions: "Assistant Instructions",
     assistantInstructionsIntro:
       "Shape the hidden guidance the model receives before every reply.",
@@ -166,6 +172,9 @@ const translations = {
     freshSession: "Fresh session",
     messageCount: ({ count }) =>
       Number(count) === 1 ? "1 message" : `${count} messages`,
+    speechInputRoute: ({ route }) => `Speech in: ${route}`,
+    replyModelRoute: ({ route }) => `Reply model: ${route}`,
+    voiceOutputRoute: ({ route }) => `Voice out: ${route}`,
     conversation: "Conversation",
     open: "Open",
     copyThread: "Copy Thread",
@@ -309,6 +318,12 @@ const translations = {
       `API-Schluessel fuer ${provider} erstellen`,
     useProvider: ({ provider }) => `${provider} verwenden`,
     createApiKey: "API-Schluessel erstellen",
+    configured: "Konfiguriert",
+    missing: "Fehlt",
+    showKey: "Schluessel zeigen",
+    hideKey: "Schluessel verbergen",
+    apiKeyProtectedHint:
+      "Gespeicherte Schluessel bleiben standardmaessig verborgen. Zeige sie nur an, wenn du einen Wert pruefen oder aendern musst.",
     assistantInstructions: "Assistenten-Anweisungen",
     assistantInstructionsIntro:
       "Lege die verborgene Anleitung fest, die das Modell vor jeder Antwort erhaelt.",
@@ -412,6 +427,9 @@ const translations = {
     freshSession: "Neue Sitzung",
     messageCount: ({ count }) =>
       Number(count) === 1 ? "1 Nachricht" : `${count} Nachrichten`,
+    speechInputRoute: ({ route }) => `Sprache rein: ${route}`,
+    replyModelRoute: ({ route }) => `Antwortmodell: ${route}`,
+    voiceOutputRoute: ({ route }) => `Stimme raus: ${route}`,
     conversation: "Konversation",
     open: "Oeffnen",
     copyThread: "Verlauf kopieren",

@@ -327,14 +327,21 @@ function ProviderSection({
   const [selectedProvider, setSelectedProvider] = useState<Provider>(
     focusProvider ?? settings.lastProvider
   );
+  const [apiKeyVisible, setApiKeyVisible] = useState(false);
 
   useEffect(() => {
     setSelectedProvider(focusProvider ?? settings.lastProvider);
   }, [focusProvider, settings.lastProvider]);
 
+  useEffect(() => {
+    setApiKeyVisible(false);
+  }, [selectedProvider]);
+
   const handleOpenProviderPortal = React.useCallback(() => {
     void Linking.openURL(PROVIDER_API_KEY_URLS[selectedProvider]);
   }, [selectedProvider]);
+  const hasApiKey = settings.apiKeys[selectedProvider].trim().length > 0;
+  const secureApiKey = hasApiKey && !apiKeyVisible;
 
   return (
     <View
@@ -395,6 +402,24 @@ function ProviderSection({
         <Text style={[styles.apiKeyTitle, { color: colors.text }]}>
           {PROVIDER_LABELS[selectedProvider]}
         </Text>
+        <View
+          style={[
+            styles.providerStatusPill,
+            {
+              backgroundColor: hasApiKey ? colors.accentSoft : colors.surfaceElevated,
+              borderColor: hasApiKey ? colors.borderStrong : colors.border,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.providerStatusText,
+              { color: hasApiKey ? colors.accent : colors.textSecondary },
+            ]}
+          >
+            {hasApiKey ? t("configured") : t("missing")}
+          </Text>
+        </View>
         <Text style={[styles.apiKeyHint, { color: colors.textMuted }]}>
           {getProviderApiKeyHint(selectedProvider, language)}
         </Text>
@@ -418,25 +443,53 @@ function ProviderSection({
           </Text>
           <Feather name="external-link" size={14} color={colors.accent} />
         </TouchableOpacity>
-        <TextInput
-          value={settings.apiKeys[selectedProvider]}
-          onChangeText={(value) => onUpdateApiKey(selectedProvider, value)}
-          onFocus={onTextInputFocus}
-          placeholder={getProviderApiKeyPlaceholder(selectedProvider, language)}
-          placeholderTextColor={colors.textMuted}
-          selectionColor={colors.accent}
-          autoCapitalize="none"
-          autoCorrect={false}
-          spellCheck={false}
-          style={[
-            styles.apiKeyInput,
-            {
-              backgroundColor: colors.surfaceElevated,
-              borderColor: colors.border,
-              color: colors.text,
-            },
-          ]}
-        />
+        <View style={styles.apiKeyInputRow}>
+          <TextInput
+            value={settings.apiKeys[selectedProvider]}
+            onChangeText={(value) => onUpdateApiKey(selectedProvider, value)}
+            onFocus={onTextInputFocus}
+            placeholder={getProviderApiKeyPlaceholder(selectedProvider, language)}
+            placeholderTextColor={colors.textMuted}
+            selectionColor={colors.accent}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="off"
+            textContentType="password"
+            importantForAutofill="no"
+            spellCheck={false}
+            secureTextEntry={secureApiKey}
+            style={[
+              styles.apiKeyInput,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+                color: colors.text,
+              },
+            ]}
+          />
+          <TouchableOpacity
+            style={[
+              styles.apiKeyVisibilityButton,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+              },
+            ]}
+            onPress={() => setApiKeyVisible((previous) => !previous)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={apiKeyVisible ? t("hideKey") : t("showKey")}
+          >
+            <Feather
+              name={apiKeyVisible ? "eye-off" : "eye"}
+              size={16}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+        </View>
+        <Text style={[styles.sectionHint, { color: colors.textMuted, marginTop: 8 }]}>
+          {t("apiKeyProtectedHint")}
+        </Text>
         <Picker
           label={`${PROVIDER_LABELS[selectedProvider]} ${t("model")}`}
           value={settings.providerModels[selectedProvider]}
@@ -1374,6 +1427,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 14,
   },
+  providerStatusPill: {
+    alignSelf: "flex-start",
+    marginTop: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  providerStatusText: {
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    fontFamily: fonts.mono,
+  },
   apiKeyTitle: {
     fontSize: 14,
     fontFamily: fonts.display,
@@ -1385,14 +1452,28 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: fonts.body,
   },
+  apiKeyInputRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 10,
+  },
   apiKeyInput: {
     minHeight: 48,
+    flex: 1,
     borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
     fontFamily: fonts.body,
+  },
+  apiKeyVisibilityButton: {
+    width: 48,
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   apiKeyLinkButton: {
     minHeight: 42,

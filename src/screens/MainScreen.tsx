@@ -102,6 +102,12 @@ export function MainScreen() {
   const ttsProvider = settings.ttsMode === "provider" ? settings.ttsProvider : null;
   const sttApiKey = sttProvider ? settings.apiKeys[sttProvider].trim() : "";
   const ttsApiKey = ttsProvider ? settings.apiKeys[ttsProvider].trim() : "";
+  const sttStatusLabel =
+    settings.sttMode === "native"
+      ? t("appNative")
+      : sttProvider
+        ? PROVIDER_LABELS[sttProvider]
+        : t("noProviderYet");
   const selectedTtsVoice = ttsProvider
     ? settings.providerTtsVoices[ttsProvider] ||
       PROVIDER_DEFAULT_TTS_VOICES[ttsProvider] ||
@@ -719,6 +725,7 @@ export function MainScreen() {
   const sessionMeta = activeConversation
     ? `${t("messageCount", { count: messages.length })} · ${providerLabel} · ${model}`
     : `${providerLabel} · ${model}`;
+  const routeModelLabel = `${providerLabel} · ${model}`;
 
   const renderTopBar = (compact = false) => (
     <View style={styles.topBar}>
@@ -973,6 +980,17 @@ export function MainScreen() {
                   </Text>
                   <Text style={[styles.statusMeta, { color: colors.textMuted }]}>
                     {ttsStatusLabel}
+                  </Text>
+                </View>
+                <View style={styles.statusRouteList}>
+                  <Text style={[styles.statusRouteText, { color: colors.textMuted }]}>
+                    {t("speechInputRoute", { route: sttStatusLabel })}
+                  </Text>
+                  <Text style={[styles.statusRouteText, { color: colors.textMuted }]}>
+                    {t("replyModelRoute", { route: routeModelLabel })}
+                  </Text>
+                  <Text style={[styles.statusRouteText, { color: colors.textMuted }]}>
+                    {t("voiceOutputRoute", { route: ttsStatusLabel })}
                   </Text>
                 </View>
               </View>
@@ -1402,6 +1420,15 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: "uppercase",
     fontFamily: fonts.mono,
+  },
+  statusRouteList: {
+    marginTop: 12,
+    gap: 6,
+  },
+  statusRouteText: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: fonts.body,
   },
   transcriptShell: {
     height: 288,
