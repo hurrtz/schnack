@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Keyboard,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -64,6 +66,7 @@ interface SettingsModalProps {
 }
 
 type SettingsTab = "instructions" | "providers" | "stt" | "tts" | "ui";
+type TextInputFocusHandler = NonNullable<React.ComponentProps<typeof TextInput>["onFocus"]>;
 
 const TABS: SettingsTab[] = [
   "instructions",
@@ -177,7 +180,9 @@ function getResponseToneOptions(
 }
 
 function getPreviewSampleText(language: AppLanguage) {
-  return language === "de" ? "Hallo, ich bin schnack." : "Hello, I'm schnack.";
+  return language === "de"
+    ? "Hallo, ich bin SchnackAI."
+    : "Hello, I'm SchnackAI.";
 }
 
 function TabIntro({ tab }: { tab: SettingsTab }) {
@@ -309,11 +314,13 @@ function ProviderSection({
   focusProvider,
   onUpdateProviderModel,
   onUpdateApiKey,
+  onTextInputFocus,
 }: {
   settings: Settings;
   focusProvider?: Provider;
   onUpdateProviderModel: (provider: Provider, model: string) => void;
   onUpdateApiKey: (provider: Provider, apiKey: string) => void;
+  onTextInputFocus: TextInputFocusHandler;
 }) {
   const { colors } = useTheme();
   const { t, language } = useLocalization();
@@ -414,6 +421,7 @@ function ProviderSection({
         <TextInput
           value={settings.apiKeys[selectedProvider]}
           onChangeText={(value) => onUpdateApiKey(selectedProvider, value)}
+          onFocus={onTextInputFocus}
           placeholder={getProviderApiKeyPlaceholder(selectedProvider, language)}
           placeholderTextColor={colors.textMuted}
           selectionColor={colors.accent}
@@ -446,9 +454,11 @@ function ProviderSection({
 function AssistantResponseSection({
   settings,
   onUpdate,
+  onTextInputFocus,
 }: {
   settings: Settings;
   onUpdate: (partial: Partial<Omit<Settings, "apiKeys" | "providerModels">>) => void;
+  onTextInputFocus: TextInputFocusHandler;
 }) {
   const { colors } = useTheme();
   const { t } = useLocalization();
@@ -487,6 +497,7 @@ function AssistantResponseSection({
         <TextInput
           value={settings.assistantInstructions}
           onChangeText={(value) => onUpdate({ assistantInstructions: value })}
+          onFocus={onTextInputFocus}
           multiline
           placeholder={t("assistantInstructionsPlaceholder")}
           placeholderTextColor={colors.textMuted}
@@ -552,6 +563,7 @@ function TtsPreviewSection({
   selectedVoice,
   settings,
   onUpdateProviderTtsVoice,
+  onTextInputFocus,
 }: {
   previewText: string;
   setPreviewText: (text: string) => void;
@@ -562,6 +574,7 @@ function TtsPreviewSection({
   selectedVoice: string;
   settings: Settings;
   onUpdateProviderTtsVoice: (provider: Provider, voice: string) => void;
+  onTextInputFocus: TextInputFocusHandler;
 }) {
   const { colors } = useTheme();
   const { t } = useLocalization();
@@ -615,6 +628,7 @@ function TtsPreviewSection({
         <TextInput
           value={previewText}
           onChangeText={setPreviewText}
+          onFocus={onTextInputFocus}
           multiline
           placeholder={t("voicePreviewPlaceholder")}
           placeholderTextColor={colors.textMuted}
@@ -689,6 +703,7 @@ export function SettingsModal({
   const [activeTab, setActiveTab] = useState<SettingsTab>("instructions");
   const [previewText, setPreviewText] = useState(getPreviewSampleText(language));
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [keyboardInset, setKeyboardInset] = useState(0);
 
   const enabledSttProviders = useMemo(
     () => getEnabledSttProviders(settings),
@@ -805,10 +820,72 @@ export function SettingsModal({
     );
   }, [language]);
 
+  useEffect(() => {
+    if (!visible) {
+      setKeyboardInset(0);
+      return;
+    }
+
+    const updateInset = (height: number) => {
+      setKeyboardInset(Math.max(height - insets.bottom, 0));
+    };
+
+    const handleKeyboardShow = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (event) => updateInset(event.endCoordinates.height)
+    );
+    const handleKeyboardHide = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => updateInset(0)
+    );
+    const handleKeyboardFrameChange =
+      Platform.OS === "ios"
+        ? Keyboard.addListener("keyboardWillChangeFrame", (event) =>
+            updateInset(event.endCoordinates.height)
+          )
+        : null;
+
+    return () => {
+      handleKeyboardShow.remove();
+      handleKeyboardHide.remove();
+      handleKeyboardFrameChange?.remove();
+    };
+  }, [insets.bottom, visible]);
+
   const modalAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }, { translateY: translateY.value }],
     opacity: opacity.value,
   }));
+
+  const handleTextInputFocus = React.useCallback<TextInputFocusHandler>(
+    (event) => {
+      const target = Number(event.target);
+      const scrollResponder = (
+        contentScrollRef.current as ScrollView & {
+          getScrollResponder?: () => {
+            scrollResponderScrollNativeHandleToKeyboard?: (
+              nodeHandle: number,
+              additionalOffset?: number,
+              preventNegativeScrollOffset?: boolean
+            ) => void;
+          };
+        }
+      ).getScrollResponder?.();
+
+      if (!target || !scrollResponder?.scrollResponderScrollNativeHandleToKeyboard) {
+        return;
+      }
+
+      setTimeout(() => {
+        scrollResponder.scrollResponderScrollNativeHandleToKeyboard?.(
+          target,
+          96,
+          true
+        );
+      }, Platform.OS === "ios" ? 80 : 40);
+    },
+    []
+  );
 
   const handlePreviewVoice = async () => {
     const trimmed = previewText.trim();
@@ -951,15 +1028,23 @@ export function SettingsModal({
             ref={contentScrollRef}
             style={styles.contentScroll}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.content}
-            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={[
+              styles.content,
+              { paddingBottom: Math.max(20, keyboardInset + 20) },
+            ]}
+            scrollIndicatorInsets={{ bottom: keyboardInset }}
+            keyboardShouldPersistTaps="always"
             keyboardDismissMode="interactive"
             nestedScrollEnabled
           >
             <TabIntro tab={activeTab} />
 
             {activeTab === "instructions" ? (
-              <AssistantResponseSection settings={settings} onUpdate={onUpdate} />
+              <AssistantResponseSection
+                settings={settings}
+                onUpdate={onUpdate}
+                onTextInputFocus={handleTextInputFocus}
+              />
             ) : null}
 
             {activeTab === "providers" ? (
@@ -968,6 +1053,7 @@ export function SettingsModal({
                 focusProvider={focusProvider}
                 onUpdateProviderModel={onUpdateProviderModel}
                 onUpdateApiKey={onUpdateApiKey}
+                onTextInputFocus={handleTextInputFocus}
               />
             ) : null}
 
@@ -1107,6 +1193,7 @@ export function SettingsModal({
                   selectedVoice={selectedTtsVoice}
                   settings={settings}
                   onUpdateProviderTtsVoice={onUpdateProviderTtsVoice}
+                  onTextInputFocus={handleTextInputFocus}
                 />
               </>
             ) : null}

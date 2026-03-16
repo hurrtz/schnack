@@ -40,6 +40,7 @@ describe("synthesizeSpeech", () => {
       mode: "provider",
       provider: "openai",
       apiKey: "sk-test",
+      language: "en",
     });
 
     expect(result).toMatch(/^\/tmp\/tts-/);
@@ -58,6 +59,7 @@ describe("synthesizeSpeech", () => {
         text: "Test",
         voice: "alloy",
         mode: "provider",
+        language: "en",
       })
     ).rejects.toThrow("Choose a text-to-speech provider");
   });
@@ -74,6 +76,7 @@ describe("synthesizeSpeech", () => {
       mode: "provider",
       provider: "together",
       apiKey: "together-test",
+      language: "en",
     });
 
     expect(result).toMatch(/^\/tmp\/tts-.*\.mp3$/);
@@ -113,6 +116,7 @@ describe("synthesizeSpeech", () => {
       mode: "provider",
       provider: "gemini",
       apiKey: "AIza-test",
+      language: "de",
     });
 
     expect(result).toMatch(/^\/tmp\/tts-.*\.wav$/);
@@ -139,6 +143,7 @@ describe("synthesizeSpeech", () => {
       mode: "provider",
       provider: "xai",
       apiKey: "xai-test",
+      language: "en",
     });
 
     expect(result).toMatch(/^\/tmp\/tts-.*\.mp3$/);

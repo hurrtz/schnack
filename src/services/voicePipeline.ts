@@ -12,6 +12,8 @@ import {
   VoiceBackendMode,
 } from "../types";
 
+const PROVIDER_TTS_MAX_INPUT_CHARS = 3500;
+
 export function splitIntoSentences(text: string): string[] {
   const result: string[] = [];
   let current = "";
@@ -25,9 +27,6 @@ export function splitIntoSentences(text: string): string[] {
   if (current) result.push(current);
   return result;
 }
-
-const STREAM_PROVIDER_TTS_MAX_CHARS = 260;
-const STREAM_PROVIDER_TTS_MAX_SENTENCES = 2;
 
 function extractCompleteSentences(text: string): {
   completeSentences: string[];
@@ -50,6 +49,118 @@ function extractCompleteSentences(text: string): {
     completeSentences: segments.slice(0, completeCount).filter((segment) => segment.trim()),
     remainder: segments.slice(completeCount).join(""),
   };
+}
+
+function splitLongTtsSegment(text: string, maxChars: number): string[] {
+  const normalized = text.replace(/\s+/g, " ").trim();
+
+  if (!normalized) {
+    return [];
+  }
+
+  if (normalized.length <= maxChars) {
+    return [normalized];
+  }
+
+  const chunks: string[] = [];
+  const words = normalized.split(/\s+/);
+  let current = "";
+
+  const pushCurrent = () => {
+    if (current) {
+      chunks.push(current);
+      current = "";
+    }
+  };
+
+  for (const word of words) {
+    if (!word) {
+      continue;
+    }
+
+    if (!current) {
+      if (word.length <= maxChars) {
+        current = word;
+      } else {
+        for (let index = 0; index < word.length; index += maxChars) {
+          chunks.push(word.slice(index, index + maxChars));
+        }
+      }
+      continue;
+    }
+
+    const next = `${current} ${word}`;
+
+    if (next.length <= maxChars) {
+      current = next;
+      continue;
+    }
+
+    pushCurrent();
+
+    if (word.length <= maxChars) {
+      current = word;
+    } else {
+      for (let index = 0; index < word.length; index += maxChars) {
+        chunks.push(word.slice(index, index + maxChars));
+      }
+    }
+  }
+
+  pushCurrent();
+  return chunks;
+}
+
+function splitTextForTts(text: string, maxChars: number): string[] {
+  const normalized = text.trim();
+
+  if (!normalized) {
+    return [];
+  }
+
+  const sentenceSegments = splitIntoSentences(normalized);
+  const chunks: string[] = [];
+  let current = "";
+
+  const pushCurrent = () => {
+    if (current) {
+      chunks.push(current);
+      current = "";
+    }
+  };
+
+  const appendSegment = (segment: string) => {
+    const normalizedSegment = segment.replace(/\s+/g, " ").trim();
+
+    if (!normalizedSegment) {
+      return;
+    }
+
+    if (normalizedSegment.length > maxChars) {
+      pushCurrent();
+      chunks.push(...splitLongTtsSegment(normalizedSegment, maxChars));
+      return;
+    }
+
+    if (!current) {
+      current = normalizedSegment;
+      return;
+    }
+
+    const next = `${current} ${normalizedSegment}`;
+
+    if (next.length <= maxChars) {
+      current = next;
+      return;
+    }
+
+    pushCurrent();
+    current = normalizedSegment;
+  };
+
+  sentenceSegments.forEach(appendSegment);
+  pushCurrent();
+  return chunks;
 }
 
 interface PipelineCallbacks {
@@ -184,22 +295,26 @@ export async function runVoicePipeline(params: {
   let sentenceBuffer = "";
   let ttsChain = Promise.resolve();
   const ttsQueue: Promise<void>[] = [];
-  let streamProviderTtsBuffer = "";
-  let streamProviderTtsSentenceCount = 0;
 
-  const enqueueTts = (sentence: string) => {
+  const enqueueTtsChunk = (text: string) => {
+    const trimmed = text.trim();
+
+    if (!trimmed) {
+      return;
+    }
+
     const task = ttsChain.then(async () => {
       if (abortSignal?.aborted) {
         return;
       }
 
       if (ttsMode === "native") {
-        callbacks.onSpeechTextReady(sentence, undefined);
+        callbacks.onSpeechTextReady(trimmed, undefined);
         return;
       }
 
       const audio = await synthesizeSpeech({
-        text: sentence,
+        text: trimmed,
         voice: ttsVoice,
         mode: ttsMode,
         provider: ttsProvider,
@@ -218,37 +333,23 @@ export async function runVoicePipeline(params: {
     ttsQueue.push(task.catch(() => undefined));
   };
 
-  const flushStreamProviderTtsBuffer = () => {
-    const text = streamProviderTtsBuffer.trim();
-
-    if (!text) {
-      streamProviderTtsBuffer = "";
-      streamProviderTtsSentenceCount = 0;
+  const enqueueTts = (text: string) => {
+    if (ttsMode !== "provider") {
+      enqueueTtsChunk(text);
       return;
     }
 
-    enqueueTts(text);
-    streamProviderTtsBuffer = "";
-    streamProviderTtsSentenceCount = 0;
+    const segments = splitTextForTts(text, PROVIDER_TTS_MAX_INPUT_CHARS);
+
+    if (segments.length === 0) {
+      return;
+    }
+
+    segments.forEach(enqueueTtsChunk);
   };
 
   const enqueueStreamPlayback = (sentence: string) => {
-    if (ttsMode === "native") {
-      enqueueTts(sentence);
-      return;
-    }
-
-    streamProviderTtsBuffer += sentence;
-    streamProviderTtsSentenceCount += 1;
-
-    const shouldFlush =
-      /\n/.test(sentence) ||
-      streamProviderTtsBuffer.trim().length >= STREAM_PROVIDER_TTS_MAX_CHARS ||
-      streamProviderTtsSentenceCount >= STREAM_PROVIDER_TTS_MAX_SENTENCES;
-
-    if (shouldFlush) {
-      flushStreamProviderTtsBuffer();
-    }
+    enqueueTts(sentence);
   };
 
   await streamChat({
@@ -281,7 +382,6 @@ export async function runVoicePipeline(params: {
         if (sentenceBuffer.trim()) {
           enqueueStreamPlayback(sentenceBuffer);
         }
-        flushStreamProviderTtsBuffer();
       } else {
         enqueueTts(fullText);
       }

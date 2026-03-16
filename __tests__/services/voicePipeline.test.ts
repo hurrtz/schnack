@@ -60,6 +60,7 @@ describe("runVoicePipeline", () => {
       assistantInstructions: "You are a voice assistant.",
       responseLength: "normal",
       responseTone: "professional",
+      language: "en",
       callbacks,
     });
 
@@ -113,6 +114,7 @@ describe("runVoicePipeline", () => {
       assistantInstructions: "You are a voice assistant.",
       responseLength: "normal",
       responseTone: "professional",
+      language: "en",
       callbacks,
     });
 
@@ -120,7 +122,7 @@ describe("runVoicePipeline", () => {
     expect(events).toEqual(["speak:Wind is moving air.", "response-done"]);
   });
 
-  it("batches provider TTS into small chunks in stream mode", async () => {
+  it("queues provider TTS sentence by sentence in stream mode", async () => {
     (streamChat as jest.Mock).mockImplementation(
       async ({
         onChunk,
@@ -133,6 +135,10 @@ describe("runVoicePipeline", () => {
         await onDone("Sentence one. Sentence two.");
       }
     );
+
+    (synthesizeSpeech as jest.Mock)
+      .mockResolvedValueOnce("/tmp/tts-1.mp3")
+      .mockResolvedValueOnce("/tmp/tts-2.mp3");
 
     const callbacks = {
       onTranscription: jest.fn(),
@@ -158,21 +164,31 @@ describe("runVoicePipeline", () => {
       assistantInstructions: "You are a voice assistant.",
       responseLength: "normal",
       responseTone: "professional",
+      language: "en",
       callbacks,
     });
 
     expect(synthesizeSpeech).toHaveBeenNthCalledWith(1, {
-      text: "Sentence one. Sentence two.",
+      text: "Sentence one.",
       voice: "alloy",
       mode: "provider",
       provider: "openai",
       apiKey: "sk-test",
+      language: "en",
     });
-    expect(callbacks.onAudioReady).toHaveBeenCalledTimes(1);
+    expect(synthesizeSpeech).toHaveBeenNthCalledWith(2, {
+      text: "Sentence two.",
+      voice: "alloy",
+      mode: "provider",
+      provider: "openai",
+      apiKey: "sk-test",
+      language: "en",
+    });
+    expect(callbacks.onAudioReady).toHaveBeenCalledTimes(2);
     expect(callbacks.onSpeechTextReady).not.toHaveBeenCalled();
   });
 
-  it("flushes provider stream playback at sentence count boundaries", async () => {
+  it("flushes a trailing partial sentence for provider TTS when the stream finishes", async () => {
     (streamChat as jest.Mock).mockImplementation(
       async ({
         onChunk,
@@ -181,8 +197,8 @@ describe("runVoicePipeline", () => {
         onChunk: (text: string) => void;
         onDone: (text: string) => Promise<void>;
       }) => {
-        onChunk("One. Two. Three.");
-        await onDone("One. Two. Three.");
+        onChunk("One. Two");
+        await onDone("One. Two");
       }
     );
 
@@ -214,23 +230,86 @@ describe("runVoicePipeline", () => {
       assistantInstructions: "You are a voice assistant.",
       responseLength: "normal",
       responseTone: "professional",
+      language: "en",
       callbacks,
     });
 
     expect(synthesizeSpeech).toHaveBeenNthCalledWith(1, {
-      text: "One. Two.",
+      text: "One.",
       voice: "alloy",
       mode: "provider",
       provider: "openai",
       apiKey: "sk-test",
+      language: "en",
     });
     expect(synthesizeSpeech).toHaveBeenNthCalledWith(2, {
-      text: "Three.",
+      text: "Two",
       voice: "alloy",
       mode: "provider",
       provider: "openai",
       apiKey: "sk-test",
+      language: "en",
     });
     expect(callbacks.onAudioReady).toHaveBeenCalledTimes(2);
+  });
+
+  it("chunks long provider TTS replies in wait mode", async () => {
+    const longReply = Array.from(
+      { length: 180 },
+      () => "This is a deliberately long reply sentence."
+    ).join(" ");
+
+    (streamChat as jest.Mock).mockImplementation(
+      async ({
+        onDone,
+      }: {
+        onChunk: (text: string) => void;
+        onDone: (text: string) => Promise<void>;
+      }) => {
+        await onDone(longReply);
+      }
+    );
+
+    (synthesizeSpeech as jest.Mock).mockImplementation(
+      async ({ text }: { text: string }) => `/tmp/tts-${text.length}.mp3`
+    );
+
+    const callbacks = {
+      onTranscription: jest.fn(),
+      onChunk: jest.fn(),
+      onResponseDone: jest.fn(),
+      onAudioReady: jest.fn(),
+      onSpeechTextReady: jest.fn(),
+      onError: jest.fn(),
+    };
+
+    await runVoicePipeline({
+      transcriptionOverride: "Summarize the route.",
+      messages: [],
+      model: "gpt-5.4",
+      provider: "openai",
+      providerApiKey: "sk-test",
+      sttMode: "native",
+      ttsMode: "provider",
+      ttsProvider: "openai",
+      ttsApiKey: "sk-test",
+      ttsVoice: "alloy",
+      replyPlayback: "wait",
+      assistantInstructions: "You are a voice assistant.",
+      responseLength: "normal",
+      responseTone: "professional",
+      language: "en",
+      callbacks,
+    });
+
+    const synthesizedTexts = (synthesizeSpeech as jest.Mock).mock.calls.map(
+      ([params]: [{ text: string }]) => params.text
+    );
+
+    expect(synthesizedTexts.length).toBeGreaterThan(1);
+    expect(synthesizedTexts.every((text: string) => text.length <= 3500)).toBe(true);
+    expect(synthesizedTexts.join(" ")).toBe(longReply);
+    expect(callbacks.onAudioReady).toHaveBeenCalledTimes(synthesizedTexts.length);
+    expect(callbacks.onError).not.toHaveBeenCalled();
   });
 });
