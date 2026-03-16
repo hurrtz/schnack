@@ -9,6 +9,7 @@ type TranslationValue =
 const translations = {
   en: {
     retry: "Retry",
+    dismiss: "Dismiss",
     unavailable: "Unavailable",
     selection: "Selection",
     chooseCompatibleProviderFirst: "Choose a compatible provider first",
@@ -288,6 +289,7 @@ const translations = {
   },
   de: {
     retry: "Erneut",
+    dismiss: "Schliessen",
     unavailable: "Nicht verfuegbar",
     selection: "Auswahl",
     chooseCompatibleProviderFirst:

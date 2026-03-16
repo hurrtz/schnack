@@ -50,7 +50,7 @@ export function Toast({
       opacity.value = withTiming(0, { duration: 200 });
       translateY.value = withTiming(-20, { duration: 200 });
     }
-  }, [visible]);
+  }, [duration, onDismiss, onRetry, opacity, translateY, visible]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -82,19 +82,32 @@ export function Toast({
         <Feather name="alert-circle" size={16} color={colors.accent} />
       </View>
       <Text style={[styles.message, { color: colors.text }]}>{message}</Text>
-      {onRetry && (
+      <View style={styles.actions}>
+        {onRetry && (
+          <TouchableOpacity
+            style={[
+              styles.retryButton,
+              { backgroundColor: colors.accentSoft, borderColor: colors.border },
+            ]}
+            onPress={onRetry}
+          >
+            <Text style={[styles.retry, { color: colors.accent }]}>
+              {t("retry")}
+            </Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={[
-            styles.retryButton,
-            { backgroundColor: colors.accentSoft, borderColor: colors.border },
+            styles.dismissButton,
+            { backgroundColor: colors.surface, borderColor: colors.border },
           ]}
-          onPress={onRetry}
+          onPress={onDismiss}
+          accessibilityRole="button"
+          accessibilityLabel={t("dismiss")}
         >
-          <Text style={[styles.retry, { color: colors.accent }]}>
-            {t("retry")}
-          </Text>
+          <Feather name="x" size={15} color={colors.textSecondary} />
         </TouchableOpacity>
-      )}
+      </View>
     </Animated.View>
   );
 }
@@ -139,8 +152,13 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: fonts.body,
   },
-  retryButton: {
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     marginLeft: 12,
+  },
+  retryButton: {
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderRadius: 999,
@@ -149,5 +167,13 @@ const styles = StyleSheet.create({
   retry: {
     fontSize: 13,
     fontFamily: fonts.display,
+  },
+  dismissButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
