@@ -778,84 +778,90 @@ function AssistantResponseSection({
   );
 
   return (
-    <View
-      style={[
-        styles.sectionCard,
-        { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
-      ]}
-    >
-      <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-        {t("assistantInstructions")}
-      </Text>
-      <Text style={[styles.sectionIntro, { color: colors.textMuted }]}>
-        {t("assistantInstructionsIntro")}
-      </Text>
-
+    <>
       <View
         style={[
-          styles.promptCard,
-          { backgroundColor: colors.surface, borderColor: colors.border },
+          styles.sectionCard,
+          { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
         ]}
       >
-        <Text style={[styles.promptLabel, { color: colors.textSecondary }]}>
-          {t("baseInstructions")}
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+          {t("assistantInstructions")}
         </Text>
-        <TextInput
-          value={settings.assistantInstructions}
-          onChangeText={(value) => onUpdate({ assistantInstructions: value })}
-          onFocus={onTextInputFocus}
-          multiline
-          placeholder={t("assistantInstructionsPlaceholder")}
-          placeholderTextColor={colors.textMuted}
-          selectionColor={colors.accent}
+        <Text style={[styles.sectionIntro, { color: colors.textMuted }]}>
+          {t("assistantInstructionsIntro")}
+        </Text>
+
+        <View
           style={[
-            styles.promptInput,
-            {
-              backgroundColor: colors.surfaceElevated,
-              borderColor: colors.border,
-              color: colors.text,
-            },
+            styles.promptCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
           ]}
-        />
-        <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
-          {t("assistantInstructionsHint")}
-        </Text>
+        >
+          <Text style={[styles.promptLabel, { color: colors.textSecondary }]}>
+            {t("baseInstructions")}
+          </Text>
+          <TextInput
+            value={settings.assistantInstructions}
+            onChangeText={(value) => onUpdate({ assistantInstructions: value })}
+            onFocus={onTextInputFocus}
+            multiline
+            placeholder={t("assistantInstructionsPlaceholder")}
+            placeholderTextColor={colors.textMuted}
+            selectionColor={colors.accent}
+            style={[
+              styles.promptInput,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+                color: colors.text,
+              },
+            ]}
+          />
+          <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+            {t("assistantInstructionsHint")}
+          </Text>
+        </View>
       </View>
 
-      <Picker
-        label={t("adaptiveLength")}
-        value={settings.responseLength}
-        options={responseLengthOptions.map((option) => ({
-          value: option.value,
-          label: option.label,
-        }))}
-        onChange={(value) =>
-          onUpdate({ responseLength: value as AssistantResponseLength })
-        }
-      />
-      {selectedLength ? (
-        <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
-          {selectedLength.description}
-        </Text>
-      ) : null}
+      <PickerSection>
+        <Picker
+          label={t("adaptiveLength")}
+          value={settings.responseLength}
+          options={responseLengthOptions.map((option) => ({
+            value: option.value,
+            label: option.label,
+          }))}
+          onChange={(value) =>
+            onUpdate({ responseLength: value as AssistantResponseLength })
+          }
+        />
+        {selectedLength ? (
+          <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+            {selectedLength.description}
+          </Text>
+        ) : null}
+      </PickerSection>
 
-      <Picker
-        label={t("responseTone")}
-        value={settings.responseTone}
-        options={responseToneOptions.map((option) => ({
-          value: option.value,
-          label: option.label,
-        }))}
-        onChange={(value) =>
-          onUpdate({ responseTone: value as AssistantResponseTone })
-        }
-      />
-      {selectedTone ? (
-        <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
-          {selectedTone.description}
-        </Text>
-      ) : null}
-    </View>
+      <PickerSection>
+        <Picker
+          label={t("responseTone")}
+          value={settings.responseTone}
+          options={responseToneOptions.map((option) => ({
+            value: option.value,
+            label: option.label,
+          }))}
+          onChange={(value) =>
+            onUpdate({ responseTone: value as AssistantResponseTone })
+          }
+        />
+        {selectedTone ? (
+          <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+            {selectedTone.description}
+          </Text>
+        ) : null}
+      </PickerSection>
+    </>
   );
 }
 
