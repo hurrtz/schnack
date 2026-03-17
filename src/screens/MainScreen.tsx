@@ -42,7 +42,10 @@ import { useNativeSpeechRecognizer } from "../hooks/useNativeSpeechRecognizer";
 import { useConversations } from "../hooks/useConversations";
 import { useLocalization } from "../i18n";
 import { validateProviderConnection } from "../services/llm";
-import { releaseLocalTtsResources } from "../services/localTts";
+import {
+  getLocalTtsInstallStatus,
+  releaseLocalTtsResources,
+} from "../services/localTts";
 import { runVoicePipeline } from "../services/voicePipeline";
 import { synthesizeSpeech, synthesizeSpeechSequence } from "../services/tts";
 import { useTheme } from "../theme/ThemeContext";
@@ -990,6 +993,23 @@ export function MainScreen() {
 
         if (!request.voice) {
           showToast(t("chooseTtsToPreviewVoices"));
+          return;
+        }
+
+        const localStatus = await getLocalTtsInstallStatus({
+          language: request.localLanguage,
+          voice: request.voice,
+        });
+
+        if (!localStatus.installed) {
+          showToast(
+            t("downloadSelectedLocalVoiceFirst", {
+              languageLabel: getTtsListenLanguageLabel(
+                request.localLanguage,
+                language,
+              ),
+            }),
+          );
           return;
         }
 

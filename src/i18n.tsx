@@ -212,6 +212,8 @@ const translations = {
       "Stop the active voice session before previewing a voice.",
     chooseTtsToPreviewVoices:
       "Choose an enabled TTS provider in Settings to preview voices.",
+    downloadSelectedLocalVoiceFirst: ({ languageLabel }) =>
+      `Download the selected ${languageLabel} local voice first.`,
     couldntPreviewVoice: "Couldn't preview voice.",
     providerVoiceFallback:
       "Provider voice failed. Switched this reply to the system voice.",
@@ -634,6 +636,8 @@ const translations = {
       "Beende die laufende Sprachsitzung, bevor du eine Stimme testest.",
     chooseTtsToPreviewVoices:
       "Wähle in den Einstellungen einen aktivierten TTS-Anbieter, um Stimmen zu testen.",
+    downloadSelectedLocalVoiceFirst: ({ languageLabel }) =>
+      `Lade zuerst die ausgewählte lokale Stimme für ${languageLabel} herunter.`,
     couldntPreviewVoice: "Die Stimmvorschau konnte nicht abgespielt werden.",
     providerVoiceFallback:
       "Die Anbieter-Stimme ist ausgefallen. Diese Antwort wird mit der Systemstimme abgespielt.",

@@ -1,11 +1,14 @@
 import * as FileSystem from "expo-file-system/legacy";
-import { getTtsListenLanguageLabel } from "../constants/localTts";
+import {
+  getLocalTtsVoiceOptions,
+  getTtsListenLanguageLabel,
+} from "../constants/localTts";
 import {
   PROVIDER_DEFAULT_TTS_VOICES,
   PROVIDER_LABELS,
 } from "../constants/models";
 import { translate } from "../i18n";
-import { synthesizeLocalSpeech } from "./localTts";
+import { getLocalTtsInstallStatus, synthesizeLocalSpeech } from "./localTts";
 import {
   AppLanguage,
   LocalTtsVoiceSelections,
@@ -469,18 +472,50 @@ async function trySynthesizeResolvedLocalSpeech(params: {
 }) {
   const selection = getResolvedLocalTtsSelection(params);
 
-  if (!selection.canUseLocal) {
+  if (!supportsLocalTtsLanguage(selection.resolvedLanguage)) {
     return null;
   }
 
-  return {
-    resolvedLanguage: selection.resolvedLanguage,
-    audioPath: await synthesizeLocalSpeech({
-      text: params.text,
+  const candidateVoices = [
+    selection.localVoice,
+    ...getLocalTtsVoiceOptions(selection.resolvedLanguage).map(
+      (option) => option.value,
+    ),
+  ].filter((voice, index, values): voice is string => {
+    return !!voice && values.indexOf(voice) === index;
+  });
+
+  let lastError: unknown = null;
+
+  for (const voice of candidateVoices) {
+    const status = await getLocalTtsInstallStatus({
       language: selection.resolvedLanguage,
-      voice: selection.localVoice,
-    }),
-  };
+      voice,
+    });
+
+    if (!status.installed) {
+      continue;
+    }
+
+    try {
+      return {
+        resolvedLanguage: selection.resolvedLanguage,
+        audioPath: await synthesizeLocalSpeech({
+          text: params.text,
+          language: selection.resolvedLanguage,
+          voice,
+        }),
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  return null;
 }
 
 export function getProviderTtsTimeoutMs(text: string) {
@@ -567,22 +602,20 @@ export async function synthesizeSpeech(params: {
       localVoices,
     });
 
-    if (localSelection.canUseLocal) {
-      try {
-        const localResult = await trySynthesizeResolvedLocalSpeech({
-          text,
-          language,
-          listenLanguages,
-          localVoices,
-        });
+    try {
+      const localResult = await trySynthesizeResolvedLocalSpeech({
+        text,
+        language,
+        listenLanguages,
+        localVoices,
+      });
 
-        if (localResult) {
-          return localResult.audioPath;
-        }
-      } catch (error) {
-        if (!provider || !apiKey?.trim()) {
-          throw error;
-        }
+      if (localResult) {
+        return localResult.audioPath;
+      }
+    } catch (error) {
+      if (!provider || !apiKey?.trim()) {
+        throw error;
       }
     }
 
