@@ -46,7 +46,12 @@ import {
   PRICING_ASSUMPTIONS,
   PRICING_ASSUMPTIONS_LAST_UPDATED,
 } from "../constants/usagePricing";
+import { useSpeechDiagnostics } from "../hooks/useSpeechDiagnostics";
 import { useLocalization } from "../i18n";
+import {
+  clearSpeechDiagnostics,
+  type SpeechDiagnosticRequestSummary,
+} from "../services/speech/diagnostics";
 import {
   AppLanguage,
   AssistantResponseLength,
@@ -1569,6 +1574,177 @@ function LocalPackSection({
   );
 }
 
+function getSpeechRouteLabel(
+  route: "local" | "provider" | "native" | null,
+  t: ReturnType<typeof useLocalization>["t"],
+) {
+  if (route === "local") {
+    return t("localTts");
+  }
+
+  if (route === "provider") {
+    return t("provider");
+  }
+
+  if (route === "native") {
+    return t("appNative");
+  }
+
+  return "—";
+}
+
+function getSpeechSourceLabel(
+  source: SpeechDiagnosticRequestSummary["source"],
+  t: ReturnType<typeof useLocalization>["t"],
+) {
+  switch (source) {
+    case "conversation":
+      return t("speechDiagnosticSourceConversation");
+    case "repeat":
+      return t("speechDiagnosticSourceRepeat");
+    case "preview":
+      return t("speechDiagnosticSourcePreview");
+    default:
+      return t("speechDiagnosticSourceUnknown");
+  }
+}
+
+function formatSpeechDiagnosticTime(createdAt: string) {
+  return new Date(createdAt).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function SpeechDiagnosticsSection({
+  summaries,
+}: {
+  summaries: SpeechDiagnosticRequestSummary[];
+}) {
+  const { colors } = useTheme();
+  const { t, language } = useLocalization();
+
+  return (
+    <PickerSection>
+      <View style={styles.localPackHeader}>
+        <View style={styles.localPackCopy}>
+          <Text style={[styles.groupLabel, { color: colors.textSecondary }]}>
+            {t("speechDiagnostics")}
+          </Text>
+          <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+            {t("speechDiagnosticsHint")}
+          </Text>
+        </View>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            clearSpeechDiagnostics();
+          }}
+        >
+          <Text
+            style={[styles.speechDiagnosticClear, { color: colors.accent }]}
+          >
+            {t("clear")}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {summaries.length === 0 ? (
+        <View
+          style={[
+            styles.localPackCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.previewHint, { color: colors.textMuted }]}>
+            {t("speechDiagnosticsEmpty")}
+          </Text>
+        </View>
+      ) : (
+        summaries.map((summary) => (
+          <View
+            key={summary.id}
+            style={[
+              styles.localPackCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={styles.speechDiagnosticHeader}>
+              <Text
+                style={[styles.previewLabel, { color: colors.textSecondary }]}
+              >
+                {getSpeechSourceLabel(summary.source, t)}
+              </Text>
+              <Text style={[styles.previewHint, { color: colors.textMuted }]}>
+                {formatSpeechDiagnosticTime(summary.createdAt)}
+              </Text>
+            </View>
+            <Text
+              style={[
+                styles.previewHint,
+                { color: colors.textSecondary, marginTop: 8 },
+              ]}
+            >
+              {t("speechDiagnosticRouteLine", {
+                requested: getSpeechRouteLabel(summary.requestedRoute, t),
+                actual: getSpeechRouteLabel(
+                  summary.actualRoute ?? summary.requestedRoute,
+                  t,
+                ),
+              })}
+            </Text>
+            <Text style={[styles.previewHint, { color: colors.textMuted }]}>
+              {t("speechDiagnosticStageLine", {
+                stage: summary.latestStage,
+              })}
+            </Text>
+            {summary.language && summary.language !== "app" ? (
+              <Text style={[styles.previewHint, { color: colors.textMuted }]}>
+                {t("speechDiagnosticLanguageLine", {
+                  languageLabel: getTtsListenLanguageLabel(
+                    summary.language,
+                    language,
+                  ),
+                })}
+              </Text>
+            ) : null}
+            {summary.provider ? (
+              <Text style={[styles.previewHint, { color: colors.textMuted }]}>
+                {t("speechDiagnosticProviderLine", {
+                  provider: summary.provider,
+                })}
+              </Text>
+            ) : null}
+            {summary.voice ? (
+              <Text style={[styles.previewHint, { color: colors.textMuted }]}>
+                {t("speechDiagnosticVoiceLine", {
+                  voice: summary.voice,
+                })}
+              </Text>
+            ) : null}
+            {summary.fallbackReason || summary.message ? (
+              <Text
+                style={[
+                  styles.previewHint,
+                  { color: colors.textMuted, marginTop: 6 },
+                ]}
+              >
+                {summary.fallbackReason || summary.message}
+              </Text>
+            ) : null}
+          </View>
+        ))
+      )}
+    </PickerSection>
+  );
+}
+
 function renderProviderPickerOptions(providers: Provider[]) {
   return providers.map((provider) => ({
     value: provider,
@@ -1625,6 +1801,7 @@ export function SettingsModal({
   const [selectedNativeVoice, setSelectedNativeVoice] = useState("");
   const [activePreviewId, setActivePreviewId] = useState<string | null>(null);
   const [keyboardInset, setKeyboardInset] = useState(0);
+  const speechDiagnostics = useSpeechDiagnostics(6);
 
   const enabledSttProviders = useMemo(
     () => getEnabledSttProviders(settings),
@@ -2363,6 +2540,7 @@ export function SettingsModal({
                   onPreview={handlePreviewNativeVoice}
                   onTextInputFocus={handleTextInputFocus}
                 />
+                <SpeechDiagnosticsSection summaries={speechDiagnostics} />
               </>
             ) : null}
 
@@ -2868,6 +3046,18 @@ const styles = StyleSheet.create({
     color: "#F4F8FF",
     fontSize: 13,
     fontFamily: fonts.display,
+  },
+  speechDiagnosticHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  speechDiagnosticClear: {
+    fontSize: 12,
+    fontFamily: fonts.mono,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
   radioRow: {
     flexDirection: "row",

@@ -7,7 +7,10 @@ import {
   splitTextForTts,
   synthesizeSpeech,
 } from "./tts";
-import { createSpeechRequestId } from "./speech/diagnostics";
+import {
+  type SpeechDiagnosticsContext,
+  createSpeechRequestId,
+} from "./speech/diagnostics";
 import { buildConversationContextPlan } from "./conversationContext";
 import {
   AppLanguage,
@@ -57,8 +60,15 @@ interface PipelineCallbacks {
   ) => void;
   onChunk: (text: string) => void;
   onResponseDone: (fullText: string, usage?: UsageEstimate) => void;
-  onAudioReady: (audioUri: string) => void;
-  onSpeechTextReady: (text: string, voice?: string) => void;
+  onAudioReady: (
+    audioUri: string,
+    diagnostics?: SpeechDiagnosticsContext,
+  ) => void;
+  onSpeechTextReady: (
+    text: string,
+    voice?: string,
+    diagnostics?: SpeechDiagnosticsContext,
+  ) => void;
   onTtsFallback?: (error: Error) => void;
   onError: (error: Error) => void;
 }
@@ -193,6 +203,10 @@ export async function runVoicePipeline(params: {
   const ttsQueue: Promise<void>[] = [];
   const effectiveReplyPlayback = ttsMode === "local" ? "wait" : replyPlayback;
   const speechRequestId = createSpeechRequestId("conversation");
+  const speechDiagnostics = {
+    requestId: speechRequestId,
+    source: "conversation" as const,
+  };
 
   const enqueueTtsChunk = (text: string) => {
     const trimmed = text.trim();
@@ -207,7 +221,7 @@ export async function runVoicePipeline(params: {
       }
 
       if (ttsMode === "native") {
-        callbacks.onSpeechTextReady(trimmed, undefined);
+        callbacks.onSpeechTextReady(trimmed, undefined, speechDiagnostics);
         return;
       }
 
@@ -221,14 +235,11 @@ export async function runVoicePipeline(params: {
           language,
           listenLanguages: ttsListenLanguages,
           localVoices: localTtsVoices,
-          diagnostics: {
-            requestId: speechRequestId,
-            source: "conversation",
-          },
+          diagnostics: speechDiagnostics,
         });
 
         if (!abortSignal?.aborted) {
-          callbacks.onAudioReady(audio);
+          callbacks.onAudioReady(audio, speechDiagnostics);
         }
       } catch (error) {
         const normalizedError =
@@ -237,7 +248,7 @@ export async function runVoicePipeline(params: {
         callbacks.onTtsFallback?.(normalizedError);
 
         if (!abortSignal?.aborted) {
-          callbacks.onSpeechTextReady(trimmed, undefined);
+          callbacks.onSpeechTextReady(trimmed, undefined, speechDiagnostics);
         }
       }
     });

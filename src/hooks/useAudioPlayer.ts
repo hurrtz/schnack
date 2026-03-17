@@ -6,7 +6,10 @@ import {
   useAudioSampleListener,
   useAudioPlayerStatus,
 } from "expo-audio";
-import { recordSpeechDiagnostic } from "../services/speech/diagnostics";
+import {
+  type SpeechDiagnosticsContext,
+  recordSpeechDiagnostic,
+} from "../services/speech/diagnostics";
 import {
   EMPTY_VISUAL_LEVELS,
   averageLevels,
@@ -39,16 +42,27 @@ export function useAudioPlayer() {
   const [meteringData, setMeteringData] = useState(-160);
   const [waveformData, setWaveformData] = useState(EMPTY_VISUAL_LEVELS);
   const [hasPendingPlayback, setHasPendingPlayback] = useState(false);
-  const queueRef = useRef<Array<{ id: string; uri: string }>>([]);
-  const currentAudioRef = useRef<{ id: string; uri: string } | null>(null);
+  const queueRef = useRef<
+    Array<{ id: string; uri: string; diagnostics?: SpeechDiagnosticsContext }>
+  >([]);
+  const currentAudioRef = useRef<{
+    id: string;
+    uri: string;
+    diagnostics?: SpeechDiagnosticsContext;
+  } | null>(null);
   const playingRef = useRef(false);
   const startingRef = useRef(false);
   const cancelledRef = useRef(false);
   const loadedSourceRef = useRef(false);
   const hasSeenAudioPlayingRef = useRef(false);
-  const nativeQueueRef = useRef<Array<{ id: string; text: string; voice?: string }>>(
-    [],
-  );
+  const nativeQueueRef = useRef<
+    Array<{
+      id: string;
+      text: string;
+      voice?: string;
+      diagnostics?: SpeechDiagnosticsContext;
+    }>
+  >([]);
   const nativeSpeakingRef = useRef(false);
   const nativeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioSessionReadyRef = useRef(false);
@@ -201,7 +215,8 @@ export function useAudioPlayer() {
       currentAudioRef.current = null;
       playingRef.current = false;
       recordSpeechDiagnostic({
-        source: "unknown",
+        requestId: next.diagnostics?.requestId,
+        source: next.diagnostics?.source ?? "unknown",
         stage: "playback-stopped",
         message:
           error instanceof Error
@@ -213,7 +228,12 @@ export function useAudioPlayer() {
       startingRef.current = false;
       updatePendingPlaybackState();
     }
-  }, [ensurePlaybackSession, finalizeDrainedState, player, updatePendingPlaybackState]);
+  }, [
+    ensurePlaybackSession,
+    finalizeDrainedState,
+    player,
+    updatePendingPlaybackState,
+  ]);
 
   const playNextNative = useCallback(async () => {
     if (
@@ -249,7 +269,8 @@ export function useAudioPlayer() {
       startNativeMetering();
       updatePendingPlaybackState();
       recordSpeechDiagnostic({
-        source: "unknown",
+        requestId: next.diagnostics?.requestId,
+        source: next.diagnostics?.source ?? "unknown",
         stage: "playback-started",
         actualRoute: "native",
         voice: next.voice ?? null,
@@ -263,7 +284,8 @@ export function useAudioPlayer() {
           nativeSpeakingRef.current = false;
           setNativeSpeaking(false);
           recordSpeechDiagnostic({
-            source: "unknown",
+            requestId: next.diagnostics?.requestId,
+            source: next.diagnostics?.source ?? "unknown",
             stage: "playback-finished",
             actualRoute: "native",
             voice: next.voice ?? null,
@@ -285,7 +307,8 @@ export function useAudioPlayer() {
           setNativeSpeaking(false);
           stopNativeMetering();
           recordSpeechDiagnostic({
-            source: "unknown",
+            requestId: next.diagnostics?.requestId,
+            source: next.diagnostics?.source ?? "unknown",
             stage: "playback-stopped",
             actualRoute: "native",
             voice: next.voice ?? null,
@@ -307,7 +330,8 @@ export function useAudioPlayer() {
           setNativeSpeaking(false);
           stopNativeMetering();
           recordSpeechDiagnostic({
-            source: "unknown",
+            requestId: next.diagnostics?.requestId,
+            source: next.diagnostics?.source ?? "unknown",
             stage: "playback-stopped",
             actualRoute: "native",
             voice: next.voice ?? null,
@@ -334,7 +358,8 @@ export function useAudioPlayer() {
       setNativeSpeaking(false);
       stopNativeMetering();
       recordSpeechDiagnostic({
-        source: "unknown",
+        requestId: next.diagnostics?.requestId,
+        source: next.diagnostics?.source ?? "unknown",
         stage: "playback-stopped",
         actualRoute: "native",
         voice: next.voice ?? null,
@@ -369,7 +394,8 @@ export function useAudioPlayer() {
       if (currentAudioRef.current && !hasSeenAudioPlayingRef.current) {
         hasSeenAudioPlayingRef.current = true;
         recordSpeechDiagnostic({
-          source: "unknown",
+          requestId: currentAudioRef.current.diagnostics?.requestId,
+          source: currentAudioRef.current.diagnostics?.source ?? "unknown",
           stage: "playback-started",
           textLength: undefined,
           message: currentAudioRef.current.uri,
@@ -385,7 +411,8 @@ export function useAudioPlayer() {
       hasSeenAudioPlayingRef.current = false;
       playingRef.current = false;
       recordSpeechDiagnostic({
-        source: "unknown",
+        requestId: finishedAudio.diagnostics?.requestId,
+        source: finishedAudio.diagnostics?.source ?? "unknown",
         stage: "playback-finished",
         message: finishedAudio.uri,
       });
@@ -472,10 +499,17 @@ export function useAudioPlayer() {
     return () => {
       clearInterval(interval);
     };
-  }, [nativeSpeaking, player.currentTime, player.id, player.isAudioSamplingSupported, resetVisualState, status.playing]);
+  }, [
+    nativeSpeaking,
+    player.currentTime,
+    player.id,
+    player.isAudioSamplingSupported,
+    resetVisualState,
+    status.playing,
+  ]);
 
   const enqueueAudio = useCallback(
-    (audioUri: string) => {
+    (audioUri: string, diagnostics?: SpeechDiagnosticsContext) => {
       if (cancelledRef.current) {
         return;
       }
@@ -483,15 +517,21 @@ export function useAudioPlayer() {
       queueRef.current.push({
         id: nextPlaybackJobId("audio"),
         uri: audioUri,
+        diagnostics,
       });
       recordSpeechDiagnostic({
-        source: "unknown",
+        requestId: diagnostics?.requestId,
+        source: diagnostics?.source ?? "unknown",
         stage: "playback-enqueued",
         message: audioUri,
       });
       updatePendingPlaybackState();
 
-      if (!playingRef.current && !startingRef.current && !nativeSpeakingRef.current) {
+      if (
+        !playingRef.current &&
+        !startingRef.current &&
+        !nativeSpeakingRef.current
+      ) {
         void playNextAudio();
       }
     },
@@ -499,7 +539,10 @@ export function useAudioPlayer() {
   );
 
   const speakText = useCallback(
-    (text: string, options?: { voice?: string }) => {
+    (
+      text: string,
+      options?: { voice?: string; diagnostics?: SpeechDiagnosticsContext },
+    ) => {
       if (cancelledRef.current) {
         return;
       }
@@ -508,9 +551,11 @@ export function useAudioPlayer() {
         id: nextPlaybackJobId("native"),
         text,
         voice: options?.voice,
+        diagnostics: options?.diagnostics,
       });
       recordSpeechDiagnostic({
-        source: "unknown",
+        requestId: options?.diagnostics?.requestId,
+        source: options?.diagnostics?.source ?? "unknown",
         stage: "playback-enqueued",
         actualRoute: "native",
         voice: options?.voice ?? null,
@@ -518,7 +563,11 @@ export function useAudioPlayer() {
       });
       updatePendingPlaybackState();
 
-      if (!nativeSpeakingRef.current && !playingRef.current && !startingRef.current) {
+      if (
+        !nativeSpeakingRef.current &&
+        !playingRef.current &&
+        !startingRef.current
+      ) {
         void playNextNative();
       }
     },

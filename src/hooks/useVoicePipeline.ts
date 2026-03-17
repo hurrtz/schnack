@@ -114,7 +114,10 @@ export interface UseVoicePipelineParams {
   showToast: (message: string, onRetry?: () => void) => void;
 
   /** Translation function. */
-  t: (key: TranslationKey, params?: Record<string, string | number | undefined>) => string;
+  t: (
+    key: TranslationKey,
+    params?: Record<string, string | number | undefined>,
+  ) => string;
 }
 
 export interface UseVoicePipelineResult {
@@ -192,9 +195,15 @@ export function useVoicePipeline(
         }
 
         player.resetCancellation();
+        const speechDiagnostics = {
+          requestId: createSpeechRequestId("repeat"),
+          source: "repeat" as const,
+        };
 
         if (ttsMode === "native") {
-          player.speakText(trimmed);
+          player.speakText(trimmed, {
+            diagnostics: speechDiagnostics,
+          });
           await player.waitForDrain();
           return;
         }
@@ -213,12 +222,11 @@ export function useVoicePipeline(
           language,
           listenLanguages: ttsListenLanguages,
           localVoices: localTtsVoices,
-          diagnostics: {
-            requestId: createSpeechRequestId("repeat"),
-            source: "repeat",
-          },
+          diagnostics: speechDiagnostics,
         }).catch(async () => {
-          player.speakText(trimmed);
+          player.speakText(trimmed, {
+            diagnostics: speechDiagnostics,
+          });
           showToast(
             ttsMode === "local"
               ? t("localVoiceFallback")
@@ -232,7 +240,7 @@ export function useVoicePipeline(
         }
 
         audioUris.forEach((audioUri) => {
-          player.enqueueAudio(audioUri);
+          player.enqueueAudio(audioUri, speechDiagnostics);
         });
         await player.waitForDrain();
       } finally {
@@ -360,11 +368,13 @@ export function useVoicePipeline(
                 usage,
               });
             },
-            onAudioReady: (audioData) => {
-              player.enqueueAudio(audioData);
+            onAudioReady: (audioData, diagnostics) => {
+              player.enqueueAudio(audioData, diagnostics);
             },
-            onSpeechTextReady: (text) => {
-              player.speakText(text);
+            onSpeechTextReady: (text, _voice, diagnostics) => {
+              player.speakText(text, {
+                diagnostics,
+              });
             },
             onTtsFallback: () => {
               if (ttsFallbackToastShownRef.current) {

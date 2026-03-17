@@ -163,6 +163,22 @@ const translations = {
       "This speaks directly through the phone's built-in speech synthesizer so you can compare it against local and cloud voices.",
     nativeVoiceUnavailable:
       "This device did not report any native system voices for preview.",
+    speechDiagnostics: "Recent Speech Activity",
+    speechDiagnosticsHint:
+      "Shows the latest speech requests, the route they asked for, the route they actually used, and any fallback reason.",
+    speechDiagnosticsEmpty:
+      "No recent speech requests yet. Preview a voice or play a reply to see routing details here.",
+    speechDiagnosticSourceConversation: "Conversation reply",
+    speechDiagnosticSourceRepeat: "Repeat reply",
+    speechDiagnosticSourcePreview: "Voice preview",
+    speechDiagnosticSourceUnknown: "Speech request",
+    speechDiagnosticRouteLine: ({ requested, actual }) =>
+      `Requested: ${requested} -> Actual: ${actual}`,
+    speechDiagnosticStageLine: ({ stage }) => `Latest stage: ${stage}`,
+    speechDiagnosticLanguageLine: ({ languageLabel }) =>
+      `Language: ${languageLabel}`,
+    speechDiagnosticProviderLine: ({ provider }) => `Provider: ${provider}`,
+    speechDiagnosticVoiceLine: ({ voice }) => `Voice: ${voice}`,
     localTtsPackReady: "Installed on this device.",
     localTtsPackBroken:
       "Downloaded, but this voice failed local verification on this device. Re-download it or choose another voice.",
@@ -228,6 +244,7 @@ const translations = {
     localTtsPackInstalled: ({ languageLabel }) =>
       `${languageLabel} local voice pack installed.`,
     localTtsPackInstallFailed: "Couldn't install the local voice pack.",
+    clear: "Clear",
     liveInput: "Live Input",
     parsingInput: "Parsing Input",
     awaitingModel: "Awaiting Model",
@@ -588,6 +605,22 @@ const translations = {
       "Nutzt direkt die eingebaute Sprachsynthese des Geräts, damit du sie mit lokalen und Cloud-Stimmen vergleichen kannst.",
     nativeVoiceUnavailable:
       "Dieses Gerät hat keine nativen Systemstimmen für die Vorschau gemeldet.",
+    speechDiagnostics: "Letzte Sprachaktivität",
+    speechDiagnosticsHint:
+      "Zeigt die letzten Sprachanfragen, die gewünschte Route, die tatsächlich genutzte Route und den jeweiligen Grund für einen Fallback.",
+    speechDiagnosticsEmpty:
+      "Noch keine aktuellen Sprachanfragen. Teste eine Stimme oder spiele eine Antwort ab, um hier Routing-Details zu sehen.",
+    speechDiagnosticSourceConversation: "Antwort aus dem Schnack",
+    speechDiagnosticSourceRepeat: "Antwort wiederholen",
+    speechDiagnosticSourcePreview: "Stimmvorschau",
+    speechDiagnosticSourceUnknown: "Sprachanfrage",
+    speechDiagnosticRouteLine: ({ requested, actual }) =>
+      `Angefragt: ${requested} -> Tatsächlich: ${actual}`,
+    speechDiagnosticStageLine: ({ stage }) => `Letzte Stufe: ${stage}`,
+    speechDiagnosticLanguageLine: ({ languageLabel }) =>
+      `Sprache: ${languageLabel}`,
+    speechDiagnosticProviderLine: ({ provider }) => `Anbieter: ${provider}`,
+    speechDiagnosticVoiceLine: ({ voice }) => `Stimme: ${voice}`,
     localTtsPackReady: "Auf diesem Gerät installiert.",
     localTtsPackBroken:
       "Heruntergeladen, aber diese Stimme hat die lokale Prüfung auf diesem Gerät nicht bestanden. Lade sie erneut herunter oder wähle eine andere Stimme.",
@@ -655,6 +688,7 @@ const translations = {
       `Lokales Sprachpaket für ${languageLabel} installiert.`,
     localTtsPackInstallFailed:
       "Das lokale Sprachpaket konnte nicht installiert werden.",
+    clear: "Leeren",
     liveInput: "Live-Eingabe",
     parsingInput: "Eingabe wird verarbeitet",
     awaitingModel: "Warte auf Modell",

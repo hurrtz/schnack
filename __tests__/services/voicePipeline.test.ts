@@ -143,6 +143,10 @@ describe("runVoicePipeline", () => {
     expect(callbacks.onSpeechTextReady).toHaveBeenCalledWith(
       "Wind is moving air.",
       undefined,
+      expect.objectContaining({
+        requestId: expect.stringMatching(/^conversation-/),
+        source: "conversation",
+      }),
     );
     expect(synthesizeSpeech).not.toHaveBeenCalled();
   });
@@ -270,6 +274,10 @@ describe("runVoicePipeline", () => {
     expect(callbacks.onSpeechTextReady).toHaveBeenCalledWith(
       "Wind is moving air.",
       undefined,
+      expect.objectContaining({
+        requestId: expect.stringMatching(/^conversation-/),
+        source: "conversation",
+      }),
     );
     expect(events).toEqual(["speak:Wind is moving air.", "response-done"]);
   });
@@ -625,6 +633,10 @@ describe("runVoicePipeline", () => {
     expect(callbacks.onSpeechTextReady).toHaveBeenCalledWith(
       "A complete answer.",
       undefined,
+      expect.objectContaining({
+        requestId: expect.stringMatching(/^conversation-/),
+        source: "conversation",
+      }),
     );
     expect(callbacks.onAudioReady).not.toHaveBeenCalled();
     expect(callbacks.onError).not.toHaveBeenCalled();

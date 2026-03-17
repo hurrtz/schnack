@@ -752,9 +752,16 @@ export function MainScreen() {
           await player.stopPlayback();
         }
         player.resetCancellation();
+        const speechDiagnostics = {
+          requestId: createSpeechRequestId("preview"),
+          source: "preview" as const,
+        };
 
         if (request.mode === "native") {
-          player.speakText(trimmed, { voice: request.nativeVoice });
+          player.speakText(trimmed, {
+            voice: request.nativeVoice,
+            diagnostics: speechDiagnostics,
+          });
           await player.waitForDrain();
           return;
         }
@@ -775,13 +782,10 @@ export function MainScreen() {
             provider: request.provider,
             apiKey: providerApiKey,
             language,
-            diagnostics: {
-              requestId: createSpeechRequestId("preview"),
-              source: "preview",
-            },
+            diagnostics: speechDiagnostics,
           });
 
-          player.enqueueAudio(audioUri);
+          player.enqueueAudio(audioUri, speechDiagnostics);
           await player.waitForDrain();
           return;
         }
@@ -820,14 +824,11 @@ export function MainScreen() {
             ...settings.localTtsVoices,
             [request.localLanguage]: request.voice,
           },
-          diagnostics: {
-            requestId: createSpeechRequestId("preview"),
-            source: "preview",
-          },
+          diagnostics: speechDiagnostics,
           strictLocalVoice: true,
         });
 
-        player.enqueueAudio(audioUri);
+        player.enqueueAudio(audioUri, speechDiagnostics);
         await player.waitForDrain();
       } catch (error) {
         if (request.mode === "local") {
