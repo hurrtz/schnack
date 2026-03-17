@@ -1,4 +1,6 @@
 import {
+  getProviderTtsTimeoutMs,
+  PROVIDER_TTS_MAX_TIMEOUT_MS,
   PROVIDER_TTS_TIMEOUT_MS,
   synthesizeSpeech,
   synthesizeSpeechSequence,
@@ -219,9 +221,10 @@ describe("synthesizeSpeech", () => {
     jest.useFakeTimers();
     try {
       (fetch as jest.Mock).mockImplementation(() => new Promise(() => undefined));
+      const text = "Hello world";
 
       const pending = synthesizeSpeech({
-        text: "Hello world",
+        text,
         voice: "alloy",
         mode: "provider",
         provider: "openai",
@@ -232,11 +235,16 @@ describe("synthesizeSpeech", () => {
         "OpenAI speech output took too long."
       );
 
-      await jest.advanceTimersByTimeAsync(PROVIDER_TTS_TIMEOUT_MS + 1);
+      await jest.advanceTimersByTimeAsync(getProviderTtsTimeoutMs(text) + 1);
 
       await expectation;
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it("scales provider TTS timeout with reply length up to a cap", () => {
+    expect(getProviderTtsTimeoutMs("short")).toBeGreaterThan(PROVIDER_TTS_TIMEOUT_MS);
+    expect(getProviderTtsTimeoutMs("x".repeat(10000))).toBe(PROVIDER_TTS_MAX_TIMEOUT_MS);
   });
 });

@@ -7,6 +7,8 @@ import { getTogetherTtsLanguageCode } from "../utils/speechLanguage";
 let ttsCounter = 0;
 export const PROVIDER_TTS_MAX_INPUT_CHARS = 3500;
 export const PROVIDER_TTS_TIMEOUT_MS = 15000;
+export const PROVIDER_TTS_TIMEOUT_MS_PER_CHAR = 10;
+export const PROVIDER_TTS_MAX_TIMEOUT_MS = 60000;
 
 export class TtsRequestError extends Error {
   readonly provider: Provider;
@@ -420,6 +422,15 @@ function createTtsTimeoutError(params: {
   );
 }
 
+export function getProviderTtsTimeoutMs(text: string) {
+  const normalizedLength = text.trim().length;
+
+  return Math.min(
+    PROVIDER_TTS_MAX_TIMEOUT_MS,
+    PROVIDER_TTS_TIMEOUT_MS + normalizedLength * PROVIDER_TTS_TIMEOUT_MS_PER_CHAR
+  );
+}
+
 async function fetchWithTimeout(
   input: RequestInfo | URL,
   init: RequestInit,
@@ -477,6 +488,7 @@ export async function synthesizeSpeech(params: {
   }
 
   const config = TTS_PROVIDER_CONFIGS[provider];
+  const timeoutMs = getProviderTtsTimeoutMs(text);
 
   if (!config) {
     throw new Error(
@@ -520,7 +532,7 @@ export async function synthesizeSpeech(params: {
         },
       }),
       },
-      PROVIDER_TTS_TIMEOUT_MS,
+      timeoutMs,
       () => createTtsTimeoutError({ provider, language })
     );
 
@@ -595,7 +607,7 @@ export async function synthesizeSpeech(params: {
     },
     body: JSON.stringify(requestBody),
     },
-    PROVIDER_TTS_TIMEOUT_MS,
+    timeoutMs,
     () => createTtsTimeoutError({ provider, language })
   );
 
