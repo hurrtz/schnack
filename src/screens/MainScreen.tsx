@@ -928,25 +928,6 @@ export function MainScreen() {
       ]
     : baseMessages;
 
-  const statusEyebrow = isRecording
-      ? t("liveInput")
-      : pipelinePhase === "transcribing"
-        ? t("parsingInput")
-        : pipelinePhase === "thinking"
-          ? t("awaitingModel")
-      : player.isPlaying
-        ? t("voiceOutput")
-        : t("controlRoom");
-  const statusTitle = isRecording
-      ? t("listeningToYourVoice")
-      : pipelinePhase === "transcribing"
-        ? t("parsingYourVoiceInput")
-        : pipelinePhase === "thinking"
-          ? t("waitingForProvider", { provider: providerLabel })
-      : player.isPlaying
-        ? t("speakingBackToYou")
-        : t("readyForNextThought");
-  const sessionTitle = activeConversation?.title || t("freshSession");
   const sessionMeta = activeConversation
     ? `${t("messageCount", { count: messages.length })} · ${providerLabel} · ${model}`
     : `${providerLabel} · ${model}`;
@@ -1287,11 +1268,8 @@ export function MainScreen() {
             >
               <View style={styles.statusCardHeader}>
                 <View style={styles.statusHeaderCopy}>
-                  <Text style={[styles.eyebrow, { color: colors.accent }]}>
-                    {statusEyebrow}
-                  </Text>
                   <Text style={[styles.statusTitle, { color: colors.text }]}>
-                    {statusTitle}
+                    {t("controlRoom")}
                   </Text>
                 </View>
                 <View
@@ -1360,13 +1338,8 @@ export function MainScreen() {
 
             <View style={styles.transcriptHeader}>
               <View style={styles.transcriptHeaderCopy}>
-                <Text
-                  style={[styles.eyebrow, { color: colors.textSecondary }]}
-                >
-                  {t("conversation")}
-                </Text>
                 <Text style={[styles.transcriptTitle, { color: colors.text }]}>
-                  {sessionTitle}
+                  {t("conversation")}
                 </Text>
               </View>
               <View style={styles.transcriptTopActions}>
@@ -1493,9 +1466,6 @@ export function MainScreen() {
               ]}
             >
               <View style={styles.expandedTranscriptHeader}>
-                <Text style={[styles.transcriptTitle, { color: colors.text }]}>
-                  {sessionTitle}
-                </Text>
                 <TouchableOpacity
                   style={[
                     styles.menuIconButton,
@@ -1805,7 +1775,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   statusTitle: {
-    marginTop: 4,
     fontSize: 24,
     lineHeight: 28,
     fontFamily: fonts.display,
@@ -1873,11 +1842,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-end",
     gap: 8,
-    marginTop: 2,
+    marginTop: -2,
   },
   transcriptTitle: {
-    fontSize: 20,
-    lineHeight: 24,
+    fontSize: 24,
+    lineHeight: 28,
     fontFamily: fonts.display,
   },
   menuIconButton: {
@@ -1960,14 +1929,14 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     flex: 1,
-    fontSize: 22,
+    fontSize: 24,
     lineHeight: 28,
     fontFamily: fonts.display,
   },
   expandedTranscriptHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     gap: 12,
     marginBottom: 10,
   },
