@@ -20,6 +20,7 @@ const translations = {
     ui: "UI",
     theme: "Theme",
     language: "Language",
+    usageStats: "Usage Stats",
     model: "Model",
     english: "English",
     german: "German",
@@ -244,6 +245,7 @@ const translations = {
     voiceOutputRoute: ({ route }) => `Voice out: ${route}`,
     conversation: "Conversation",
     show: "Show",
+    hide: "Hide",
     open: "Open",
     copyThread: "Copy Thread",
     shareThread: "Share Thread",
@@ -261,6 +263,35 @@ const translations = {
       "Speak with the control above. Close this screen when you want to return to the main stage.",
     transcriptSelectionHint:
       "Select any message text directly, or share and copy individual messages below.",
+    usageStatsHiddenDescription:
+      "Keep token and cost estimates out of the transcript UI.",
+    usageStatsVisibleDescription:
+      "Show estimated token usage and estimated cost for replies and conversation totals.",
+    estimatedUsageTitle: "Estimated Usage",
+    estimatedUsageCounts: ({ replies, summaries }) =>
+      `${replies} replies · ${summaries} memory updates`,
+    estimatedUsageConversationScope:
+      "Totals include every provider and model used inside this conversation.",
+    estimatedPromptTokens: ({ count }) => `Prompt: ${count}`,
+    estimatedReplyTokens: ({ count }) => `Reply: ${count}`,
+    estimatedTotalTokens: ({ count }) => `Total: ${count}`,
+    estimatedCost: ({ cost }) => `Cost: ${cost}`,
+    estimatedCostPartial: ({ cost }) => `Cost: ${cost} partial`,
+    estimatedUsageInline: ({ prompt, completion, total }) =>
+      `Est. ${prompt} in · ${completion} out · ${total} total`,
+    estimatedRouteUsage: ({ tokens, cost }) => `${tokens} tokens · ${cost}`,
+    estimatedRouteUsagePartial: ({ tokens, cost }) =>
+      `${tokens} tokens · ${cost} partial`,
+    estimatedRouteUsageTokensOnly: ({ tokens }) => `${tokens} tokens`,
+    unknownUsageRoute: "Unknown route",
+    pricingAssumptions: "Pricing Assumptions",
+    pricingAssumptionsHint: ({ date }) =>
+      `Last reviewed ${date}. Costs are only shown when the active model matches one of these source-backed assumptions.`,
+    pricingAssumptionRates: ({ input, output }) =>
+      `$${input}/1M input · $${output}/1M output`,
+    pricingAssumptionCheckedAt: ({ date }) => `Checked: ${date}`,
+    openPricingSource: ({ source }) => `Open pricing source: ${source}`,
+    source: "Source",
     startWithGroq: "Start with Groq",
     groqStarterDescription:
       "Groq offers a free tier, so it is the fastest way to unlock the app. Add its API key in Settings and the provider switcher will appear here right away.",
@@ -408,6 +439,7 @@ const translations = {
     ui: "UI",
     theme: "Design",
     language: "Sprache",
+    usageStats: "Nutzungsdaten",
     model: "Modell",
     english: "Englisch",
     german: "Deutsch",
@@ -498,7 +530,7 @@ const translations = {
     sttProviderEnabledHint:
       "Hier erscheinen nur aktivierte Anbieter mit Transkriptionsunterstützung.",
     sttProviderMissingHint:
-      "Aktiviere im Tab „Anbieter" einen Dienst mit STT-Unterstützung, um ihn hier auszuwählen.",
+      'Aktiviere im Tab "Anbieter" einen Dienst mit STT-Unterstützung, um ihn hier auszuwählen.',
     nativeSttHint:
       "Native STT nutzt die Spracherkennung des Geräts direkt und funktioniert unabhängig von deinen Anbieter-Schlüsseln.",
     replyPlayback: "Antwort-Wiedergabe",
@@ -520,7 +552,7 @@ const translations = {
     ttsProviderEnabledHint:
       "Hier erscheinen nur aktivierte Anbieter mit Sprachausgabe-Unterstützung.",
     ttsProviderMissingHint:
-      "Aktiviere im Tab „Anbieter" einen Dienst mit TTS-Unterstützung, um ihn hier auszuwählen.",
+      'Aktiviere im Tab "Anbieter" einen Dienst mit TTS-Unterstützung, um ihn hier auszuwählen.',
     localTtsOrderHint:
       "Reihenfolge: passende lokale Stimme zuerst, dann der ausgewählte Anbieter (falls konfiguriert), dann die Systemstimme.",
     providerTtsOrderHint:
@@ -543,8 +575,7 @@ const translations = {
     localVoicePacks: "Lokale Sprachpakete",
     localVoicePacksHint:
       "Jede Sprache hat ihre eigene lokale Stimme. Wähle zuerst die Stimme pro Sprache und lade dann nur die Pakete herunter, die dir wirklich wichtig sind.",
-    localVoiceForLanguage: ({ languageLabel }) =>
-      `Stimme für ${languageLabel}`,
+    localVoiceForLanguage: ({ languageLabel }) => `Stimme für ${languageLabel}`,
     providerVoicePreviews: "Anbieter-Stimmvorschau",
     providerVoicePreviewsHint:
       "Jeder aktivierte TTS-Anbieter kann hier mit eigener Stimme und eigenem Beispieltext getestet werden, ohne die aktive Antwort-Route zu ändern.",
@@ -637,6 +668,7 @@ const translations = {
     voiceOutputRoute: ({ route }) => `Stimme raus: ${route}`,
     conversation: "Schnack",
     show: "Anzeigen",
+    hide: "Ausblenden",
     open: "Öffnen",
     copyThread: "Schnack kopieren",
     shareThread: "Schnack teilen",
@@ -654,6 +686,35 @@ const translations = {
       "Sprich über die Steuerung oben. Schließe diesen Bildschirm, wenn du zur Hauptansicht zurückkehren willst.",
     transcriptSelectionHint:
       "Du kannst Text direkt markieren oder einzelne Nachrichten unten teilen und kopieren.",
+    usageStatsHiddenDescription:
+      "Blende Token- und Kostenschätzungen im Transkript aus.",
+    usageStatsVisibleDescription:
+      "Zeige geschätzte Token-Nutzung und geschätzte Kosten pro Antwort sowie für die gesamte Unterhaltung.",
+    estimatedUsageTitle: "Geschätzte Nutzung",
+    estimatedUsageCounts: ({ replies, summaries }) =>
+      `${replies} Antworten · ${summaries} Speicher-Updates`,
+    estimatedUsageConversationScope:
+      "Die Summen enthalten alle Anbieter und Modelle, die in diesem Schnack verwendet wurden.",
+    estimatedPromptTokens: ({ count }) => `Prompt: ${count}`,
+    estimatedReplyTokens: ({ count }) => `Antwort: ${count}`,
+    estimatedTotalTokens: ({ count }) => `Gesamt: ${count}`,
+    estimatedCost: ({ cost }) => `Kosten: ${cost}`,
+    estimatedCostPartial: ({ cost }) => `Kosten: ${cost} teilweise`,
+    estimatedUsageInline: ({ prompt, completion, total }) =>
+      `Geschätzt: ${prompt} rein · ${completion} raus · ${total} gesamt`,
+    estimatedRouteUsage: ({ tokens, cost }) => `${tokens} Token · ${cost}`,
+    estimatedRouteUsagePartial: ({ tokens, cost }) =>
+      `${tokens} Token · ${cost} teilweise`,
+    estimatedRouteUsageTokensOnly: ({ tokens }) => `${tokens} Token`,
+    unknownUsageRoute: "Unbekannte Route",
+    pricingAssumptions: "Preisannahmen",
+    pricingAssumptionsHint: ({ date }) =>
+      `Zuletzt geprüft am ${date}. Kosten werden nur gezeigt, wenn das aktive Modell zu einer dieser quellenbasierten Annahmen passt.`,
+    pricingAssumptionRates: ({ input, output }) =>
+      `$${input}/1M Input · $${output}/1M Output`,
+    pricingAssumptionCheckedAt: ({ date }) => `Geprüft: ${date}`,
+    openPricingSource: ({ source }) => `Preisquelle öffnen: ${source}`,
+    source: "Quelle",
     startWithGroq: "Mit Groq starten",
     groqStarterDescription:
       "Groq bietet einen kostenlosen Tarif und ist damit der schnellste Weg, die App freizuschalten. Füge in den Einstellungen den API-Schlüssel hinzu – der Anbieter-Umschalter erscheint dann sofort hier.",

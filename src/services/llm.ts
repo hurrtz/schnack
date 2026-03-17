@@ -12,8 +12,10 @@ import {
   getDefaultAssistantInstructions,
   Message,
   Provider,
+  UsageEstimate,
 } from "../types";
 import { translate } from "../i18n";
+import { estimateChatUsage } from "../utils/usageStats";
 
 interface StreamChatParams {
   messages: Message[];
@@ -26,7 +28,7 @@ interface StreamChatParams {
   language: AppLanguage;
   conversationSummary?: string;
   onChunk: (text: string) => void;
-  onDone: (fullText: string) => void;
+  onDone: (fullText: string, usage?: UsageEstimate) => void;
   onError: (error: Error) => void;
   abortSignal?: AbortSignal;
 }
@@ -51,8 +53,7 @@ const RESPONSE_TONE_INSTRUCTIONS: Record<AssistantResponseTone, string> = {
     "Be as brief as possible while still being complete. No preamble, no filler, just the answer. Think telegram style.",
   socratic:
     "Challenge the user's thinking. Ask counter-questions, offer alternative perspectives, don't just confirm what they said. Be a sparring partner, not a yes-machine.",
-  eli5:
-    "Explain everything as simply as possible. Use analogies, everyday language, zero jargon. Assume no prior knowledge on any topic.",
+  eli5: "Explain everything as simply as possible. Use analogies, everyday language, zero jargon. Assume no prior knowledge on any topic.",
 };
 
 const CONTEXT_SUMMARIZER_PROMPT =
@@ -110,13 +111,13 @@ function toAPIMessages(messages: ChatMessage[]) {
 function requireProviderKey(
   provider: Provider,
   apiKey: string,
-  language: AppLanguage
+  language: AppLanguage,
 ) {
   if (!apiKey) {
     throw new Error(
       translate(language, "providerConfiguredInSettings", {
         provider: PROVIDER_LABELS[provider],
-      })
+      }),
     );
   }
 
@@ -216,7 +217,7 @@ async function requestOpenAICompatibleChat(params: {
 
 async function readEventStream(
   stream: ReadableStream<Uint8Array>,
-  onEvent: (event: { type: string; data: string }) => void | Promise<void>
+  onEvent: (event: { type: string; data: string }) => void | Promise<void>,
 ) {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
@@ -356,7 +357,7 @@ async function requestOpenAICompatibleChatStream(params: {
 
     const payload = JSON.parse(data);
     const delta = extractOpenAICompatibleText(
-      payload.choices?.[0]?.delta?.content
+      payload.choices?.[0]?.delta?.content,
     );
 
     if (!delta) {
@@ -418,9 +419,10 @@ async function requestAnthropicChat(params: {
   }
 
   const data = await response.json();
-  return data.content
-    ?.map((part: { text?: string }) => part.text || "")
-    .join("") || "";
+  return (
+    data.content?.map((part: { text?: string }) => part.text || "").join("") ||
+    ""
+  );
 }
 
 async function requestAnthropicChatStream(params: {
@@ -432,7 +434,8 @@ async function requestAnthropicChatStream(params: {
   onChunk: (text: string) => void;
   abortSignal?: AbortSignal;
 }) {
-  const { model, messages, apiKey, systemPrompt, onChunk, abortSignal } = params;
+  const { model, messages, apiKey, systemPrompt, onChunk, abortSignal } =
+    params;
   let response: Awaited<ReturnType<typeof networkFetch>>;
 
   try {
@@ -638,7 +641,7 @@ async function requestChatText(params: {
       throw new Error(
         translate(params.language, "providerNotWiredUpYet", {
           provider: PROVIDER_LABELS[params.provider],
-        })
+        }),
       );
   }
 }
@@ -664,7 +667,10 @@ export async function summarizeConversationContext(params: {
   const existingSummary = params.existingSummary?.trim() ?? "";
 
   if (!existingSummary && params.messages.length === 0) {
-    return "";
+    return {
+      summary: "",
+      usage: undefined,
+    };
   }
 
   const promptSections: string[] = [];
@@ -675,26 +681,40 @@ export async function summarizeConversationContext(params: {
 
   if (params.messages.length > 0) {
     promptSections.push(
-      `Conversation turns to absorb:\n${formatMessagesForSummary(params.messages)}`
+      `Conversation turns to absorb:\n${formatMessagesForSummary(params.messages)}`,
     );
   }
 
+  const summaryRequestMessages = [
+    {
+      role: "user" as const,
+      content: promptSections.join("\n\n"),
+    },
+  ];
+
   const summary = await requestChatText({
     provider: params.provider,
-      model: params.model,
-      apiKey: params.apiKey,
-      language: params.language,
-      systemPrompt: CONTEXT_SUMMARIZER_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: promptSections.join("\n\n"),
-      },
-    ],
+    model: params.model,
+    apiKey: params.apiKey,
+    language: params.language,
+    systemPrompt: CONTEXT_SUMMARIZER_PROMPT,
+    messages: summaryRequestMessages,
     abortSignal: params.abortSignal,
   });
 
-  return summary.trim();
+  const trimmedSummary = summary.trim();
+
+  return {
+    summary: trimmedSummary,
+    usage: estimateChatUsage({
+      provider: params.provider,
+      model: params.model,
+      kind: "summary",
+      systemPrompt: CONTEXT_SUMMARIZER_PROMPT,
+      messages: summaryRequestMessages,
+      completionText: trimmedSummary,
+    }),
+  };
 }
 
 export async function validateProviderConnection(params: {
@@ -785,7 +805,17 @@ export async function streamChat({
       }
     }
 
-    onDone(fullText);
+    onDone(
+      fullText,
+      estimateChatUsage({
+        provider,
+        model,
+        kind: "reply",
+        systemPrompt,
+        messages,
+        completionText: fullText,
+      }),
+    );
   } catch (error) {
     if (abortSignal?.aborted) {
       return;

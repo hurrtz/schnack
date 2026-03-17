@@ -53,6 +53,7 @@ import {
   TtsListenLanguage,
   VoicePreviewRequest,
   VoiceVisualPhase,
+  UsageEstimate,
 } from "../types";
 import { formatConversationForCopy } from "../utils/conversationExport";
 import {
@@ -60,6 +61,12 @@ import {
   getEnabledSttProviders,
   getEnabledTtsProviders,
 } from "../utils/providerCapabilities";
+import {
+  aggregateConversationUsage,
+  aggregateConversationUsageByRoute,
+  formatTokenCount,
+  formatUsd,
+} from "../utils/usageStats";
 
 export function MainScreen() {
   const { colors, isDark } = useTheme();
@@ -634,14 +641,20 @@ export function MainScreen() {
                 });
               }, 0);
             },
-            onContextSummary: (summary, summarizedCount) => {
-              updateConversationContextSummary(summary, summarizedCount);
+            onContextSummary: (summary, summarizedCount, usage) => {
+              updateConversationContextSummary(
+                summary,
+                summarizedCount,
+                usage,
+                model,
+                provider,
+              );
             },
             onChunk: (text) => {
               setPipelinePhase("thinking");
               setStreamingText((prev) => prev + text);
             },
-            onResponseDone: (fullText) => {
+            onResponseDone: (fullText, usage?: UsageEstimate) => {
               setStreamingText("");
               setPipelinePhase(
                 settings.ttsMode === "native" ? "idle" : "synthesizing",
@@ -652,6 +665,7 @@ export function MainScreen() {
                 content: fullText,
                 model,
                 provider,
+                usage,
               });
             },
             onAudioReady: (audioData) => {
@@ -1082,6 +1096,16 @@ export function MainScreen() {
               : (messageCountLabel ?? t("freshSession"));
   const activeConversationTitle =
     activeConversation?.title.trim() || t("untitledConversation");
+  const conversationUsageTotals =
+    aggregateConversationUsage(activeConversation);
+  const conversationUsageByRoute =
+    aggregateConversationUsageByRoute(activeConversation);
+  const showConversationUsageCard =
+    settings.showUsageStats && conversationUsageTotals.totalTokens > 0;
+  const conversationUsageCostLabel =
+    conversationUsageTotals.pricedEntryCount > 0
+      ? formatUsd(conversationUsageTotals.totalCostUsd)
+      : null;
 
   const openMemory = useCallback(
     async (conversationId?: string) => {
@@ -1548,6 +1572,7 @@ export function MainScreen() {
                 emptyDescription={t("previewTranscriptEmptyDescription")}
                 contentContainerStyle={styles.previewTranscriptContent}
                 scrollEnabled={false}
+                showUsageStats={settings.showUsageStats}
                 onCopyMessage={(message) => {
                   void handleCopyMessage(message.content);
                 }}
@@ -1827,11 +1852,163 @@ export function MainScreen() {
                 {t("transcriptSelectionHint")}
               </Text>
 
+              {showConversationUsageCard ? (
+                <View
+                  style={[
+                    styles.usageSummaryCard,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <View style={styles.usageSummaryHeader}>
+                    <Text
+                      style={[styles.usageSummaryTitle, { color: colors.text }]}
+                    >
+                      {t("estimatedUsageTitle")}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.usageSummaryMeta,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {t("estimatedUsageCounts", {
+                        replies: conversationUsageTotals.replyCount,
+                        summaries: conversationUsageTotals.summaryCount,
+                      })}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.usageSummaryNote,
+                        { color: colors.textMuted },
+                      ]}
+                    >
+                      {t("estimatedUsageConversationScope")}
+                    </Text>
+                  </View>
+                  <View style={styles.usageSummaryRow}>
+                    <Text
+                      style={[
+                        styles.usageSummaryMetric,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {t("estimatedPromptTokens", {
+                        count: formatTokenCount(
+                          conversationUsageTotals.promptTokens,
+                        ),
+                      })}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.usageSummaryMetric,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {t("estimatedReplyTokens", {
+                        count: formatTokenCount(
+                          conversationUsageTotals.completionTokens,
+                        ),
+                      })}
+                    </Text>
+                  </View>
+                  <View style={styles.usageSummaryRow}>
+                    <Text
+                      style={[
+                        styles.usageSummaryMetricStrong,
+                        { color: colors.text },
+                      ]}
+                    >
+                      {t("estimatedTotalTokens", {
+                        count: formatTokenCount(
+                          conversationUsageTotals.totalTokens,
+                        ),
+                      })}
+                    </Text>
+                    {conversationUsageCostLabel ? (
+                      <Text
+                        style={[
+                          styles.usageSummaryMetricStrong,
+                          { color: colors.text },
+                        ]}
+                      >
+                        {t(
+                          conversationUsageTotals.unpricedEntryCount > 0
+                            ? "estimatedCostPartial"
+                            : "estimatedCost",
+                          {
+                            cost: conversationUsageCostLabel,
+                          },
+                        )}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {conversationUsageByRoute.length > 1 ? (
+                    <View style={styles.usageRouteList}>
+                      {conversationUsageByRoute.map((route) => {
+                        const routeLabel =
+                          route.provider && route.model
+                            ? `${PROVIDER_LABELS[route.provider]} · ${getProviderModelName(
+                                route.provider,
+                                route.model,
+                              )}`
+                            : route.model || t("unknownUsageRoute");
+                        const routeCostLabel =
+                          route.pricedEntryCount > 0
+                            ? formatUsd(route.totalCostUsd)
+                            : null;
+
+                        return (
+                          <View
+                            key={`${route.provider ?? "unknown"}:${route.model ?? "unknown"}`}
+                            style={styles.usageRouteRow}
+                          >
+                            <Text
+                              style={[
+                                styles.usageRouteLabel,
+                                { color: colors.textSecondary },
+                              ]}
+                            >
+                              {routeLabel}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.usageRouteValue,
+                                { color: colors.textSecondary },
+                              ]}
+                            >
+                              {routeCostLabel
+                                ? t(
+                                    route.unpricedEntryCount > 0
+                                      ? "estimatedRouteUsagePartial"
+                                      : "estimatedRouteUsage",
+                                    {
+                                      tokens: formatTokenCount(
+                                        route.totalTokens,
+                                      ),
+                                      cost: routeCostLabel,
+                                    },
+                                  )
+                                : t("estimatedRouteUsageTokensOnly", {
+                                    tokens: formatTokenCount(route.totalTokens),
+                                  })}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
               <ChatTranscript
                 messages={messages}
                 emptyTitle={t("noConversationYet")}
                 emptyDescription={t("expandedTranscriptEmptyDescription")}
                 contentContainerStyle={styles.expandedTranscriptContent}
+                showUsageStats={settings.showUsageStats}
                 onCopyMessage={(message) => {
                   void handleCopyMessage(message.content);
                 }}
@@ -2351,5 +2528,65 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginBottom: 8,
     fontFamily: fonts.body,
+  },
+  usageSummaryCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  usageSummaryHeader: {
+    gap: 4,
+  },
+  usageSummaryTitle: {
+    fontSize: 14,
+    lineHeight: 18,
+    fontFamily: fonts.display,
+  },
+  usageSummaryMeta: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontFamily: fonts.mono,
+  },
+  usageSummaryNote: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: fonts.body,
+  },
+  usageSummaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  usageRouteList: {
+    marginTop: 4,
+    gap: 8,
+  },
+  usageRouteRow: {
+    gap: 2,
+  },
+  usageRouteLabel: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: fonts.display,
+  },
+  usageRouteValue: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontFamily: fonts.mono,
+  },
+  usageSummaryMetric: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: fonts.mono,
+  },
+  usageSummaryMetricStrong: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: fonts.mono,
   },
 });

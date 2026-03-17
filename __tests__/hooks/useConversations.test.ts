@@ -19,13 +19,13 @@ describe("useConversations", () => {
     jest.clearAllMocks();
     mockUuidCounter = 0;
     (AsyncStorage.getItem as jest.Mock).mockImplementation(() =>
-      Promise.resolve(null)
+      Promise.resolve(null),
     );
     (AsyncStorage.setItem as jest.Mock).mockImplementation(() =>
-      Promise.resolve()
+      Promise.resolve(),
     );
     (AsyncStorage.removeItem as jest.Mock).mockImplementation(() =>
-      Promise.resolve()
+      Promise.resolve(),
     );
   });
 
@@ -38,7 +38,11 @@ describe("useConversations", () => {
   it("creates a new conversation", async () => {
     const { result } = renderHook(() => useConversations());
     await act(async () => {
-      result.current.createConversation("Hello, how are you?", "gpt-5.4", "openai");
+      result.current.createConversation(
+        "Hello, how are you?",
+        "gpt-5.4",
+        "openai",
+      );
     });
     expect(result.current.conversations).toHaveLength(1);
     expect(result.current.conversations[0].title).toBe("Hello, how are you?");
@@ -51,7 +55,9 @@ describe("useConversations", () => {
   it("truncates long titles at word boundary to ~40 chars", async () => {
     const { result } = renderHook(() => useConversations());
     await act(async () => {
-      result.current.createConversation("This is a very long message that should be truncated at a word boundary for display");
+      result.current.createConversation(
+        "This is a very long message that should be truncated at a word boundary for display",
+      );
     });
     const title = result.current.conversations[0].title;
     expect(title.length).toBeLessThanOrEqual(43);
@@ -60,9 +66,16 @@ describe("useConversations", () => {
 
   it("adds a message to the active conversation", async () => {
     const { result } = renderHook(() => useConversations());
-    await act(async () => { result.current.createConversation("Test"); });
     await act(async () => {
-      result.current.addMessage({ role: "user", content: "Test message", model: null, provider: null });
+      result.current.createConversation("Test");
+    });
+    await act(async () => {
+      result.current.addMessage({
+        role: "user",
+        content: "Test message",
+        model: null,
+        provider: null,
+      });
     });
     expect(result.current.activeConversation!.messages).toHaveLength(1);
   });
@@ -77,17 +90,57 @@ describe("useConversations", () => {
     await act(async () => {
       result.current.updateConversationContextSummary(
         "User prefers concise answers and is planning a launch.",
-        4
+        4,
       );
     });
 
     expect(result.current.activeConversation?.contextSummary).toBe(
-      "User prefers concise answers and is planning a launch."
+      "User prefers concise answers and is planning a launch.",
     );
     expect(result.current.activeConversation?.summarizedMessageCount).toBe(4);
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
       "@schnackai/conversation/test-uuid-1",
-      expect.stringContaining('"summarizedMessageCount":4')
+      expect.stringContaining('"summarizedMessageCount":4'),
+    );
+  });
+
+  it("stores summary usage events alongside conversation memory", async () => {
+    const { result } = renderHook(() => useConversations());
+
+    await act(async () => {
+      result.current.createConversation("Usage test");
+    });
+
+    await act(async () => {
+      result.current.updateConversationContextSummary(
+        "User prefers quick answers.",
+        2,
+        {
+          kind: "summary",
+          source: "estimated",
+          promptTokens: 80,
+          completionTokens: 12,
+          totalTokens: 92,
+          inputCostUsd: 0.0002,
+          outputCostUsd: 0.0001,
+          totalCostUsd: 0.0003,
+        },
+        "gpt-5.4",
+        "openai",
+      );
+    });
+
+    expect(result.current.activeConversation?.usageEvents).toHaveLength(1);
+    expect(result.current.activeConversation?.usageEvents?.[0]).toEqual(
+      expect.objectContaining({
+        kind: "context-summary",
+        model: "gpt-5.4",
+        provider: "openai",
+        usage: expect.objectContaining({
+          kind: "summary",
+          totalTokens: 92,
+        }),
+      }),
     );
   });
 
@@ -101,7 +154,7 @@ describe("useConversations", () => {
     await act(async () => {
       result.current.updateConversationContextSummary(
         "User wants a concise summary later.",
-        3
+        3,
       );
     });
 
@@ -111,7 +164,7 @@ describe("useConversations", () => {
 
     await act(async () => {
       updatedConversation = await result.current.clearConversationMemory(
-        result.current.conversations[0].id
+        result.current.conversations[0].id,
       );
     });
 
@@ -154,7 +207,7 @@ describe("useConversations", () => {
               updatedAt: "2026-03-14T10:00:00.000Z",
               lastModel: null,
             },
-          ])
+          ]),
         );
       }
 
@@ -183,7 +236,7 @@ describe("useConversations", () => {
                 timestamp: "2026-03-14T10:00:00.000Z",
               },
             ],
-          })
+          }),
         );
       }
 
@@ -197,7 +250,7 @@ describe("useConversations", () => {
     });
 
     expect(result.current.conversations[0]?.lastModel).toBe(
-      "claude-sonnet-4-20250514"
+      "claude-sonnet-4-20250514",
     );
     expect(result.current.conversations[0]?.lastProvider).toBe("anthropic");
   });
@@ -228,16 +281,20 @@ describe("useConversations", () => {
     });
 
     expect(result.current.conversations[0]?.lastModel).toBe(
-      "claude-sonnet-4-20250514"
+      "claude-sonnet-4-20250514",
     );
     expect(result.current.conversations[0]?.lastProvider).toBe("anthropic");
   });
 
   it("deletes a conversation", async () => {
     const { result } = renderHook(() => useConversations());
-    await act(async () => { result.current.createConversation("To be deleted"); });
+    await act(async () => {
+      result.current.createConversation("To be deleted");
+    });
     const id = result.current.conversations[0].id;
-    await act(async () => { result.current.deleteConversation(id); });
+    await act(async () => {
+      result.current.deleteConversation(id);
+    });
     expect(result.current.conversations).toHaveLength(0);
     expect(result.current.activeConversation).toBeNull();
   });
@@ -256,7 +313,9 @@ describe("useConversations", () => {
     });
 
     expect(result.current.conversations[0]?.title).toBe("A much better title");
-    expect(result.current.activeConversation?.title).toBe("A much better title");
+    expect(result.current.activeConversation?.title).toBe(
+      "A much better title",
+    );
   });
 
   it("pins a conversation and sorts pinned items before recent unpinned ones", async () => {
@@ -272,7 +331,7 @@ describe("useConversations", () => {
     });
 
     const firstConversationId = result.current.conversations.find(
-      (conversation) => conversation.title === "First"
+      (conversation) => conversation.title === "First",
     )?.id;
 
     expect(firstConversationId).toBeTruthy();

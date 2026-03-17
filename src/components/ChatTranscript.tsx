@@ -25,6 +25,7 @@ interface ChatTranscriptProps {
   onShareMessage?: (message: Message) => void;
   onRepeatMessage?: (message: Message) => void;
   messageSelectionEnabled?: boolean;
+  showUsageStats?: boolean;
 }
 
 export function ChatTranscript({
@@ -38,6 +39,7 @@ export function ChatTranscript({
   onShareMessage,
   onRepeatMessage,
   messageSelectionEnabled = false,
+  showUsageStats = false,
 }: ChatTranscriptProps) {
   const { colors } = useTheme();
   const { t } = useLocalization();
@@ -70,6 +72,7 @@ export function ChatTranscript({
           onShare={onShareMessage}
           onRepeat={onRepeatMessage}
           selectable={messageSelectionEnabled}
+          showUsageStats={showUsageStats}
         />
       )}
       contentContainerStyle={[
@@ -90,7 +93,10 @@ export function ChatTranscript({
           <View
             style={[
               styles.emptyIcon,
-              { backgroundColor: colors.accentSoft, borderColor: colors.border },
+              {
+                backgroundColor: colors.accentSoft,
+                borderColor: colors.border,
+              },
             ]}
           >
             <Feather name="mic" size={18} color={colors.accent} />

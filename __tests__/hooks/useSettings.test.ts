@@ -26,19 +26,19 @@ describe("useSettings", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (AsyncStorage.getItem as jest.Mock).mockImplementation(() =>
-      Promise.resolve(null)
+      Promise.resolve(null),
     );
     (AsyncStorage.setItem as jest.Mock).mockImplementation(() =>
-      Promise.resolve()
+      Promise.resolve(),
     );
     (SecureStore.getItemAsync as jest.Mock).mockImplementation(() =>
-      Promise.resolve(null)
+      Promise.resolve(null),
     );
     (SecureStore.setItemAsync as jest.Mock).mockImplementation(() =>
-      Promise.resolve()
+      Promise.resolve(),
     );
     (SecureStore.deleteItemAsync as jest.Mock).mockImplementation(() =>
-      Promise.resolve()
+      Promise.resolve(),
     );
   });
 
@@ -46,22 +46,27 @@ describe("useSettings", () => {
     const { result } = renderHook(() => useSettings());
     await flushSettingsLoad();
     expect(result.current.settings).toEqual(DEFAULT_SETTINGS);
+    expect(result.current.settings.showUsageStats).toBe(false);
   });
 
   it("loads saved settings from AsyncStorage", async () => {
     const saved = { ...DEFAULT_SETTINGS, lastProvider: "anthropic" as const };
     delete (saved as Partial<typeof saved>).setupGuideDismissed;
-    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify(saved));
-    (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) => {
-      const values: Record<string, string | null> = {
-        "schnackai.provider_key.openai": "sk-openai",
-        "schnackai.provider_key.anthropic": "sk-anthropic",
-        "schnackai.provider_key.gemini": "AIza-test",
-        "schnackai.provider_key.nvidia": "nvapi-test",
-      };
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(
+      JSON.stringify(saved),
+    );
+    (SecureStore.getItemAsync as jest.Mock).mockImplementation(
+      (key: string) => {
+        const values: Record<string, string | null> = {
+          "schnackai.provider_key.openai": "sk-openai",
+          "schnackai.provider_key.anthropic": "sk-anthropic",
+          "schnackai.provider_key.gemini": "AIza-test",
+          "schnackai.provider_key.nvidia": "nvapi-test",
+        };
 
-      return Promise.resolve(values[key] ?? null);
-    });
+        return Promise.resolve(values[key] ?? null);
+      },
+    );
     const { result } = renderHook(() => useSettings());
     await flushSettingsLoad();
     expect(result.current.settings.lastProvider).toBe("anthropic");
@@ -88,7 +93,7 @@ describe("useSettings", () => {
     legacyStored.ttsVoice = "shimmer";
 
     (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(
-      JSON.stringify(legacyStored)
+      JSON.stringify(legacyStored),
     );
 
     const { result } = renderHook(() => useSettings());
@@ -97,17 +102,34 @@ describe("useSettings", () => {
     expect(result.current.settings.replyPlayback).toBe("wait");
     expect(result.current.settings.providerTtsVoices.openai).toBe("shimmer");
     expect(result.current.settings.providerTtsVoices.gemini).toBe(
-      DEFAULT_SETTINGS.providerTtsVoices.gemini
+      DEFAULT_SETTINGS.providerTtsVoices.gemini,
     );
   });
 
   it("persists settings on update", async () => {
     const { result } = renderHook(() => useSettings());
     await flushSettingsLoad();
-    await act(async () => { result.current.updateSettings({ lastProvider: "anthropic" }); });
+    await act(async () => {
+      result.current.updateSettings({ lastProvider: "anthropic" });
+    });
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
       "@schnackai/settings",
-      expect.stringContaining('"lastProvider":"anthropic"')
+      expect.stringContaining('"lastProvider":"anthropic"'),
+    );
+  });
+
+  it("persists the usage stats visibility toggle", async () => {
+    const { result } = renderHook(() => useSettings());
+    await flushSettingsLoad();
+
+    await act(async () => {
+      result.current.updateSettings({ showUsageStats: true });
+    });
+
+    expect(result.current.settings.showUsageStats).toBe(true);
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      "@schnackai/settings",
+      expect.stringContaining('"showUsageStats":true'),
     );
   });
 
@@ -128,11 +150,11 @@ describe("useSettings", () => {
 
     expect(result.current.settings.language).toBe("de");
     expect(result.current.settings.assistantInstructions).toBe(
-      DEFAULT_ASSISTANT_INSTRUCTIONS_BY_LANGUAGE.de
+      DEFAULT_ASSISTANT_INSTRUCTIONS_BY_LANGUAGE.de,
     );
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
       "@schnackai/settings",
-      expect.stringContaining('"language":"de"')
+      expect.stringContaining('"language":"de"'),
     );
   });
 
@@ -152,7 +174,7 @@ describe("useSettings", () => {
 
     expect(result.current.settings.language).toBe("de");
     expect(result.current.settings.assistantInstructions).toBe(
-      "Always answer with one short sentence."
+      "Always answer with one short sentence.",
     );
   });
 
@@ -166,9 +188,11 @@ describe("useSettings", () => {
 
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
       "@schnackai/settings",
-      expect.stringContaining('"groq":"openai/gpt-oss-120b"')
+      expect.stringContaining('"groq":"openai/gpt-oss-120b"'),
     );
-    expect(result.current.settings.providerModels.groq).toBe("openai/gpt-oss-120b");
+    expect(result.current.settings.providerModels.groq).toBe(
+      "openai/gpt-oss-120b",
+    );
   });
 
   it("persists provider TTS voice selections", async () => {
@@ -181,7 +205,7 @@ describe("useSettings", () => {
 
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
       "@schnackai/settings",
-      expect.stringContaining('"gemini":"Aoede"')
+      expect.stringContaining('"gemini":"Aoede"'),
     );
     expect(result.current.settings.providerTtsVoices.gemini).toBe("Aoede");
   });
@@ -196,7 +220,7 @@ describe("useSettings", () => {
 
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
       "@schnackai/settings",
-      expect.stringContaining('"en":"af_bella"')
+      expect.stringContaining('"en":"af_bella"'),
     );
     expect(result.current.settings.localTtsVoices.en).toBe("af_bella");
   });
@@ -210,7 +234,9 @@ describe("useSettings", () => {
       },
     };
 
-    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify(stored));
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(
+      JSON.stringify(stored),
+    );
 
     const { result } = renderHook(() => useSettings());
     await flushSettingsLoad();
@@ -228,7 +254,7 @@ describe("useSettings", () => {
 
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
       "schnackai.provider_key.gemini",
-      "AIza-live-key"
+      "AIza-live-key",
     );
     expect(result.current.settings.apiKeys.gemini).toBe("AIza-live-key");
   });
@@ -242,7 +268,7 @@ describe("useSettings", () => {
     });
 
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(
-      "schnackai.provider_key.nvidia"
+      "schnackai.provider_key.nvidia",
     );
   });
 });

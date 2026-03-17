@@ -40,6 +40,7 @@ export type ProviderApiKeys = Record<Provider, string>;
 export type ProviderModelSelections = Record<Provider, string>;
 export type ProviderTtsVoiceSelections = Record<Provider, string>;
 export type LocalTtsVoiceSelections = Record<TtsListenLanguage, string>;
+export type UsageEstimateKind = "reply" | "summary";
 export type VoicePreviewRequest =
   | {
       text: string;
@@ -83,7 +84,19 @@ export interface Settings {
   assistantInstructions: string;
   responseLength: AssistantResponseLength;
   responseTone: AssistantResponseTone;
+  showUsageStats: boolean;
   apiKeys: ProviderApiKeys;
+}
+
+export interface UsageEstimate {
+  kind: UsageEstimateKind;
+  source: "estimated";
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  inputCostUsd: number | null;
+  outputCostUsd: number | null;
+  totalCostUsd: number | null;
 }
 
 export const DEFAULT_ASSISTANT_INSTRUCTIONS_BY_LANGUAGE: Record<
@@ -153,6 +166,7 @@ export const DEFAULT_SETTINGS: Settings = {
   assistantInstructions: getDefaultAssistantInstructions("en"),
   responseLength: "normal",
   responseTone: "professional",
+  showUsageStats: false,
   apiKeys: {
     openai: "",
     anthropic: "",
@@ -173,7 +187,17 @@ export interface Message {
   content: string;
   model: string | null;
   provider: Provider | null;
+  usage?: UsageEstimate;
   timestamp: string;
+}
+
+export interface ConversationUsageEvent {
+  id: string;
+  kind: "context-summary";
+  model: string | null;
+  provider: Provider | null;
+  timestamp: string;
+  usage: UsageEstimate;
 }
 
 export interface Conversation {
@@ -182,6 +206,7 @@ export interface Conversation {
   createdAt: string;
   updatedAt: string;
   messages: Message[];
+  usageEvents?: ConversationUsageEvent[];
   contextSummary?: string;
   summarizedMessageCount?: number;
 }

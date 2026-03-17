@@ -2,7 +2,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import uuid from "react-native-uuid";
 import { PROVIDER_LABELS } from "../constants/models";
-import { Conversation, ConversationMeta, Message, Provider } from "../types";
+import {
+  Conversation,
+  ConversationMeta,
+  Message,
+  Provider,
+  UsageEstimate,
+} from "../types";
 
 const META_KEY = "@schnackai/conversations";
 const conversationKey = (id: string) => `@schnackai/conversation/${id}`;
@@ -39,7 +45,7 @@ function inferLastAssistantState(messages: Message[]) {
 
 function compareConversationMeta(
   left: ConversationMeta,
-  right: ConversationMeta
+  right: ConversationMeta,
 ) {
   if (left.pinned !== right.pinned) {
     return left.pinned ? -1 : 1;
@@ -74,12 +80,16 @@ function normalizeConversationTitle(title: string, fallback: string) {
 
 export function useConversations() {
   const [conversations, setConversations] = useState<ConversationMeta[]>([]);
-  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
+  const [activeConversation, setActiveConversation] =
+    useState<Conversation | null>(null);
   const activeConversationRef = useRef<Conversation | null>(null);
-  const setActiveConversationValue = useCallback((conversation: Conversation | null) => {
-    activeConversationRef.current = conversation;
-    setActiveConversation(conversation);
-  }, []);
+  const setActiveConversationValue = useCallback(
+    (conversation: Conversation | null) => {
+      activeConversationRef.current = conversation;
+      setActiveConversation(conversation);
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -100,7 +110,9 @@ export function useConversations() {
             return normalizedMeta;
           }
 
-          const conversationRaw = await AsyncStorage.getItem(conversationKey(meta.id));
+          const conversationRaw = await AsyncStorage.getItem(
+            conversationKey(meta.id),
+          );
 
           if (!conversationRaw) {
             return normalizedMeta;
@@ -117,9 +129,10 @@ export function useConversations() {
             ...normalizedMeta,
             updatedAt: conversation.updatedAt,
             lastModel: inferredState.lastModel ?? normalizedMeta.lastModel,
-            lastProvider: inferredState.lastProvider ?? normalizedMeta.lastProvider,
+            lastProvider:
+              inferredState.lastProvider ?? normalizedMeta.lastProvider,
           };
-        })
+        }),
       );
 
       if (cancelled) {
@@ -147,7 +160,7 @@ export function useConversations() {
     }
 
     const existsInMeta = conversations.some(
-      (conversation) => conversation.id === activeConversation.id
+      (conversation) => conversation.id === activeConversation.id,
     );
 
     if (!existsInMeta) {
@@ -160,45 +173,53 @@ export function useConversations() {
   }, []);
 
   const persistConversationMeta = useCallback((metas: ConversationMeta[]) => {
-    const sortedMetas = sortConversationMeta(metas.map(normalizeConversationMeta));
+    const sortedMetas = sortConversationMeta(
+      metas.map(normalizeConversationMeta),
+    );
     AsyncStorage.setItem(META_KEY, JSON.stringify(sortedMetas));
     return sortedMetas;
   }, []);
 
-  const createConversation = useCallback((
-    firstMessage: string,
-    initialModel: string | null = null,
-    initialProvider: Provider | null = null
-  ) => {
-    const now = new Date().toISOString();
-    const conv: Conversation = {
-      id: uuid.v4() as string,
-      title: truncateTitle(firstMessage),
-      createdAt: now,
-      updatedAt: now,
-      messages: [],
-    };
-    const meta: ConversationMeta = {
-      id: conv.id,
-      title: conv.title,
-      updatedAt: now,
-      lastModel: initialModel,
-      lastProvider: initialProvider,
-      pinned: false,
-    };
-    setConversations((prev) => {
-      return persistConversationMeta([meta, ...prev]);
-    });
-    saveConversation(conv);
-    setActiveConversationValue(conv);
-  }, [persistConversationMeta, saveConversation, setActiveConversationValue]);
+  const createConversation = useCallback(
+    (
+      firstMessage: string,
+      initialModel: string | null = null,
+      initialProvider: Provider | null = null,
+    ) => {
+      const now = new Date().toISOString();
+      const conv: Conversation = {
+        id: uuid.v4() as string,
+        title: truncateTitle(firstMessage),
+        createdAt: now,
+        updatedAt: now,
+        messages: [],
+      };
+      const meta: ConversationMeta = {
+        id: conv.id,
+        title: conv.title,
+        updatedAt: now,
+        lastModel: initialModel,
+        lastProvider: initialProvider,
+        pinned: false,
+      };
+      setConversations((prev) => {
+        return persistConversationMeta([meta, ...prev]);
+      });
+      saveConversation(conv);
+      setActiveConversationValue(conv);
+    },
+    [persistConversationMeta, saveConversation, setActiveConversationValue],
+  );
 
-  const selectConversation = useCallback(async (id: string) => {
-    const raw = await AsyncStorage.getItem(conversationKey(id));
-    if (raw) {
-      setActiveConversationValue(JSON.parse(raw));
-    }
-  }, [setActiveConversationValue]);
+  const selectConversation = useCallback(
+    async (id: string) => {
+      const raw = await AsyncStorage.getItem(conversationKey(id));
+      if (raw) {
+        setActiveConversationValue(JSON.parse(raw));
+      }
+    },
+    [setActiveConversationValue],
+  );
 
   const getConversationById = useCallback(async (id: string) => {
     if (activeConversationRef.current?.id === id) {
@@ -209,58 +230,83 @@ export function useConversations() {
     return raw ? (JSON.parse(raw) as Conversation) : null;
   }, []);
 
-  const addMessage = useCallback((msg: Omit<Message, "id" | "timestamp">) => {
-    const currentConversation = activeConversationRef.current;
+  const addMessage = useCallback(
+    (msg: Omit<Message, "id" | "timestamp">) => {
+      const currentConversation = activeConversationRef.current;
 
-    if (!currentConversation) return;
+      if (!currentConversation) return;
 
-    const message: Message = {
-      ...msg,
-      id: uuid.v4() as string,
-      timestamp: new Date().toISOString(),
-    };
-    const updated: Conversation = {
-      ...currentConversation,
-      updatedAt: message.timestamp,
-      messages: [...currentConversation.messages, message],
-    };
-    setActiveConversationValue(updated);
-    saveConversation(updated);
-    const lastModel = msg.model ?? undefined;
-    const lastProvider = msg.provider ?? undefined;
-    setConversations((prev) => {
-      const next = prev.map((m) =>
-        m.id === updated.id
-          ? {
-              ...m,
-              updatedAt: updated.updatedAt,
-              ...(lastModel !== undefined ? { lastModel } : {}),
-              ...(lastProvider !== undefined ? { lastProvider } : {}),
-            }
-          : m
-      );
-      return persistConversationMeta(next);
-    });
-  }, [persistConversationMeta, saveConversation, setActiveConversationValue]);
+      const message: Message = {
+        ...msg,
+        id: uuid.v4() as string,
+        timestamp: new Date().toISOString(),
+      };
+      const updated: Conversation = {
+        ...currentConversation,
+        updatedAt: message.timestamp,
+        messages: [...currentConversation.messages, message],
+      };
+      setActiveConversationValue(updated);
+      saveConversation(updated);
+      const lastModel = msg.model ?? undefined;
+      const lastProvider = msg.provider ?? undefined;
+      setConversations((prev) => {
+        const next = prev.map((m) =>
+          m.id === updated.id
+            ? {
+                ...m,
+                updatedAt: updated.updatedAt,
+                ...(lastModel !== undefined ? { lastModel } : {}),
+                ...(lastProvider !== undefined ? { lastProvider } : {}),
+              }
+            : m,
+        );
+        return persistConversationMeta(next);
+      });
+    },
+    [persistConversationMeta, saveConversation, setActiveConversationValue],
+  );
 
   const updateConversationContextSummary = useCallback(
-    (contextSummary: string, summarizedMessageCount: number) => {
+    (
+      contextSummary: string,
+      summarizedMessageCount: number,
+      usage?: UsageEstimate,
+      usageModel?: string | null,
+      usageProvider?: Provider | null,
+    ) => {
       const currentConversation = activeConversationRef.current;
 
       if (!currentConversation) {
         return;
       }
 
+      const lastMessage =
+        currentConversation.messages[currentConversation.messages.length - 1];
+
       const updated: Conversation = {
         ...currentConversation,
         contextSummary: contextSummary.trim(),
         summarizedMessageCount,
+        usageEvents: usage
+          ? [
+              ...(currentConversation.usageEvents ?? []),
+              {
+                id: uuid.v4() as string,
+                kind: "context-summary",
+                model: usageModel ?? lastMessage?.model ?? null,
+                provider: usageProvider ?? lastMessage?.provider ?? null,
+                timestamp: new Date().toISOString(),
+                usage,
+              },
+            ]
+          : currentConversation.usageEvents,
       };
 
       setActiveConversationValue(updated);
       saveConversation(updated);
     },
-    [saveConversation, setActiveConversationValue]
+    [saveConversation, setActiveConversationValue],
   );
 
   const clearConversationMemory = useCallback(
@@ -289,18 +335,28 @@ export function useConversations() {
 
       return updatedConversation;
     },
-    [getConversationById, saveConversation, setActiveConversationValue]
+    [getConversationById, saveConversation, setActiveConversationValue],
   );
 
-  const deleteConversation = useCallback((id: string) => {
-    AsyncStorage.removeItem(conversationKey(id));
-    setConversations((prev) => {
-      return persistConversationMeta(prev.filter((c) => c.id !== id));
-    });
-    if (activeConversation?.id === id || activeConversationRef.current?.id === id) {
-      setActiveConversationValue(null);
-    }
-  }, [activeConversation?.id, persistConversationMeta, setActiveConversationValue]);
+  const deleteConversation = useCallback(
+    (id: string) => {
+      AsyncStorage.removeItem(conversationKey(id));
+      setConversations((prev) => {
+        return persistConversationMeta(prev.filter((c) => c.id !== id));
+      });
+      if (
+        activeConversation?.id === id ||
+        activeConversationRef.current?.id === id
+      ) {
+        setActiveConversationValue(null);
+      }
+    },
+    [
+      activeConversation?.id,
+      persistConversationMeta,
+      setActiveConversationValue,
+    ],
+  );
 
   const renameConversation = useCallback(
     async (id: string, nextTitle: string) => {
@@ -313,7 +369,10 @@ export function useConversations() {
         return;
       }
 
-      const title = normalizeConversationTitle(nextTitle, currentConversation.title);
+      const title = normalizeConversationTitle(
+        nextTitle,
+        currentConversation.title,
+      );
       const updatedConversation: Conversation = {
         ...currentConversation,
         title,
@@ -333,9 +392,9 @@ export function useConversations() {
                   ...conversation,
                   title,
                 }
-              : conversation
-          )
-        )
+              : conversation,
+          ),
+        ),
       );
     },
     [
@@ -343,7 +402,7 @@ export function useConversations() {
       persistConversationMeta,
       saveConversation,
       setActiveConversationValue,
-    ]
+    ],
   );
 
   const toggleConversationPinned = useCallback(
@@ -362,13 +421,13 @@ export function useConversations() {
               ...conversation,
               pinned: nextPinned,
             };
-          })
-        )
+          }),
+        ),
       );
 
       return nextPinned;
     },
-    [persistConversationMeta]
+    [persistConversationMeta],
   );
 
   const searchConversations = useCallback(
@@ -412,16 +471,17 @@ export function useConversations() {
           return conversationHaystack.includes(normalizedQuery)
             ? conversationMeta
             : null;
-        })
+        }),
       );
 
       return sortConversationMeta(
         matches.filter(
-          (conversation): conversation is ConversationMeta => conversation !== null
-        )
+          (conversation): conversation is ConversationMeta =>
+            conversation !== null,
+        ),
       );
     },
-    [conversations, getConversationById]
+    [conversations, getConversationById],
   );
 
   const clearActiveConversation = useCallback(() => {

@@ -18,6 +18,7 @@ import {
   SttBackendMode,
   TtsBackendMode,
   TtsListenLanguage,
+  UsageEstimate,
 } from "../types";
 
 export function splitIntoSentences(text: string): string[] {
@@ -52,16 +53,22 @@ function extractCompleteSentences(text: string): {
     : Math.max(segments.length - 1, 0);
 
   return {
-    completeSentences: segments.slice(0, completeCount).filter((segment) => segment.trim()),
+    completeSentences: segments
+      .slice(0, completeCount)
+      .filter((segment) => segment.trim()),
     remainder: segments.slice(completeCount).join(""),
   };
 }
 
 interface PipelineCallbacks {
   onTranscription: (text: string) => void;
-  onContextSummary?: (summary: string, summarizedMessageCount: number) => void;
+  onContextSummary?: (
+    summary: string,
+    summarizedMessageCount: number,
+    usage?: UsageEstimate,
+  ) => void;
   onChunk: (text: string) => void;
-  onResponseDone: (fullText: string) => void;
+  onResponseDone: (fullText: string, usage?: UsageEstimate) => void;
   onAudioReady: (audioUri: string) => void;
   onSpeechTextReady: (text: string, voice?: string) => void;
   onTtsFallback?: (error: Error) => void;
@@ -147,15 +154,16 @@ export async function runVoicePipeline(params: {
 
   if (contextPlan.needsSummaryUpdate) {
     try {
-      const updatedSummary = await summarizeConversationContext({
-        existingSummary: effectiveSummary,
-        messages: contextPlan.messagesToSummarize,
-        model,
-        provider,
-        apiKey: providerApiKey,
-        language,
-        abortSignal,
-      });
+      const { summary: updatedSummary, usage } =
+        await summarizeConversationContext({
+          existingSummary: effectiveSummary,
+          messages: contextPlan.messagesToSummarize,
+          model,
+          provider,
+          apiKey: providerApiKey,
+          language,
+          abortSignal,
+        });
 
       if (abortSignal?.aborted) {
         return transcription;
@@ -165,7 +173,8 @@ export async function runVoicePipeline(params: {
         effectiveSummary = updatedSummary;
         callbacks.onContextSummary?.(
           updatedSummary,
-          contextPlan.targetSummarizedCount
+          contextPlan.targetSummarizedCount,
+          usage,
         );
       } else if (!effectiveSummary) {
         contextualMessages = contextPlan.fallbackRecentMessages;
@@ -241,7 +250,9 @@ export async function runVoicePipeline(params: {
     });
 
     ttsChain = task.catch((error) => {
-      callbacks.onError(error instanceof Error ? error : new Error(String(error)));
+      callbacks.onError(
+        error instanceof Error ? error : new Error(String(error)),
+      );
     });
     ttsQueue.push(task.catch(() => undefined));
   };
@@ -256,7 +267,7 @@ export async function runVoicePipeline(params: {
       text,
       ttsMode === "local"
         ? LOCAL_TTS_MAX_INPUT_CHARS
-        : PROVIDER_TTS_MAX_INPUT_CHARS
+        : PROVIDER_TTS_MAX_INPUT_CHARS,
     );
 
     if (segments.length === 0) {
@@ -286,16 +297,17 @@ export async function runVoicePipeline(params: {
       callbacks.onChunk(text);
       if (effectiveReplyPlayback === "stream") {
         sentenceBuffer += text;
-        const { completeSentences, remainder } = extractCompleteSentences(sentenceBuffer);
+        const { completeSentences, remainder } =
+          extractCompleteSentences(sentenceBuffer);
         for (const sentence of completeSentences) {
           enqueueStreamPlayback(sentence);
         }
         sentenceBuffer = remainder;
       }
     },
-    onDone: async (fullText) => {
+    onDone: async (fullText, usage) => {
       if (abortSignal?.aborted) return;
-      callbacks.onResponseDone(fullText);
+      callbacks.onResponseDone(fullText, usage);
       if (effectiveReplyPlayback === "stream") {
         if (sentenceBuffer.trim()) {
           enqueueStreamPlayback(sentenceBuffer);

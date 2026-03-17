@@ -42,6 +42,10 @@ import {
   getProviderTtsLanguageNote,
   getProviderTtsVoiceOptions,
 } from "../constants/models";
+import {
+  PRICING_ASSUMPTIONS,
+  PRICING_ASSUMPTIONS_LAST_UPDATED,
+} from "../constants/usagePricing";
 import { useLocalization } from "../i18n";
 import {
   AppLanguage,
@@ -401,6 +405,104 @@ function PickerSection({ children }: { children: React.ReactNode }) {
       ]}
     >
       {children}
+    </View>
+  );
+}
+
+function UsagePricingReferenceSection() {
+  const { colors } = useTheme();
+  const { t } = useLocalization();
+
+  return (
+    <View
+      style={[
+        styles.sectionCard,
+        { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+      ]}
+    >
+      <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+        {t("pricingAssumptions")}
+      </Text>
+      <Text
+        style={[
+          styles.sectionHint,
+          styles.pricingSectionHint,
+          { color: colors.textMuted },
+        ]}
+      >
+        {t("pricingAssumptionsHint", {
+          date: PRICING_ASSUMPTIONS_LAST_UPDATED,
+        })}
+      </Text>
+
+      <View style={styles.pricingAssumptionList}>
+        {PRICING_ASSUMPTIONS.map((assumption) => (
+          <View
+            key={`${assumption.provider}:${assumption.modelLabel}`}
+            style={[
+              styles.pricingAssumptionRow,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={styles.pricingAssumptionCopy}>
+              <Text
+                style={[styles.pricingAssumptionTitle, { color: colors.text }]}
+              >
+                {`${PROVIDER_LABELS[assumption.provider]} · ${assumption.modelLabel}`}
+              </Text>
+              <Text
+                style={[
+                  styles.pricingAssumptionMeta,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                {t("pricingAssumptionRates", {
+                  input: assumption.inputUsdPerMillion.toFixed(2),
+                  output: assumption.outputUsdPerMillion.toFixed(2),
+                })}
+              </Text>
+              <Text
+                style={[
+                  styles.pricingAssumptionMeta,
+                  { color: colors.textMuted },
+                ]}
+              >
+                {t("pricingAssumptionCheckedAt", {
+                  date: assumption.checkedAt,
+                })}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.pricingSourceButton,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => {
+                void Linking.openURL(assumption.sourceUrl);
+              }}
+              activeOpacity={0.85}
+              accessibilityRole="link"
+              accessibilityLabel={t("openPricingSource", {
+                source: assumption.sourceLabel,
+              })}
+            >
+              <Text
+                style={[styles.pricingSourceButtonText, { color: colors.text }]}
+              >
+                {t("source")}
+              </Text>
+              <Feather name="external-link" size={14} color={colors.accent} />
+            </TouchableOpacity>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -1486,7 +1588,7 @@ export function SettingsModal({
     TTS_LISTEN_LANGUAGE_OPTIONS.reduce(
       (accumulator, option) => ({
         ...accumulator,
-        [option.value]: getLocalPreviewSampleText(option.value),
+        [option]: getLocalPreviewSampleText(option),
       }),
       {} as Record<TtsListenLanguage, string>,
     ),
@@ -2264,6 +2366,26 @@ export function SettingsModal({
                     }
                   />
                 </PickerSection>
+                <RadioGroup<"show" | "hide">
+                  label={t("usageStats")}
+                  options={[
+                    {
+                      value: "hide",
+                      label: t("hide"),
+                      description: t("usageStatsHiddenDescription"),
+                    },
+                    {
+                      value: "show",
+                      label: t("show"),
+                      description: t("usageStatsVisibleDescription"),
+                    },
+                  ]}
+                  value={settings.showUsageStats ? "show" : "hide"}
+                  onChange={(value) =>
+                    onUpdate({ showUsageStats: value === "show" })
+                  }
+                />
+                <UsagePricingReferenceSection />
               </>
             ) : null}
           </ScrollView>
@@ -2390,6 +2512,46 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     marginTop: 10,
+    fontFamily: fonts.body,
+  },
+  pricingSectionHint: {
+    marginTop: 0,
+    marginBottom: 12,
+  },
+  pricingAssumptionList: {
+    gap: 10,
+  },
+  pricingAssumptionRow: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 12,
+    gap: 10,
+  },
+  pricingAssumptionCopy: {
+    gap: 4,
+  },
+  pricingAssumptionTitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fonts.display,
+  },
+  pricingAssumptionMeta: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontFamily: fonts.mono,
+  },
+  pricingSourceButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  pricingSourceButtonText: {
+    fontSize: 12,
     fontFamily: fonts.body,
   },
   providerButtonGrid: {

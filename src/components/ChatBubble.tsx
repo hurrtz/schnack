@@ -7,6 +7,7 @@ import { useLocalization } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Message } from "../types";
+import { formatTokenCount, formatUsd } from "../utils/usageStats";
 
 interface ChatBubbleProps {
   message: Message;
@@ -14,6 +15,7 @@ interface ChatBubbleProps {
   onShare?: (message: Message) => void;
   onRepeat?: (message: Message) => void;
   selectable?: boolean;
+  showUsageStats?: boolean;
 }
 
 export function ChatBubble({
@@ -22,6 +24,7 @@ export function ChatBubble({
   onShare,
   onRepeat,
   selectable = false,
+  showUsageStats = false,
 }: ChatBubbleProps) {
   const { colors, isDark } = useTheme();
   const { t } = useLocalization();
@@ -33,6 +36,7 @@ export function ChatBubble({
     message.provider && message.model
       ? getProviderModelName(message.provider, message.model)
       : message.model;
+  const usage = !isUser && showUsageStats ? message.usage : undefined;
 
   const bubbleContent = (
     <>
@@ -56,13 +60,36 @@ export function ChatBubble({
       )}
       <Text
         selectable={selectable}
-        style={[
-          styles.content,
-          { color: isUser ? "#F5FBFF" : colors.text },
-        ]}
+        style={[styles.content, { color: isUser ? "#F5FBFF" : colors.text }]}
       >
         {message.content}
       </Text>
+      {usage ? (
+        <View
+          style={[
+            styles.usageCard,
+            {
+              backgroundColor: colors.surfaceAlt,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.usageText, { color: colors.textSecondary }]}>
+            {t("estimatedUsageInline", {
+              prompt: formatTokenCount(usage.promptTokens),
+              completion: formatTokenCount(usage.completionTokens),
+              total: formatTokenCount(usage.totalTokens),
+            })}
+          </Text>
+          {usage.totalCostUsd !== null ? (
+            <Text style={[styles.usageTextStrong, { color: colors.text }]}>
+              {t("estimatedCost", {
+                cost: formatUsd(usage.totalCostUsd),
+              })}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
       {selectable && (onCopy || onShare || onRepeat) ? (
         <View style={styles.actionRow}>
           {onRepeat ? (
@@ -244,6 +271,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     fontFamily: fonts.body,
+  },
+  usageCard: {
+    alignSelf: "stretch",
+    marginTop: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 4,
+  },
+  usageText: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontFamily: fonts.mono,
+  },
+  usageTextStrong: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: fonts.mono,
   },
   actionRow: {
     flexDirection: "row",

@@ -1,6 +1,12 @@
-import { splitIntoSentences, runVoicePipeline } from "../../src/services/voicePipeline";
+import {
+  splitIntoSentences,
+  runVoicePipeline,
+} from "../../src/services/voicePipeline";
 import { transcribeAudio } from "../../src/services/whisper";
-import { streamChat, summarizeConversationContext } from "../../src/services/llm";
+import {
+  streamChat,
+  summarizeConversationContext,
+} from "../../src/services/llm";
 import { synthesizeSpeech } from "../../src/services/tts";
 
 jest.mock("../../src/services/whisper", () => ({
@@ -51,25 +57,47 @@ jest.mock("../../src/services/tts", () => ({
 }));
 
 describe("splitIntoSentences", () => {
-  it("splits on period", () => { expect(splitIntoSentences("Hello. World.")).toEqual(["Hello.", " World."]); });
-  it("splits on question mark", () => { expect(splitIntoSentences("How? Why?")).toEqual(["How?", " Why?"]); });
-  it("splits on exclamation mark", () => { expect(splitIntoSentences("Wow! Great!")).toEqual(["Wow!", " Great!"]); });
-  it("splits on newline", () => { expect(splitIntoSentences("Line one\nLine two")).toEqual(["Line one\n", "Line two"]); });
-  it("returns single chunk for no delimiters", () => { expect(splitIntoSentences("hello world")).toEqual(["hello world"]); });
+  it("splits on period", () => {
+    expect(splitIntoSentences("Hello. World.")).toEqual(["Hello.", " World."]);
+  });
+  it("splits on question mark", () => {
+    expect(splitIntoSentences("How? Why?")).toEqual(["How?", " Why?"]);
+  });
+  it("splits on exclamation mark", () => {
+    expect(splitIntoSentences("Wow! Great!")).toEqual(["Wow!", " Great!"]);
+  });
+  it("splits on newline", () => {
+    expect(splitIntoSentences("Line one\nLine two")).toEqual([
+      "Line one\n",
+      "Line two",
+    ]);
+  });
+  it("returns single chunk for no delimiters", () => {
+    expect(splitIntoSentences("hello world")).toEqual(["hello world"]);
+  });
 });
 
 describe("runVoicePipeline", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (summarizeConversationContext as jest.Mock).mockResolvedValue("");
+    (summarizeConversationContext as jest.Mock).mockResolvedValue({
+      summary: "",
+      usage: undefined,
+    });
   });
 
   it("uses a native transcript override and skips provider STT", async () => {
     (streamChat as jest.Mock).mockImplementation(
-      async ({ onChunk, onDone }: { onChunk: (text: string) => void; onDone: (text: string) => Promise<void> }) => {
+      async ({
+        onChunk,
+        onDone,
+      }: {
+        onChunk: (text: string) => void;
+        onDone: (text: string) => Promise<void>;
+      }) => {
         onChunk("Wind is moving air.");
         await onDone("Wind is moving air.");
-      }
+      },
     );
 
     const callbacks = {
@@ -101,8 +129,84 @@ describe("runVoicePipeline", () => {
     expect(result).toBe("Explain wind.");
     expect(transcribeAudio).not.toHaveBeenCalled();
     expect(callbacks.onTranscription).toHaveBeenCalledWith("Explain wind.");
-    expect(callbacks.onSpeechTextReady).toHaveBeenCalledWith("Wind is moving air.", undefined);
+    expect(callbacks.onSpeechTextReady).toHaveBeenCalledWith(
+      "Wind is moving air.",
+      undefined,
+    );
     expect(synthesizeSpeech).not.toHaveBeenCalled();
+  });
+
+  it("passes summary usage metadata through the pipeline callback", async () => {
+    (summarizeConversationContext as jest.Mock).mockResolvedValueOnce({
+      summary: "User prefers concise answers.",
+      usage: {
+        kind: "summary",
+        source: "estimated",
+        promptTokens: 90,
+        completionTokens: 14,
+        totalTokens: 104,
+        inputCostUsd: 0.0002,
+        outputCostUsd: 0.0003,
+        totalCostUsd: 0.0005,
+      },
+    });
+    (streamChat as jest.Mock).mockImplementation(
+      async ({
+        onChunk,
+        onDone,
+      }: {
+        onChunk: (text: string) => void;
+        onDone: (text: string) => Promise<void>;
+      }) => {
+        onChunk("Done.");
+        await onDone("Done.");
+      },
+    );
+
+    const callbacks = {
+      onTranscription: jest.fn(),
+      onContextSummary: jest.fn(),
+      onChunk: jest.fn(),
+      onResponseDone: jest.fn(),
+      onAudioReady: jest.fn(),
+      onSpeechTextReady: jest.fn(),
+      onError: jest.fn(),
+    };
+
+    await runVoicePipeline({
+      transcriptionOverride: "Remember this.",
+      messages: Array.from({ length: 8 }, (_, index) => ({
+        id: `m${index + 1}`,
+        role: index % 2 === 0 ? ("user" as const) : ("assistant" as const),
+        content: "I like short answers. ".repeat(80),
+        model: index % 2 === 0 ? null : "gpt-5.4",
+        provider: index % 2 === 0 ? null : "openai",
+        timestamp: `2026-03-17T10:0${index}:00.000Z`,
+      })),
+      contextSummary: "Prior preference.",
+      summarizedMessageCount: 1,
+      model: "gpt-5.4",
+      provider: "openai",
+      providerApiKey: "sk-test",
+      sttMode: "native",
+      ttsMode: "native",
+      ttsVoice: "alloy",
+      replyPlayback: "wait",
+      assistantInstructions: "You are a voice assistant.",
+      responseLength: "normal",
+      responseTone: "professional",
+      language: "en",
+      callbacks,
+    });
+
+    expect(callbacks.onContextSummary).toHaveBeenCalledWith(
+      "User prefers concise answers.",
+      expect.any(Number),
+      expect.objectContaining({
+        kind: "summary",
+        totalTokens: 104,
+      }),
+    );
   });
 
   it("speaks a completed sentence immediately in stream mode", async () => {
@@ -118,7 +222,7 @@ describe("runVoicePipeline", () => {
         await Promise.resolve();
         expect(events).toEqual(["speak:Wind is moving air."]);
         await onDone("Wind is moving air.");
-      }
+      },
     );
 
     const events: string[] = [];
@@ -152,7 +256,10 @@ describe("runVoicePipeline", () => {
       callbacks,
     });
 
-    expect(callbacks.onSpeechTextReady).toHaveBeenCalledWith("Wind is moving air.", undefined);
+    expect(callbacks.onSpeechTextReady).toHaveBeenCalledWith(
+      "Wind is moving air.",
+      undefined,
+    );
     expect(events).toEqual(["speak:Wind is moving air.", "response-done"]);
   });
 
@@ -167,7 +274,7 @@ describe("runVoicePipeline", () => {
       }) => {
         onChunk("Sentence one. Sentence two.");
         await onDone("Sentence one. Sentence two.");
-      }
+      },
     );
 
     (synthesizeSpeech as jest.Mock)
@@ -235,10 +342,12 @@ describe("runVoicePipeline", () => {
         await Promise.resolve();
         expect(synthesizeSpeech).not.toHaveBeenCalled();
         await onDone("Sentence one. Sentence two.");
-      }
+      },
     );
 
-    (synthesizeSpeech as jest.Mock).mockResolvedValueOnce("/tmp/local-tts-1.wav");
+    (synthesizeSpeech as jest.Mock).mockResolvedValueOnce(
+      "/tmp/local-tts-1.wav",
+    );
 
     const callbacks = {
       onTranscription: jest.fn(),
@@ -314,7 +423,7 @@ describe("runVoicePipeline", () => {
       }) => {
         onChunk("One. Two");
         await onDone("One. Two");
-      }
+      },
     );
 
     (synthesizeSpeech as jest.Mock)
@@ -371,7 +480,7 @@ describe("runVoicePipeline", () => {
   it("chunks long provider TTS replies in wait mode", async () => {
     const longReply = Array.from(
       { length: 180 },
-      () => "This is a deliberately long reply sentence."
+      () => "This is a deliberately long reply sentence.",
     ).join(" ");
 
     (streamChat as jest.Mock).mockImplementation(
@@ -382,11 +491,11 @@ describe("runVoicePipeline", () => {
         onDone: (text: string) => Promise<void>;
       }) => {
         await onDone(longReply);
-      }
+      },
     );
 
     (synthesizeSpeech as jest.Mock).mockImplementation(
-      async ({ text }: { text: string }) => `/tmp/tts-${text.length}.mp3`
+      async ({ text }: { text: string }) => `/tmp/tts-${text.length}.mp3`,
     );
 
     const callbacks = {
@@ -418,13 +527,17 @@ describe("runVoicePipeline", () => {
     });
 
     const synthesizedTexts = (synthesizeSpeech as jest.Mock).mock.calls.map(
-      ([params]: [{ text: string }]) => params.text
+      ([params]: [{ text: string }]) => params.text,
     );
 
     expect(synthesizedTexts.length).toBeGreaterThan(1);
-    expect(synthesizedTexts.every((text: string) => text.length <= 3500)).toBe(true);
+    expect(synthesizedTexts.every((text: string) => text.length <= 3500)).toBe(
+      true,
+    );
     expect(synthesizedTexts.join(" ")).toBe(longReply);
-    expect(callbacks.onAudioReady).toHaveBeenCalledTimes(synthesizedTexts.length);
+    expect(callbacks.onAudioReady).toHaveBeenCalledTimes(
+      synthesizedTexts.length,
+    );
     expect(callbacks.onError).not.toHaveBeenCalled();
   });
 
@@ -437,11 +550,11 @@ describe("runVoicePipeline", () => {
         onDone: (text: string) => Promise<void>;
       }) => {
         await onDone("A complete answer.");
-      }
+      },
     );
 
     (synthesizeSpeech as jest.Mock).mockRejectedValueOnce(
-      new Error("Provider TTS unavailable")
+      new Error("Provider TTS unavailable"),
     );
 
     const callbacks = {
@@ -476,11 +589,11 @@ describe("runVoicePipeline", () => {
     expect(callbacks.onTtsFallback).toHaveBeenCalledWith(
       expect.objectContaining({
         message: "Provider TTS unavailable",
-      })
+      }),
     );
     expect(callbacks.onSpeechTextReady).toHaveBeenCalledWith(
       "A complete answer.",
-      undefined
+      undefined,
     );
     expect(callbacks.onAudioReady).not.toHaveBeenCalled();
     expect(callbacks.onError).not.toHaveBeenCalled();
