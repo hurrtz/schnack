@@ -11,7 +11,7 @@
       "infoPlist": {
         "NSMicrophoneUsageDescription": "SchnackAI needs microphone access to record your voice for conversations."
       },
-      "appleTeamId": "X7H939KJR7"
+      "appleTeamId": "Y295UCE38G"
     },
     "plugins": [
       "expo-router",
