@@ -378,30 +378,6 @@ export function ConversationDrawer({
                             {item.lastModel || t("noModelYet")}
                           </Text>
                           <View style={styles.itemFooterActions}>
-                            <View
-                              style={[
-                                styles.statePill,
-                                {
-                                  backgroundColor: active
-                                    ? colors.accentSoft
-                                    : colors.surfaceAlt,
-                                  borderColor: colors.border,
-                                },
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.stateText,
-                                  {
-                                    color: active
-                                      ? colors.accent
-                                      : colors.textSecondary,
-                                  },
-                                ]}
-                              >
-                                {active ? t("live") : t("saved")}
-                              </Text>
-                            </View>
                             <TouchableOpacity
                               style={[
                                 styles.threadAction,
@@ -917,12 +893,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: fonts.body,
   },
-  statePill: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
   threadAction: {
     flexDirection: "row",
     alignItems: "center",
@@ -935,12 +905,6 @@ const styles = StyleSheet.create({
   copyActionText: {
     fontSize: 11,
     letterSpacing: 0.6,
-    textTransform: "uppercase",
-    fontFamily: fonts.mono,
-  },
-  stateText: {
-    fontSize: 11,
-    letterSpacing: 1,
     textTransform: "uppercase",
     fontFamily: fonts.mono,
   },
