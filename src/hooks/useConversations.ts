@@ -101,7 +101,13 @@ export function useConversations() {
         return;
       }
 
-      const storedMetas = JSON.parse(raw) as ConversationMeta[];
+      let storedMetas: ConversationMeta[];
+
+      try {
+        storedMetas = JSON.parse(raw) as ConversationMeta[];
+      } catch {
+        storedMetas = [];
+      }
       const normalizedMetas = await Promise.all(
         storedMetas.map(async (meta) => {
           const normalizedMeta = normalizeConversationMeta(meta);
@@ -118,7 +124,14 @@ export function useConversations() {
             return normalizedMeta;
           }
 
-          const conversation = JSON.parse(conversationRaw) as Conversation;
+          let conversation: Conversation;
+
+          try {
+            conversation = JSON.parse(conversationRaw) as Conversation;
+          } catch {
+            return normalizedMeta;
+          }
+
           const inferredState = inferLastAssistantState(conversation.messages);
 
           if (!inferredState.lastModel && !inferredState.lastProvider) {

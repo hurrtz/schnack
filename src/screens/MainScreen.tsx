@@ -40,14 +40,14 @@ import { useLocalTtsPacks } from "../hooks/useLocalTtsPacks";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useNativeSpeechRecognizer } from "../hooks/useNativeSpeechRecognizer";
 import { useConversations } from "../hooks/useConversations";
+import { useVoicePipeline } from "../hooks/useVoicePipeline";
 import { useLocalization } from "../i18n";
 import { validateProviderConnection } from "../services/llm";
 import {
   getLocalTtsInstallStatus,
   releaseLocalTtsResources,
 } from "../services/localTts";
-import { runVoicePipeline } from "../services/voicePipeline";
-import { synthesizeSpeech, synthesizeSpeechSequence } from "../services/tts";
+import { synthesizeSpeech } from "../services/tts";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import {
@@ -56,7 +56,6 @@ import {
   TtsListenLanguage,
   VoicePreviewRequest,
   VoiceVisualPhase,
-  UsageEstimate,
 } from "../types";
 import { formatConversationForCopy } from "../utils/conversationExport";
 import {
@@ -118,19 +117,12 @@ export function MainScreen() {
   const [memoryConversation, setMemoryConversation] =
     useState<Conversation | null>(null);
   const [memoryVisible, setMemoryVisible] = useState(false);
-  const [pipelinePhase, setPipelinePhase] = useState<
-    "idle" | "transcribing" | "thinking" | "synthesizing"
-  >("idle");
-  const [streamingText, setStreamingText] = useState("");
   const [toast, setToast] = useState<{
     message: string;
     onRetry?: () => void;
   } | null>(null);
 
-  const abortRef = useRef<AbortController | null>(null);
   const recordingStartedRef = useRef<Promise<void> | null>(null);
-  const lastCompletedReplyRef = useRef("");
-  const ttsFallbackToastShownRef = useRef(false);
 
   const provider = settings.lastProvider;
   const providerApiKey = settings.apiKeys[provider].trim();
@@ -156,7 +148,6 @@ export function MainScreen() {
     : "";
   const providerLabel = PROVIDER_LABELS[provider];
   const modelLabel = getProviderModelName(provider, model);
-  const isBusy = pipelinePhase !== "idle";
   const isRecording =
     settings.sttMode === "native"
       ? nativeStt.isRecording
@@ -183,16 +174,6 @@ export function MainScreen() {
               language,
             )}`
           : t("noTtsProvider");
-  const visualPhase: VoiceVisualPhase = isRecording
-    ? "recording"
-    : pipelinePhase === "transcribing"
-      ? "transcribing"
-      : player.isPlaying
-        ? "speaking"
-        : pipelinePhase === "thinking"
-          ? "thinking"
-          : "idle";
-  const isActive = visualPhase !== "idle";
   const metering = isRecording
     ? recordingMetering
     : player.isPlaying
@@ -207,6 +188,56 @@ export function MainScreen() {
   const showToast = useCallback((message: string, onRetry?: () => void) => {
     setToast({ message, onRetry });
   }, []);
+
+  const {
+    pipelinePhase,
+    setPipelinePhase,
+    streamingText,
+    setStreamingText,
+    abortRef,
+    lastCompletedReplyRef,
+    playReplyText,
+    handleRepeatLastReply,
+    handleVoiceCaptureDone,
+  } = useVoicePipeline({
+    activeConversation,
+    addMessage,
+    createConversation,
+    updateConversationContextSummary,
+    player,
+    provider,
+    providerApiKey,
+    model,
+    sttMode: settings.sttMode,
+    sttProvider,
+    sttApiKey,
+    ttsMode: settings.ttsMode,
+    ttsProvider,
+    ttsApiKey,
+    selectedTtsVoice,
+    ttsListenLanguages: settings.ttsListenLanguages,
+    localTtsVoices: settings.localTtsVoices,
+    replyPlayback: settings.replyPlayback,
+    assistantInstructions: settings.assistantInstructions,
+    responseLength: settings.responseLength,
+    responseTone: settings.responseTone,
+    language,
+    isRecording,
+    showToast,
+    t,
+  });
+
+  const isBusy = pipelinePhase !== "idle";
+  const visualPhase: VoiceVisualPhase = isRecording
+    ? "recording"
+    : pipelinePhase === "transcribing"
+      ? "transcribing"
+      : player.isPlaying
+        ? "speaking"
+        : pipelinePhase === "thinking"
+          ? "thinking"
+          : "idle";
+  const isActive = visualPhase !== "idle";
 
   const handleInstallLocalTtsLanguage = useCallback(
     async (languageCode: TtsListenLanguage) => {
@@ -334,97 +365,6 @@ export function MainScreen() {
       showToast(pinned ? t("threadPinned") : t("threadUnpinned"));
     },
     [showToast, t, toggleConversationPinned],
-  );
-
-  const playReplyText = useCallback(
-    async (text: string) => {
-      const trimmed = text.trim();
-
-      if (!trimmed) {
-        return;
-      }
-
-      if (player.isPlaying) {
-        await player.stopPlayback();
-      }
-
-      player.resetCancellation();
-
-      if (settings.ttsMode === "native") {
-        player.speakText(trimmed);
-        return;
-      }
-
-      if (settings.ttsMode === "provider" && (!ttsProvider || !ttsApiKey)) {
-        showToast(t("chooseTtsBeforeSpokenReplies"));
-        return;
-      }
-
-      const audioUris = await synthesizeSpeechSequence({
-        text: trimmed,
-        voice: selectedTtsVoice,
-        mode: settings.ttsMode,
-        provider: ttsProvider,
-        apiKey: ttsApiKey,
-        language,
-        listenLanguages: settings.ttsListenLanguages,
-        localVoices: settings.localTtsVoices,
-      }).catch(async () => {
-        player.speakText(trimmed);
-        showToast(
-          settings.ttsMode === "local"
-            ? t("localVoiceFallback")
-            : t("providerVoiceFallback"),
-        );
-        return null;
-      });
-
-      if (!audioUris) {
-        return;
-      }
-
-      audioUris.forEach((audioUri) => {
-        player.enqueueAudio(audioUri);
-      });
-    },
-    [
-      player,
-      settings.ttsMode,
-      settings.ttsListenLanguages,
-      settings.localTtsVoices,
-      selectedTtsVoice,
-      showToast,
-      t,
-      ttsApiKey,
-      language,
-      ttsProvider,
-    ],
-  );
-
-  const handleRepeatLastReply = useCallback(
-    async (textOverride?: string) => {
-      const replyText =
-        textOverride?.trim() || lastCompletedReplyRef.current.trim();
-
-      if (!replyText) {
-        showToast(t("noReplyToRepeatYet"));
-        return;
-      }
-
-      if (isRecording || isBusy) {
-        showToast(t("stopSessionBeforeReplay"));
-        return;
-      }
-
-      try {
-        await playReplyText(replyText);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : t("couldntReplayReply");
-        showToast(message);
-      }
-    },
-    [isBusy, isRecording, playReplyText, showToast, t],
   );
 
   const openSettings = useCallback((focusProvider?: Provider) => {
@@ -589,161 +529,6 @@ export function MainScreen() {
     ttsApiKey,
     ttsProvider,
   ]);
-
-  const handleVoiceCaptureDone = useCallback(
-    async ({
-      audioUri,
-      transcriptionOverride,
-    }: {
-      audioUri?: string;
-      transcriptionOverride?: string;
-    }) => {
-      setPipelinePhase(transcriptionOverride ? "thinking" : "transcribing");
-      setStreamingText("");
-      ttsFallbackToastShownRef.current = false;
-      abortRef.current = new AbortController();
-      player.resetCancellation();
-
-      try {
-        const transcription = await runVoicePipeline({
-          audioUri,
-          transcriptionOverride,
-          messages: activeConversation?.messages || [],
-          contextSummary: activeConversation?.contextSummary,
-          summarizedMessageCount: activeConversation?.summarizedMessageCount,
-          model,
-          provider,
-          providerApiKey,
-          sttMode: settings.sttMode,
-          sttProvider,
-          sttApiKey,
-          ttsMode: settings.ttsMode,
-          ttsProvider,
-          ttsApiKey,
-          ttsVoice: selectedTtsVoice,
-          ttsListenLanguages: settings.ttsListenLanguages,
-          localTtsVoices: settings.localTtsVoices,
-          replyPlayback: settings.replyPlayback,
-          assistantInstructions: settings.assistantInstructions,
-          responseLength: settings.responseLength,
-          responseTone: settings.responseTone,
-          language,
-          abortSignal: abortRef.current!.signal,
-          callbacks: {
-            onTranscription: (text) => {
-              setPipelinePhase("thinking");
-              if (!activeConversation) {
-                createConversation(text, model, provider);
-              }
-              setTimeout(() => {
-                addMessage({
-                  role: "user",
-                  content: text,
-                  model: null,
-                  provider: null,
-                });
-              }, 0);
-            },
-            onContextSummary: (summary, summarizedCount, usage) => {
-              updateConversationContextSummary(
-                summary,
-                summarizedCount,
-                usage,
-                model,
-                provider,
-              );
-            },
-            onChunk: (text) => {
-              setPipelinePhase("thinking");
-              setStreamingText((prev) => prev + text);
-            },
-            onResponseDone: (fullText, usage?: UsageEstimate) => {
-              setStreamingText("");
-              setPipelinePhase(
-                settings.ttsMode === "native" ? "idle" : "synthesizing",
-              );
-              lastCompletedReplyRef.current = fullText;
-              addMessage({
-                role: "assistant",
-                content: fullText,
-                model,
-                provider,
-                usage,
-              });
-            },
-            onAudioReady: (audioData) => {
-              player.enqueueAudio(audioData);
-            },
-            onSpeechTextReady: (text) => {
-              player.speakText(text);
-            },
-            onTtsFallback: () => {
-              if (ttsFallbackToastShownRef.current) {
-                return;
-              }
-
-              ttsFallbackToastShownRef.current = true;
-              showToast(
-                settings.ttsMode === "local"
-                  ? t("localVoiceFallback")
-                  : t("providerVoiceFallback"),
-              );
-            },
-            onError: (error) => {
-              setPipelinePhase("idle");
-              const retryAction = lastCompletedReplyRef.current.trim()
-                ? () => {
-                    void handleRepeatLastReply(lastCompletedReplyRef.current);
-                  }
-                : () => {
-                    void handleVoiceCaptureDone({
-                      audioUri,
-                      transcriptionOverride,
-                    });
-                  };
-
-              showToast(error.message, retryAction);
-            },
-          },
-        });
-
-        if (!transcription) {
-          showToast(t("couldntCatchThatTryAgain"));
-        }
-      } catch {
-        // Errors are surfaced through the toast callback above.
-      } finally {
-        setPipelinePhase("idle");
-      }
-    },
-    [
-      activeConversation,
-      addMessage,
-      createConversation,
-      model,
-      player,
-      provider,
-      providerApiKey,
-      settings.replyPlayback,
-      selectedTtsVoice,
-      settings.sttMode,
-      settings.ttsMode,
-      settings.ttsListenLanguages,
-      settings.localTtsVoices,
-      settings.assistantInstructions,
-      settings.responseLength,
-      settings.responseTone,
-      language,
-      handleRepeatLastReply,
-      showToast,
-      sttApiKey,
-      sttProvider,
-      t,
-      ttsApiKey,
-      ttsProvider,
-      updateConversationContextSummary,
-    ],
-  );
 
   const handlePressIn = useCallback(async () => {
     if (!ensureVoiceSessionReady()) {

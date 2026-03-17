@@ -2,6 +2,9 @@ import {
   getProviderTtsTimeoutMs,
   PROVIDER_TTS_MAX_TIMEOUT_MS,
   PROVIDER_TTS_TIMEOUT_MS,
+  PROVIDER_TTS_MAX_INPUT_CHARS,
+  splitIntoSentences,
+  splitTextForTts,
   synthesizeSpeech,
   synthesizeSpeechSequence,
   TtsRequestError,
@@ -68,6 +71,94 @@ function mockInstalledLocalVoice(language: string, voice: string) {
     }),
   );
 }
+
+describe("splitIntoSentences", () => {
+  it("returns an empty array for an empty string", () => {
+    expect(splitIntoSentences("")).toEqual([]);
+  });
+
+  it("splits a single sentence ending with a period", () => {
+    expect(splitIntoSentences("Hello world.")).toEqual(["Hello world."]);
+  });
+
+  it("splits multiple sentences with different terminators", () => {
+    expect(splitIntoSentences("Hi. How are you? Great!\nBye")).toEqual([
+      "Hi.",
+      " How are you?",
+      " Great!",
+      "\n",
+      "Bye",
+    ]);
+  });
+
+  it("returns the full text as a single element when there is no sentence boundary", () => {
+    expect(splitIntoSentences("no punctuation here")).toEqual([
+      "no punctuation here",
+    ]);
+  });
+
+  it("handles text with only whitespace", () => {
+    expect(splitIntoSentences("   ")).toEqual(["   "]);
+  });
+
+  it("handles consecutive terminators", () => {
+    expect(splitIntoSentences("Wait...")).toEqual(["Wait.", ".", "."]);
+  });
+});
+
+describe("splitTextForTts", () => {
+  it("returns an empty array for an empty string", () => {
+    expect(splitTextForTts("")).toEqual([]);
+  });
+
+  it("returns an empty array for whitespace-only input", () => {
+    expect(splitTextForTts("   ")).toEqual([]);
+  });
+
+  it("returns a single chunk for short text", () => {
+    expect(splitTextForTts("Hello world.")).toEqual(["Hello world."]);
+  });
+
+  it("groups sentences together up to the max chars limit", () => {
+    const chunks = splitTextForTts("Short. Also short.", 30);
+    expect(chunks).toEqual(["Short. Also short."]);
+  });
+
+  it("splits into multiple chunks when text exceeds max chars", () => {
+    const sentence = "Word. ";
+    const text = sentence.repeat(100);
+    const chunks = splitTextForTts(text, 20);
+
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const chunk of chunks) {
+      expect(chunk.length).toBeLessThanOrEqual(20);
+    }
+  });
+
+  it("uses the default max chars constant when none is provided", () => {
+    const longText = "Sentence. ".repeat(500);
+    const chunks = splitTextForTts(longText);
+
+    for (const chunk of chunks) {
+      expect(chunk.length).toBeLessThanOrEqual(PROVIDER_TTS_MAX_INPUT_CHARS);
+    }
+  });
+
+  it("handles a single very long word by splitting it into fixed-size chunks", () => {
+    const longWord = "a".repeat(50);
+    const chunks = splitTextForTts(longWord, 20);
+
+    expect(chunks.length).toBe(3);
+    expect(chunks[0]).toBe("a".repeat(20));
+    expect(chunks[1]).toBe("a".repeat(20));
+    expect(chunks[2]).toBe("a".repeat(10));
+  });
+
+  it("normalizes internal whitespace", () => {
+    const chunks = splitTextForTts("Hello   world.   Goodbye   world.");
+    expect(chunks).toEqual(["Hello world. Goodbye world."]);
+  });
+});
 
 describe("synthesizeSpeech", () => {
   beforeEach(() => {

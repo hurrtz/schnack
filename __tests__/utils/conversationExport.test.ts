@@ -15,7 +15,7 @@ describe("conversationExport", () => {
       timestamp: "2026-03-15T12:00:00.000Z",
     };
 
-    expect(formatMessageForCopy(message)).toBe("You\nExplain the wind.");
+    expect(formatMessageForCopy(message, "en")).toBe("You\nExplain the wind.");
   });
 
   it("formats assistant messages with provider and model labels", () => {
@@ -28,8 +28,8 @@ describe("conversationExport", () => {
       timestamp: "2026-03-15T12:00:05.000Z",
     };
 
-    expect(formatMessageForCopy(message)).toBe(
-      "OpenAI · gpt-5.4\nWind is moving air."
+    expect(formatMessageForCopy(message, "en")).toBe(
+      "OpenAI · GPT-5.4\nWind is moving air."
     );
   });
 
@@ -59,11 +59,11 @@ describe("conversationExport", () => {
       ],
     };
 
-    expect(formatConversationForCopy(conversation)).toBe(
+    expect(formatConversationForCopy(conversation, "en")).toBe(
       [
         "Conversation: Wind basics",
         "You\nExplain the wind.",
-        "OpenAI · gpt-5.4\nWind is moving air.",
+        "OpenAI · GPT-5.4\nWind is moving air.",
       ].join("\n\n")
     );
   });

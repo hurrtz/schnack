@@ -3,6 +3,7 @@ import { streamChat, summarizeConversationContext } from "./llm";
 import {
   LOCAL_TTS_MAX_INPUT_CHARS,
   PROVIDER_TTS_MAX_INPUT_CHARS,
+  splitIntoSentences,
   splitTextForTts,
   synthesizeSpeech,
 } from "./tts";
@@ -20,20 +21,6 @@ import {
   TtsListenLanguage,
   UsageEstimate,
 } from "../types";
-
-export function splitIntoSentences(text: string): string[] {
-  const result: string[] = [];
-  let current = "";
-  for (const char of text) {
-    current += char;
-    if (char === "." || char === "!" || char === "?" || char === "\n") {
-      result.push(current);
-      current = "";
-    }
-  }
-  if (current) result.push(current);
-  return result;
-}
 
 function extractCompleteSentences(text: string): {
   completeSentences: string[];

@@ -2,10 +2,6 @@ import { streamChat, validateProviderConnection } from "../../src/services/llm";
 import { Message } from "../../src/types";
 global.fetch = jest.fn();
 
-jest.mock("../../src/config", () => ({
-  OPENAI_API_KEY: "sk-test-key",
-  ANTHROPIC_API_KEY: "sk-ant-test-key",
-}));
 
 const mockMessages: Message[] = [{ id: "1", role: "user", content: "Hello", model: null, provider: null, timestamp: "2026-01-01T00:00:00Z" }];
 

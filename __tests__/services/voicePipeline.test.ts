@@ -1,7 +1,5 @@
-import {
-  splitIntoSentences,
-  runVoicePipeline,
-} from "../../src/services/voicePipeline";
+import { runVoicePipeline } from "../../src/services/voicePipeline";
+import { splitIntoSentences } from "../../src/services/tts";
 import { transcribeAudio } from "../../src/services/whisper";
 import {
   streamChat,
@@ -19,6 +17,19 @@ jest.mock("../../src/services/llm", () => ({
 }));
 
 jest.mock("../../src/services/tts", () => ({
+  splitIntoSentences: (text: string): string[] => {
+    const result: string[] = [];
+    let current = "";
+    for (const char of text) {
+      current += char;
+      if (char === "." || char === "!" || char === "?" || char === "\n") {
+        result.push(current);
+        current = "";
+      }
+    }
+    if (current) result.push(current);
+    return result;
+  },
   LOCAL_TTS_MAX_INPUT_CHARS: 420,
   PROVIDER_TTS_MAX_INPUT_CHARS: 3500,
   splitTextForTts: (text: string, maxChars = 3500) => {

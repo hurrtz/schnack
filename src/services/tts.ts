@@ -9,6 +9,7 @@ import {
 } from "../constants/models";
 import { translate } from "../i18n";
 import { getLocalTtsInstallStatus, synthesizeLocalSpeech } from "./localTts";
+import { extractProviderErrorMessage } from "./providerErrors";
 import {
   AppLanguage,
   LocalTtsVoiceSelections,
@@ -159,7 +160,7 @@ function base64ToBytes(base64: string, language: AppLanguage) {
   throw new Error(translate(language, "noBase64DecoderAvailable"));
 }
 
-function splitIntoSentences(text: string): string[] {
+export function splitIntoSentences(text: string): string[] {
   const result: string[] = [];
   let current = "";
 
@@ -352,46 +353,6 @@ function getGeminiAudioPart(data: any) {
     parts.find((part) => typeof part?.inlineData?.data === "string")
       ?.inlineData ?? null
   );
-}
-
-function safeJsonParse(text: string) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-function extractProviderErrorMessage(errorText: string) {
-  const parsed = safeJsonParse(errorText);
-
-  if (!parsed) {
-    return errorText.replace(/\s+/g, " ").trim();
-  }
-
-  if (typeof parsed === "string") {
-    return parsed.trim();
-  }
-
-  if (typeof parsed?.error?.message === "string") {
-    return parsed.error.message.trim();
-  }
-
-  if (typeof parsed?.message === "string") {
-    return parsed.message.trim();
-  }
-
-  if (Array.isArray(parsed?.errors)) {
-    const firstMessage = parsed.errors.find(
-      (entry: any) => typeof entry?.message === "string",
-    )?.message;
-
-    if (typeof firstMessage === "string") {
-      return firstMessage.trim();
-    }
-  }
-
-  return errorText.replace(/\s+/g, " ").trim();
 }
 
 function isInputTooLongError(errorText: string) {

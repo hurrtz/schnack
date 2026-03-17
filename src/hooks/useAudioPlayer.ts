@@ -155,6 +155,7 @@ export function useAudioPlayer() {
       });
 
       if (cancelledRef.current) {
+        queueRef.current.unshift(audioUri);
         return;
       }
 
@@ -213,7 +214,7 @@ export function useAudioPlayer() {
   const enqueueAudio = useCallback((audioUri: string) => {
     if (cancelledRef.current) return;
     queueRef.current.push(audioUri);
-    if (!playingRef.current) {
+    if (!playingRef.current && !startingRef.current) {
       void playNext();
     }
   }, [playNext]);
