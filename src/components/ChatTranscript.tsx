@@ -23,6 +23,7 @@ interface ChatTranscriptProps {
   scrollEnabled?: boolean;
   onCopyMessage?: (message: Message) => void;
   onShareMessage?: (message: Message) => void;
+  onRepeatMessage?: (message: Message) => void;
   messageSelectionEnabled?: boolean;
 }
 
@@ -35,6 +36,7 @@ export function ChatTranscript({
   scrollEnabled = true,
   onCopyMessage,
   onShareMessage,
+  onRepeatMessage,
   messageSelectionEnabled = false,
 }: ChatTranscriptProps) {
   const { colors } = useTheme();
@@ -62,6 +64,7 @@ export function ChatTranscript({
           message={item}
           onCopy={onCopyMessage}
           onShare={onShareMessage}
+          onRepeat={onRepeatMessage}
           selectable={messageSelectionEnabled}
         />
       )}

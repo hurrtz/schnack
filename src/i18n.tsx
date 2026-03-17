@@ -201,6 +201,7 @@ const translations = {
     replyModelRoute: ({ route }) => `Reply model: ${route}`,
     voiceOutputRoute: ({ route }) => `Voice out: ${route}`,
     conversation: "Conversation",
+    show: "Show",
     open: "Open",
     copyThread: "Copy Thread",
     shareThread: "Share Thread",
@@ -214,7 +215,7 @@ const translations = {
     transcript: "Transcript",
     noConversationYet: "No conversation yet",
     expandedTranscriptEmptyDescription:
-      "Speak with the control above. Pull the drawer handle down when you want to return to the main stage.",
+      "Speak with the control above. Close this screen when you want to return to the main stage.",
     transcriptSelectionHint:
       "Select any message text directly, or share and copy individual messages below.",
     startWithGroq: "Start with Groq",
@@ -544,6 +545,7 @@ const translations = {
     replyModelRoute: ({ route }) => `Antwortmodell: ${route}`,
     voiceOutputRoute: ({ route }) => `Stimme raus: ${route}`,
     conversation: "Konversation",
+    show: "Anzeigen",
     open: "Oeffnen",
     copyThread: "Verlauf kopieren",
     shareThread: "Verlauf teilen",
@@ -558,7 +560,7 @@ const translations = {
     transcript: "Transkript",
     noConversationYet: "Noch keine Konversation",
     expandedTranscriptEmptyDescription:
-      "Sprich ueber die Steuerung oben. Ziehe den Griff des Drawers nach unten, um zur Hauptansicht zurueckzukehren.",
+      "Sprich ueber die Steuerung oben. Schliesse diesen Bildschirm, wenn du zur Hauptansicht zurueckkehren willst.",
     transcriptSelectionHint:
       "Du kannst Text direkt markieren oder einzelne Nachrichten unten teilen und kopieren.",
     startWithGroq: "Mit Groq starten",

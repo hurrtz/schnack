@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
-  Animated,
-  PanResponder,
+  Modal,
   ScrollView,
   Share,
   StyleSheet,
@@ -54,8 +53,6 @@ import {
   getEnabledTtsProviders,
 } from "../utils/providerCapabilities";
 
-type ViewMode = "default" | "expanded";
-
 export function MainScreen() {
   const { colors, isDark } = useTheme();
   const { t, language } = useLocalization();
@@ -87,10 +84,11 @@ export function MainScreen() {
   const nativeStt = useNativeSpeechRecognizer();
   const player = useAudioPlayer();
 
-  const [viewMode, setViewMode] = useState<ViewMode>("default");
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [settingsFocusProvider, setSettingsFocusProvider] = useState<Provider | undefined>();
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [transcriptVisible, setTranscriptVisible] = useState(false);
+  const [conversationMenuVisible, setConversationMenuVisible] = useState(false);
   const [setupGuideVisible, setSetupGuideVisible] = useState(false);
   const [memoryConversation, setMemoryConversation] = useState<Conversation | null>(
     null
@@ -109,7 +107,6 @@ export function MainScreen() {
   const recordingStartedRef = useRef<Promise<void> | null>(null);
   const lastCompletedReplyRef = useRef("");
   const ttsFallbackToastShownRef = useRef(false);
-  const expandedDrawerTranslateY = useRef(new Animated.Value(0)).current;
 
   const provider = settings.lastProvider;
   const providerApiKey = settings.apiKeys[provider].trim();
@@ -374,47 +371,6 @@ export function MainScreen() {
     [isBusy, isRecording, playReplyText, showToast, t]
   );
 
-  const resetExpandedDrawer = useCallback(() => {
-    Animated.spring(expandedDrawerTranslateY, {
-      toValue: 0,
-      useNativeDriver: true,
-      bounciness: 0,
-      speed: 18,
-    }).start();
-  }, [expandedDrawerTranslateY]);
-
-  const collapseExpandedDrawer = useCallback(() => {
-    Animated.timing(expandedDrawerTranslateY, {
-      toValue: 220,
-      duration: 180,
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (!finished) {
-        return;
-      }
-
-      expandedDrawerTranslateY.setValue(0);
-      setViewMode("default");
-    });
-  }, [expandedDrawerTranslateY]);
-
-  const expandedDrawerPanResponder = PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gestureState) =>
-      gestureState.dy > 6 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
-    onPanResponderMove: (_, gestureState) => {
-      expandedDrawerTranslateY.setValue(Math.max(0, gestureState.dy));
-    },
-    onPanResponderRelease: (_, gestureState) => {
-      if (gestureState.dy > 86 || gestureState.vy > 1.1) {
-        collapseExpandedDrawer();
-        return;
-      }
-
-      resetExpandedDrawer();
-    },
-    onPanResponderTerminate: resetExpandedDrawer,
-  });
-
   const openSettings = useCallback((focusProvider?: Provider) => {
     setSettingsFocusProvider(focusProvider);
     setSettingsVisible(true);
@@ -480,12 +436,6 @@ export function MainScreen() {
     ttsProvider,
     updateSettings,
   ]);
-
-  useEffect(() => {
-    if (viewMode === "expanded") {
-      expandedDrawerTranslateY.setValue(0);
-    }
-  }, [expandedDrawerTranslateY, viewMode]);
 
   useEffect(() => {
     if (!loaded) {
@@ -1045,6 +995,24 @@ export function MainScreen() {
     showToast(t("memoryCleared"));
   }, [clearConversationMemory, memoryConversation, showToast, t]);
 
+  const openTranscript = useCallback(() => {
+    setConversationMenuVisible(false);
+    setTranscriptVisible(true);
+  }, []);
+
+  const closeTranscript = useCallback(() => {
+    setConversationMenuVisible(false);
+    setTranscriptVisible(false);
+  }, []);
+
+  const closeConversationMenu = useCallback(() => {
+    setConversationMenuVisible(false);
+  }, []);
+
+  const toggleConversationMenu = useCallback(() => {
+    setConversationMenuVisible((previous) => !previous);
+  }, []);
+
   const renderTopBar = (compact = false) => (
     <View style={styles.topBar}>
       <TouchableOpacity
@@ -1099,6 +1067,63 @@ export function MainScreen() {
     </View>
   );
 
+  const renderConversationMenu = (variant: "preview" | "modal") =>
+    conversationMenuVisible ? (
+      <View
+        style={[
+          styles.conversationMenu,
+          variant === "modal"
+            ? styles.conversationMenuModal
+            : styles.conversationMenuPreview,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            shadowColor: colors.glow,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.conversationMenuItem}
+          onPress={() => {
+            closeConversationMenu();
+            void openMemory();
+          }}
+          activeOpacity={0.85}
+        >
+          <Feather name="archive" size={15} color={colors.accent} />
+          <Text style={[styles.conversationMenuText, { color: colors.text }]}>
+            {t("memory")}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.conversationMenuItem}
+          onPress={() => {
+            closeConversationMenu();
+            void handleCopyThread();
+          }}
+          activeOpacity={0.85}
+        >
+          <Feather name="copy" size={15} color={colors.accent} />
+          <Text style={[styles.conversationMenuText, { color: colors.text }]}>
+            {t("copyThread")}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.conversationMenuItem}
+          onPress={() => {
+            closeConversationMenu();
+            void handleShareThread();
+          }}
+          activeOpacity={0.85}
+        >
+          <Feather name="share" size={15} color={colors.accent} />
+          <Text style={[styles.conversationMenuText, { color: colors.text }]}>
+            {t("shareThread")}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    ) : null;
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -1138,497 +1163,376 @@ export function MainScreen() {
         onRetry={toast?.onRetry}
       />
 
-      {viewMode === "default" ? (
-        <View style={styles.defaultLayout}>
-          {renderTopBar(false)}
+      <View style={styles.defaultLayout}>
+        {renderTopBar(false)}
 
-          <ScrollView
-            style={styles.defaultScroll}
-            contentContainerStyle={styles.defaultLayoutContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <View
-              style={[
-                styles.heroCard,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  shadowColor: colors.glow,
-                },
-              ]}
-            >
-              <LinearGradient
-                colors={[colors.accentSoft, "rgba(255,255,255,0)"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.heroCardGlow}
-              />
-              {loaded && availableProviders.length > 0 ? (
-                <ProviderToggle
-                  selected={provider}
-                  onSelect={handleProviderChange}
-                  visibleProviders={availableProviders}
-                />
-              ) : (
-                <TouchableOpacity
-                  style={[
-                    styles.providerEmptyState,
-                    {
-                      backgroundColor: colors.surfaceElevated,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => openSettings("groq")}
-                  activeOpacity={0.9}
-                >
-                  <View style={styles.providerEmptyHeader}>
-                    <View
-                      style={[
-                        styles.providerEmptyBadge,
-                        {
-                          backgroundColor: colors.backgroundSecondary,
-                          borderColor: colors.border,
-                        },
-                      ]}
-                    >
-                      <ProviderIcon
-                        provider="groq"
-                        color={colors.text}
-                      />
-                      <Text
-                        style={[
-                          styles.providerEmptyBadgeText,
-                          { color: colors.text },
-                        ]}
-                      >
-                        Groq
-                      </Text>
-                    </View>
-                    <Feather
-                      name="arrow-up-right"
-                      size={16}
-                      color={colors.accent}
-                    />
-                  </View>
-                  <Text style={[styles.providerEmptyTitle, { color: colors.text }]}>
-                    {t("startWithGroq")}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.providerEmptyText,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    {t("groqStarterDescription")}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <View style={styles.stageBlock}>
-              <View
-                style={[
-                  styles.stageHalo,
-                  { backgroundColor: colors.glowStrong },
-                ]}
-              />
-              <WaveformCircle
-                metering={metering}
-                levels={signalLevels}
-                isActive={isActive}
-                phase={visualPhase}
-                providerLabel={providerLabel}
-                inputMode={settings.inputMode}
-                onPressIn={handlePressIn}
-                onPressOut={handlePressOut}
-                onPress={handleTogglePress}
-              />
-              <View
-                style={[
-                  styles.statusCard,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                    shadowColor: colors.glow,
-                  },
-                ]}
-              >
-                <View style={styles.statusCardHeader}>
-                  <View style={styles.statusHeaderCopy}>
-                    <Text style={[styles.eyebrow, { color: colors.accent }]}>
-                      {statusEyebrow}
-                    </Text>
-                    <Text style={[styles.statusTitle, { color: colors.text }]}>
-                      {statusTitle}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.livePill,
-                      styles.controlRoomPill,
-                      {
-                        backgroundColor: colors.surfaceElevated,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.liveDot,
-                        {
-                          backgroundColor: isActive
-                            ? colors.success
-                            : colors.accentWarm,
-                        },
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.livePillText,
-                        { color: colors.textSecondary },
-                      ]}
-                    >
-                      {isActive ? t("live") : t("idle")}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.statusMetaRow}>
-                  <Text style={[styles.statusMeta, { color: colors.textMuted }]}>
-                    {sessionMeta}
-                  </Text>
-                  <Text style={[styles.statusMeta, { color: colors.textMuted }]}>
-                    {ttsStatusLabel}
-                  </Text>
-                </View>
-                <View style={styles.statusRouteList}>
-                  <Text style={[styles.statusRouteText, { color: colors.textMuted }]}>
-                    {t("speechInputRoute", { route: sttStatusLabel })}
-                  </Text>
-                  <Text style={[styles.statusRouteText, { color: colors.textMuted }]}>
-                    {t("replyModelRoute", { route: routeModelLabel })}
-                  </Text>
-                  <Text style={[styles.statusRouteText, { color: colors.textMuted }]}>
-                    {t("voiceOutputRoute", { route: ttsStatusLabel })}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            <View
-              style={[
-                styles.transcriptShell,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  shadowColor: colors.glow,
-                },
-              ]}
-            >
-              <View style={styles.transcriptHeader}>
-                <View style={styles.transcriptHeaderCopy}>
-                  <Text
-                    style={[styles.eyebrow, { color: colors.textSecondary }]}
-                  >
-                    {t("conversation")}
-                  </Text>
-                  <Text style={[styles.transcriptTitle, { color: colors.text }]}>
-                    {sessionTitle}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={[
-                    styles.expandButton,
-                    {
-                      backgroundColor: colors.surfaceElevated,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => setViewMode("expanded")}
-                >
-                  <Text
-                    style={[styles.expandButtonText, { color: colors.text }]}
-                  >
-                    {t("open")}
-                  </Text>
-                  <Feather
-                    name="arrow-up-right"
-                    size={15}
-                    color={colors.accent}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.transcriptHeaderActions}>
-                <TouchableOpacity
-                  disabled={!activeConversation}
-                  style={[
-                    styles.copyButton,
-                    !activeConversation && styles.actionButtonDisabled,
-                    {
-                      backgroundColor: colors.surfaceElevated,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    void openMemory();
-                  }}
-                >
-                  <Feather name="archive" size={14} color={colors.accent} />
-                  <Text
-                    style={[styles.copyButtonText, { color: colors.text }]}
-                  >
-                    {t("memory")}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  disabled={!lastAssistantReply}
-                  style={[
-                    styles.copyButton,
-                    !lastAssistantReply && styles.actionButtonDisabled,
-                    {
-                      backgroundColor: colors.surfaceElevated,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    void handleRepeatLastReply();
-                  }}
-                >
-                  <Feather name="volume-2" size={14} color={colors.accent} />
-                  <Text
-                    style={[styles.copyButtonText, { color: colors.text }]}
-                  >
-                    {t("repeatReply")}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.copyButton,
-                    {
-                      backgroundColor: colors.surfaceElevated,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    void handleCopyThread();
-                  }}
-                >
-                  <Feather name="copy" size={14} color={colors.accent} />
-                  <Text
-                    style={[styles.copyButtonText, { color: colors.text }]}
-                  >
-                    {t("copyThread")}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.copyButton,
-                    {
-                      backgroundColor: colors.surfaceElevated,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    void handleShareThread();
-                  }}
-                >
-                  <Feather name="share" size={14} color={colors.accent} />
-                  <Text
-                    style={[styles.copyButtonText, { color: colors.text }]}
-                  >
-                    {t("shareThread")}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <View
-                style={[
-                  styles.dragHandle,
-                  { backgroundColor: colors.borderStrong },
-                ]}
-              />
-
-              <ChatTranscript
-                messages={messages}
-                emptyTitle={t("noTranscriptYet")}
-                emptyDescription={t("previewTranscriptEmptyDescription")}
-                contentContainerStyle={styles.previewTranscriptContent}
-                scrollEnabled={false}
-                onCopyMessage={(message) => {
-                  void handleCopyMessage(message.content);
-                }}
-              />
-            </View>
-          </ScrollView>
-        </View>
-      ) : (
-        <View style={styles.expandedLayout}>
-          {renderTopBar(true)}
-
-          <View style={styles.expandedStageBar}>
-            <WaveformBar
-              metering={metering}
-              levels={signalLevels}
-              isActive={isActive}
-              phase={visualPhase}
-              inputMode={settings.inputMode}
-              onPressIn={handlePressIn}
-              onPressOut={handlePressOut}
-              onPress={handleTogglePress}
-            />
-          </View>
-
-          <Animated.View
+        <ScrollView
+          style={styles.defaultScroll}
+          contentContainerStyle={styles.defaultLayoutContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View
             style={[
-              styles.expandedTranscriptDrawer,
+              styles.heroCard,
               {
                 backgroundColor: colors.surface,
                 borderColor: colors.border,
                 shadowColor: colors.glow,
               },
+            ]}
+          >
+            <LinearGradient
+              colors={[colors.accentSoft, "rgba(255,255,255,0)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroCardGlow}
+            />
+            {loaded && availableProviders.length > 0 ? (
+              <ProviderToggle
+                selected={provider}
+                onSelect={handleProviderChange}
+                visibleProviders={availableProviders}
+              />
+            ) : (
+              <TouchableOpacity
+                style={[
+                  styles.providerEmptyState,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+                onPress={() => openSettings("groq")}
+                activeOpacity={0.9}
+              >
+                <View style={styles.providerEmptyHeader}>
+                  <View
+                    style={[
+                      styles.providerEmptyBadge,
+                      {
+                        backgroundColor: colors.backgroundSecondary,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <ProviderIcon
+                      provider="groq"
+                      color={colors.text}
+                    />
+                    <Text
+                      style={[
+                        styles.providerEmptyBadgeText,
+                        { color: colors.text },
+                      ]}
+                    >
+                      Groq
+                    </Text>
+                  </View>
+                  <Feather
+                    name="arrow-up-right"
+                    size={16}
+                    color={colors.accent}
+                  />
+                </View>
+                <Text style={[styles.providerEmptyTitle, { color: colors.text }]}>
+                  {t("startWithGroq")}
+                </Text>
+                <Text
+                  style={[
+                    styles.providerEmptyText,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {t("groqStarterDescription")}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.stageBlock}>
+            <View
+              style={[
+                styles.stageHalo,
+                { backgroundColor: colors.glowStrong },
+              ]}
+            />
+            <WaveformCircle
+              metering={metering}
+              levels={signalLevels}
+              isActive={isActive}
+              phase={visualPhase}
+              providerLabel={providerLabel}
+              inputMode={settings.inputMode}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              onPress={handleTogglePress}
+            />
+            <View
+              style={[
+                styles.statusCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  shadowColor: colors.glow,
+                },
+              ]}
+            >
+              <View style={styles.statusCardHeader}>
+                <View style={styles.statusHeaderCopy}>
+                  <Text style={[styles.eyebrow, { color: colors.accent }]}>
+                    {statusEyebrow}
+                  </Text>
+                  <Text style={[styles.statusTitle, { color: colors.text }]}>
+                    {statusTitle}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.livePill,
+                    styles.controlRoomPill,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.liveDot,
+                      {
+                        backgroundColor: isActive
+                          ? colors.success
+                          : colors.accentWarm,
+                      },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.livePillText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {isActive ? t("live") : t("idle")}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.statusMetaRow}>
+                <Text style={[styles.statusMeta, { color: colors.textMuted }]}>
+                  {sessionMeta}
+                </Text>
+                <Text style={[styles.statusMeta, { color: colors.textMuted }]}>
+                  {ttsStatusLabel}
+                </Text>
+              </View>
+              <View style={styles.statusRouteList}>
+                <Text style={[styles.statusRouteText, { color: colors.textMuted }]}>
+                  {t("speechInputRoute", { route: sttStatusLabel })}
+                </Text>
+                <Text style={[styles.statusRouteText, { color: colors.textMuted }]}>
+                  {t("replyModelRoute", { route: routeModelLabel })}
+                </Text>
+                <Text style={[styles.statusRouteText, { color: colors.textMuted }]}>
+                  {t("voiceOutputRoute", { route: ttsStatusLabel })}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View
+            style={[
+              styles.transcriptShell,
               {
-                transform: [{ translateY: expandedDrawerTranslateY }],
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                shadowColor: colors.glow,
               },
             ]}
           >
-            <View
-              style={styles.expandedDrawerHandleZone}
-              {...expandedDrawerPanResponder.panHandlers}
-            >
-              <View
+            <View style={styles.transcriptTopActions}>
+              <TouchableOpacity
                 style={[
-                  styles.dragHandle,
-                  { backgroundColor: colors.borderStrong },
+                  styles.expandButton,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
                 ]}
-              />
+                onPress={openTranscript}
+              >
+                <Text
+                  style={[styles.expandButtonText, { color: colors.text }]}
+                >
+                  {t("show")}
+                </Text>
+                <Feather
+                  name="arrow-up-right"
+                  size={15}
+                  color={colors.accent}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.menuIconButton,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+                onPress={toggleConversationMenu}
+                activeOpacity={0.85}
+              >
+                <Feather
+                  name="more-horizontal"
+                  size={18}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+            {renderConversationMenu("preview")}
+
+            <View style={styles.transcriptHeader}>
+              <View style={styles.transcriptHeaderCopy}>
+                <Text
+                  style={[styles.eyebrow, { color: colors.textSecondary }]}
+                >
+                  {t("conversation")}
+                </Text>
+                <Text style={[styles.transcriptTitle, { color: colors.text }]}>
+                  {sessionTitle}
+                </Text>
+              </View>
             </View>
 
-            <View style={styles.expandedTranscriptHeader}>
-              <View style={styles.transcriptHeaderCopy}>
+            <ChatTranscript
+              messages={messages}
+              emptyTitle={t("noTranscriptYet")}
+              emptyDescription={t("previewTranscriptEmptyDescription")}
+              contentContainerStyle={styles.previewTranscriptContent}
+              scrollEnabled={false}
+              onCopyMessage={(message) => {
+                void handleCopyMessage(message.content);
+              }}
+            />
+          </View>
+        </ScrollView>
+      </View>
+
+      <Modal
+        visible={transcriptVisible}
+        animationType="slide"
+        onRequestClose={closeTranscript}
+      >
+        <SafeAreaView
+          style={[styles.transcriptModal, { backgroundColor: colors.background }]}
+          edges={["top", "left", "right", "bottom"]}
+        >
+          <LinearGradient
+            colors={[
+              colors.background,
+              colors.backgroundSecondary,
+              colors.background,
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.expandedLayout}>
+            <View style={styles.expandedTopBar}>
+              <View style={styles.expandedTopBarCopy}>
                 <Text style={[styles.eyebrow, { color: colors.textSecondary }]}>
                   {t("transcript")}
                 </Text>
                 <Text style={[styles.transcriptTitle, { color: colors.text }]}>
                   {sessionTitle}
                 </Text>
-                <Text
+              </View>
+              <View style={styles.expandedTopBarActions}>
+                <TouchableOpacity
                   style={[
-                    styles.expandedTranscriptMeta,
-                    { color: colors.textMuted },
+                    styles.menuIconButton,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
                   ]}
+                  onPress={toggleConversationMenu}
+                  activeOpacity={0.85}
                 >
-                  {providerLabel} · {model}
-                </Text>
-                <Text
+                  <Feather
+                    name="more-horizontal"
+                    size={18}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={[
-                    styles.expandedTranscriptHint,
-                    { color: colors.textSecondary },
+                    styles.menuIconButton,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
                   ]}
+                  onPress={closeTranscript}
+                  activeOpacity={0.85}
                 >
-                  {t("transcriptSelectionHint")}
-                </Text>
+                  <Feather name="x" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
               </View>
             </View>
+            {renderConversationMenu("modal")}
 
-            <View style={styles.transcriptHeaderActions}>
-              <TouchableOpacity
-                disabled={!activeConversation}
-                style={[
-                  styles.copyButton,
-                  !activeConversation && styles.actionButtonDisabled,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-                onPress={() => {
-                  void openMemory();
-                }}
-              >
-                <Feather name="archive" size={14} color={colors.accent} />
-                <Text
-                  style={[styles.copyButtonText, { color: colors.text }]}
-                >
-                  {t("memory")}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                disabled={!lastAssistantReply}
-                style={[
-                  styles.copyButton,
-                  !lastAssistantReply && styles.actionButtonDisabled,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-                onPress={() => {
-                  void handleRepeatLastReply();
-                }}
-              >
-                <Feather name="volume-2" size={14} color={colors.accent} />
-                <Text
-                  style={[styles.copyButtonText, { color: colors.text }]}
-                >
-                  {t("repeatReply")}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.copyButton,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-                onPress={() => {
-                  void handleCopyThread();
-                }}
-              >
-                <Feather name="copy" size={14} color={colors.accent} />
-                <Text
-                  style={[styles.copyButtonText, { color: colors.text }]}
-                >
-                  {t("copyThread")}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.copyButton,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-                onPress={() => {
-                  void handleShareThread();
-                }}
-              >
-                <Feather name="share" size={14} color={colors.accent} />
-                <Text
-                  style={[styles.copyButtonText, { color: colors.text }]}
-                >
-                  {t("shareThread")}
-                </Text>
-              </TouchableOpacity>
+            <View style={styles.expandedStageBar}>
+              <WaveformBar
+                metering={metering}
+                levels={signalLevels}
+                isActive={isActive}
+                phase={visualPhase}
+                inputMode={settings.inputMode}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                onPress={handleTogglePress}
+              />
             </View>
 
-            <ChatTranscript
-              messages={messages}
-              emptyTitle={t("noConversationYet")}
-              emptyDescription={t("expandedTranscriptEmptyDescription")}
-              contentContainerStyle={styles.expandedTranscriptContent}
-              onCopyMessage={(message) => {
-                void handleCopyMessage(message.content);
-              }}
-              onShareMessage={(message) => {
-                void handleShareMessage(message.content);
-              }}
-              messageSelectionEnabled
-            />
-          </Animated.View>
-        </View>
-      )}
+            <View
+              style={[
+                styles.expandedTranscriptDrawer,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  shadowColor: colors.glow,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.expandedTranscriptHint,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                {t("transcriptSelectionHint")}
+              </Text>
+
+              <ChatTranscript
+                messages={messages}
+                emptyTitle={t("noConversationYet")}
+                emptyDescription={t("expandedTranscriptEmptyDescription")}
+                contentContainerStyle={styles.expandedTranscriptContent}
+                onCopyMessage={(message) => {
+                  void handleCopyMessage(message.content);
+                }}
+                onShareMessage={(message) => {
+                  void handleShareMessage(message.content);
+                }}
+                onRepeatMessage={(message) => {
+                  void handleRepeatLastReply(message.content);
+                }}
+                messageSelectionEnabled
+              />
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
 
       <SettingsModal
         visible={settingsVisible}
@@ -1919,6 +1823,7 @@ const styles = StyleSheet.create({
     height: 288,
     borderRadius: 32,
     borderWidth: 1,
+    position: "relative",
     paddingTop: 18,
     paddingHorizontal: 16,
     overflow: "hidden",
@@ -1939,54 +1844,66 @@ const styles = StyleSheet.create({
     shadowRadius: 30,
     elevation: 8,
   },
-  expandedDrawerHandleZone: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 2,
-    paddingBottom: 8,
-  },
-  expandedTranscriptHeader: {
-    gap: 4,
-    marginBottom: 10,
-  },
   transcriptHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: 12,
-    marginBottom: 14,
-  },
-  transcriptHeaderActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   transcriptHeaderCopy: {
     flex: 1,
     gap: 4,
   },
-  copyButton: {
+  transcriptTopActions: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-end",
     gap: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  actionButtonDisabled: {
-    opacity: 0.48,
-  },
-  copyButtonText: {
-    fontSize: 12,
-    fontFamily: fonts.display,
   },
   transcriptTitle: {
     fontSize: 20,
     lineHeight: 24,
     fontFamily: fonts.display,
+  },
+  menuIconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  conversationMenu: {
+    position: "absolute",
+    right: 16,
+    width: 196,
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 8,
+    gap: 2,
+    zIndex: 5,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.16,
+    shadowRadius: 28,
+    elevation: 10,
+  },
+  conversationMenuPreview: {
+    top: 62,
+  },
+  conversationMenuModal: {
+    top: 56,
+  },
+  conversationMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderRadius: 16,
+  },
+  conversationMenuText: {
+    fontSize: 14,
+    fontFamily: fonts.body,
   },
   expandButton: {
     flexDirection: "row",
@@ -2001,13 +1918,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: fonts.display,
   },
-  dragHandle: {
-    width: 42,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 8,
-  },
   previewTranscriptContent: {
     paddingBottom: 26,
   },
@@ -2019,15 +1929,29 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     zIndex: 1,
   },
-  expandedTranscriptMeta: {
-    fontSize: 11,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    fontFamily: fonts.mono,
+  transcriptModal: {
+    flex: 1,
+  },
+  expandedTopBar: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 14,
+  },
+  expandedTopBarCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  expandedTopBarActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   expandedTranscriptHint: {
     fontSize: 13,
     lineHeight: 19,
+    marginBottom: 8,
     fontFamily: fonts.body,
   },
 });

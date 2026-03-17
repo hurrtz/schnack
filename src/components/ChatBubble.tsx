@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { PROVIDER_LABELS } from "../constants/models";
 import { useLocalization } from "../i18n";
@@ -11,6 +12,7 @@ interface ChatBubbleProps {
   message: Message;
   onCopy?: (message: Message) => void;
   onShare?: (message: Message) => void;
+  onRepeat?: (message: Message) => void;
   selectable?: boolean;
 }
 
@@ -18,6 +20,7 @@ export function ChatBubble({
   message,
   onCopy,
   onShare,
+  onRepeat,
   selectable = false,
 }: ChatBubbleProps) {
   const { colors, isDark } = useTheme();
@@ -56,12 +59,28 @@ export function ChatBubble({
       >
         {message.content}
       </Text>
-      {selectable && (onCopy || onShare) ? (
+      {selectable && (onCopy || onShare || onRepeat) ? (
         <View style={styles.actionRow}>
+          {onRepeat ? (
+            <TouchableOpacity
+              style={[
+                styles.iconAction,
+                {
+                  backgroundColor: colors.surfaceAlt,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => onRepeat(message)}
+              activeOpacity={0.88}
+              accessibilityLabel={t("repeatReply")}
+            >
+              <Feather name="volume-2" size={14} color={colors.textSecondary} />
+            </TouchableOpacity>
+          ) : null}
           {onCopy ? (
             <TouchableOpacity
               style={[
-                styles.messageAction,
+                styles.iconAction,
                 {
                   backgroundColor: colors.surfaceAlt,
                   borderColor: colors.border,
@@ -69,16 +88,15 @@ export function ChatBubble({
               ]}
               onPress={() => onCopy(message)}
               activeOpacity={0.88}
+              accessibilityLabel={t("copy")}
             >
-              <Text style={[styles.messageActionText, { color: colors.textSecondary }]}>
-                {t("copy")}
-              </Text>
+              <Feather name="copy" size={14} color={colors.textSecondary} />
             </TouchableOpacity>
           ) : null}
           {onShare ? (
             <TouchableOpacity
               style={[
-                styles.messageAction,
+                styles.iconAction,
                 {
                   backgroundColor: colors.surfaceAlt,
                   borderColor: colors.border,
@@ -86,10 +104,9 @@ export function ChatBubble({
               ]}
               onPress={() => onShare(message)}
               activeOpacity={0.88}
+              accessibilityLabel={t("share")}
             >
-              <Text style={[styles.messageActionText, { color: colors.textSecondary }]}>
-                {t("share")}
-              </Text>
+              <Feather name="share-2" size={14} color={colors.textSecondary} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -229,16 +246,12 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 12,
   },
-  messageAction: {
-    borderRadius: 999,
+  iconAction: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  messageActionText: {
-    fontSize: 11,
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-    fontFamily: fonts.mono,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
