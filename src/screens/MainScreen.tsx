@@ -43,6 +43,7 @@ import { useConversations } from "../hooks/useConversations";
 import { useVoicePipeline } from "../hooks/useVoicePipeline";
 import { useLocalization } from "../i18n";
 import { validateProviderConnection } from "../services/llm";
+import { createSpeechRequestId } from "../services/speech/diagnostics";
 import {
   getLocalTtsInstallStatus,
   releaseLocalTtsResources,
@@ -751,6 +752,7 @@ export function MainScreen() {
 
         if (request.mode === "native") {
           player.speakText(trimmed, { voice: request.nativeVoice });
+          await player.waitForDrain();
           return;
         }
 
@@ -770,9 +772,14 @@ export function MainScreen() {
             provider: request.provider,
             apiKey: providerApiKey,
             language,
+            diagnostics: {
+              requestId: createSpeechRequestId("preview"),
+              source: "preview",
+            },
           });
 
           player.enqueueAudio(audioUri);
+          await player.waitForDrain();
           return;
         }
 
@@ -808,9 +815,14 @@ export function MainScreen() {
             ...settings.localTtsVoices,
             [request.localLanguage]: request.voice,
           },
+          diagnostics: {
+            requestId: createSpeechRequestId("preview"),
+            source: "preview",
+          },
         });
 
         player.enqueueAudio(audioUri);
+        await player.waitForDrain();
       } catch (error) {
         const message =
           error instanceof Error ? error.message : t("couldntPreviewVoice");

@@ -327,6 +327,10 @@ describe("runVoicePipeline", () => {
       provider: "openai",
       apiKey: "sk-test",
       language: "en",
+      diagnostics: expect.objectContaining({
+        source: "conversation",
+        requestId: expect.any(String),
+      }),
     });
     expect(synthesizeSpeech).toHaveBeenNthCalledWith(2, {
       text: "Sentence two.",
@@ -335,6 +339,10 @@ describe("runVoicePipeline", () => {
       provider: "openai",
       apiKey: "sk-test",
       language: "en",
+      diagnostics: expect.objectContaining({
+        source: "conversation",
+        requestId: expect.any(String),
+      }),
     });
     expect(callbacks.onAudioReady).toHaveBeenCalledTimes(2);
     expect(callbacks.onSpeechTextReady).not.toHaveBeenCalled();
@@ -418,6 +426,10 @@ describe("runVoicePipeline", () => {
         it: "vits-piper-it_IT-paola-medium",
         ja: "",
       },
+      diagnostics: expect.objectContaining({
+        source: "conversation",
+        requestId: expect.any(String),
+      }),
     });
     expect(callbacks.onAudioReady).toHaveBeenCalledTimes(1);
     expect(callbacks.onSpeechTextReady).not.toHaveBeenCalled();
@@ -476,6 +488,10 @@ describe("runVoicePipeline", () => {
       provider: "openai",
       apiKey: "sk-test",
       language: "en",
+      diagnostics: expect.objectContaining({
+        source: "conversation",
+        requestId: expect.any(String),
+      }),
     });
     expect(synthesizeSpeech).toHaveBeenNthCalledWith(2, {
       text: "Two",
@@ -484,6 +500,10 @@ describe("runVoicePipeline", () => {
       provider: "openai",
       apiKey: "sk-test",
       language: "en",
+      diagnostics: expect.objectContaining({
+        source: "conversation",
+        requestId: expect.any(String),
+      }),
     });
     expect(callbacks.onAudioReady).toHaveBeenCalledTimes(2);
   });

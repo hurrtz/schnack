@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 
 import { TranslationKey } from "../i18n";
+import { createSpeechRequestId } from "../services/speech/diagnostics";
 import { runVoicePipeline } from "../services/voicePipeline";
 import { synthesizeSpeechSequence } from "../services/tts";
 import {
@@ -20,7 +21,12 @@ import {
 
 import type { useAudioPlayer } from "./useAudioPlayer";
 
-export type PipelinePhase = "idle" | "transcribing" | "thinking" | "synthesizing";
+export type PipelinePhase =
+  | "idle"
+  | "transcribing"
+  | "thinking"
+  | "synthesizing"
+  | "speaking";
 
 type AudioPlayer = ReturnType<typeof useAudioPlayer>;
 
@@ -189,6 +195,7 @@ export function useVoicePipeline(
 
         if (ttsMode === "native") {
           player.speakText(trimmed);
+          await player.waitForDrain();
           return;
         }
 
@@ -206,6 +213,10 @@ export function useVoicePipeline(
           language,
           listenLanguages: ttsListenLanguages,
           localVoices: localTtsVoices,
+          diagnostics: {
+            requestId: createSpeechRequestId("repeat"),
+            source: "repeat",
+          },
         }).catch(async () => {
           player.speakText(trimmed);
           showToast(
@@ -223,6 +234,7 @@ export function useVoicePipeline(
         audioUris.forEach((audioUri) => {
           player.enqueueAudio(audioUri);
         });
+        await player.waitForDrain();
       } finally {
         replayingRef.current = false;
       }
@@ -337,7 +349,7 @@ export function useVoicePipeline(
             onResponseDone: (fullText, usage?: UsageEstimate) => {
               setStreamingText("");
               setPipelinePhase(
-                ttsMode === "native" ? "idle" : "synthesizing",
+                ttsMode === "native" ? "speaking" : "synthesizing",
               );
               lastCompletedReplyRef.current = fullText;
               addMessage({
@@ -391,6 +403,13 @@ export function useVoicePipeline(
       } catch {
         // Errors are surfaced through the toast callback above.
       } finally {
+        if (player.hasPendingPlaybackNow()) {
+          setPipelinePhase("speaking");
+        }
+
+        if (player.hasPendingPlaybackNow()) {
+          await player.waitForDrain();
+        }
         setPipelinePhase("idle");
       }
     },

@@ -7,6 +7,7 @@ import {
   splitTextForTts,
   synthesizeSpeech,
 } from "./tts";
+import { createSpeechRequestId } from "./speech/diagnostics";
 import { buildConversationContextPlan } from "./conversationContext";
 import {
   AppLanguage,
@@ -191,6 +192,7 @@ export async function runVoicePipeline(params: {
   let ttsChain = Promise.resolve();
   const ttsQueue: Promise<void>[] = [];
   const effectiveReplyPlayback = ttsMode === "local" ? "wait" : replyPlayback;
+  const speechRequestId = createSpeechRequestId("conversation");
 
   const enqueueTtsChunk = (text: string) => {
     const trimmed = text.trim();
@@ -219,6 +221,10 @@ export async function runVoicePipeline(params: {
           language,
           listenLanguages: ttsListenLanguages,
           localVoices: localTtsVoices,
+          diagnostics: {
+            requestId: speechRequestId,
+            source: "conversation",
+          },
         });
 
         if (!abortSignal?.aborted) {

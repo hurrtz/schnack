@@ -11,6 +11,11 @@ import { translate } from "../i18n";
 import { getLocalTtsInstallStatus, synthesizeLocalSpeech } from "./localTts";
 import { extractProviderErrorMessage } from "./providerErrors";
 import {
+  createSpeechRequestId,
+  recordSpeechDiagnostic,
+  SpeechDiagnosticsContext,
+} from "./speech/diagnostics";
+import {
   AppLanguage,
   LocalTtsVoiceSelections,
   Provider,
@@ -430,6 +435,7 @@ async function trySynthesizeResolvedLocalSpeech(params: {
   language: AppLanguage;
   listenLanguages?: TtsListenLanguage[];
   localVoices?: LocalTtsVoiceSelections;
+  diagnostics?: SpeechDiagnosticsContext;
 }) {
   const selection = getResolvedLocalTtsSelection(params);
 
@@ -459,6 +465,17 @@ async function trySynthesizeResolvedLocalSpeech(params: {
     }
 
     try {
+      recordSpeechDiagnostic({
+        requestId: params.diagnostics?.requestId,
+        source: params.diagnostics?.source ?? "unknown",
+        stage: "local-attempt",
+        requestedRoute: "local",
+        actualRoute: "local",
+        language: selection.resolvedLanguage,
+        voice,
+        textLength: params.text.trim().length,
+      });
+
       return {
         resolvedLanguage: selection.resolvedLanguage,
         audioPath: await synthesizeLocalSpeech({
@@ -469,6 +486,17 @@ async function trySynthesizeResolvedLocalSpeech(params: {
       };
     } catch (error) {
       lastError = error;
+      recordSpeechDiagnostic({
+        requestId: params.diagnostics?.requestId,
+        source: params.diagnostics?.source ?? "unknown",
+        stage: "local-failed",
+        requestedRoute: "local",
+        actualRoute: "local",
+        language: selection.resolvedLanguage,
+        voice,
+        textLength: params.text.trim().length,
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -537,6 +565,7 @@ export async function synthesizeSpeech(params: {
   language: AppLanguage;
   listenLanguages?: TtsListenLanguage[];
   localVoices?: LocalTtsVoiceSelections;
+  diagnostics?: SpeechDiagnosticsContext;
 }): Promise<string> {
   const {
     text,
@@ -547,7 +576,21 @@ export async function synthesizeSpeech(params: {
     language,
     listenLanguages,
     localVoices,
+    diagnostics,
   } = params;
+  const requestId = diagnostics?.requestId ?? createSpeechRequestId("tts");
+
+  recordSpeechDiagnostic({
+    requestId,
+    source: diagnostics?.source ?? "unknown",
+    stage: "tts-requested",
+    requestedRoute: mode,
+    mode,
+    provider: provider ?? null,
+    voice: voice || null,
+    language: listenLanguages?.[0] ?? "app",
+    textLength: text.trim().length,
+  });
 
   if (mode === "native") {
     throw new Error(
@@ -569,26 +612,89 @@ export async function synthesizeSpeech(params: {
         language,
         listenLanguages,
         localVoices,
+        diagnostics: {
+          requestId,
+          source: diagnostics?.source,
+        },
       });
 
       if (localResult) {
+        recordSpeechDiagnostic({
+          requestId,
+          source: diagnostics?.source ?? "unknown",
+          stage: "tts-succeeded",
+          requestedRoute: "local",
+          actualRoute: "local",
+          language: localResult.resolvedLanguage,
+          voice:
+            localVoices?.[localResult.resolvedLanguage] ??
+            getLocalTtsVoiceOptions(localResult.resolvedLanguage)[0]?.value ??
+            null,
+          textLength: text.trim().length,
+        });
         return localResult.audioPath;
       }
     } catch (error) {
       if (!provider || !apiKey?.trim()) {
+        recordSpeechDiagnostic({
+          requestId,
+          source: diagnostics?.source ?? "unknown",
+          stage: "tts-failed",
+          requestedRoute: "local",
+          actualRoute: "local",
+          provider: provider ?? null,
+          voice: voice || null,
+          textLength: text.trim().length,
+          message: error instanceof Error ? error.message : String(error),
+        });
         throw error;
       }
+
+      recordSpeechDiagnostic({
+        requestId,
+        source: diagnostics?.source ?? "unknown",
+        stage: "tts-fallback",
+        requestedRoute: "local",
+        actualRoute: "provider",
+        provider,
+        voice: voice || null,
+        textLength: text.trim().length,
+        fallbackReason:
+          error instanceof Error ? error.message : "Local synthesis failed.",
+      });
     }
 
     if (provider && apiKey?.trim()) {
-      return synthesizeProviderSpeech({
+      const audioPath = await synthesizeProviderSpeech({
         text,
         voice,
         provider,
         apiKey,
         language,
       });
+      recordSpeechDiagnostic({
+        requestId,
+        source: diagnostics?.source ?? "unknown",
+        stage: "tts-succeeded",
+        requestedRoute: "local",
+        actualRoute: "provider",
+        provider,
+        voice: voice || null,
+        textLength: text.trim().length,
+      });
+      return audioPath;
     }
+
+    recordSpeechDiagnostic({
+      requestId,
+      source: diagnostics?.source ?? "unknown",
+      stage: "tts-failed",
+      requestedRoute: "local",
+      actualRoute: "local",
+      voice: voice || null,
+      textLength: text.trim().length,
+      fallbackReason: "No provider fallback configured.",
+    });
 
     throw new Error(
       translate(language, "localTtsUnavailableForLanguage", {
@@ -607,9 +713,23 @@ export async function synthesizeSpeech(params: {
         language,
         listenLanguages,
         localVoices,
+        diagnostics: {
+          requestId,
+          source: diagnostics?.source,
+        },
       });
 
       if (localResult) {
+        recordSpeechDiagnostic({
+          requestId,
+          source: diagnostics?.source ?? "unknown",
+          stage: "tts-succeeded",
+          requestedRoute: "provider",
+          actualRoute: "local",
+          language: localResult.resolvedLanguage,
+          textLength: text.trim().length,
+          fallbackReason: "No provider configured.",
+        });
         return localResult.audioPath;
       }
     } catch {
@@ -622,13 +742,24 @@ export async function synthesizeSpeech(params: {
   }
 
   try {
-    return await synthesizeProviderSpeech({
+    const audioPath = await synthesizeProviderSpeech({
       text,
       voice,
       provider,
       apiKey,
       language,
     });
+    recordSpeechDiagnostic({
+      requestId,
+      source: diagnostics?.source ?? "unknown",
+      stage: "tts-succeeded",
+      requestedRoute: "provider",
+      actualRoute: "provider",
+      provider,
+      voice: voice || null,
+      textLength: text.trim().length,
+    });
+    return audioPath;
   } catch (providerError) {
     try {
       const localResult = await trySynthesizeResolvedLocalSpeech({
@@ -636,14 +767,48 @@ export async function synthesizeSpeech(params: {
         language,
         listenLanguages,
         localVoices,
+        diagnostics: {
+          requestId,
+          source: diagnostics?.source,
+        },
       });
 
       if (localResult) {
+        recordSpeechDiagnostic({
+          requestId,
+          source: diagnostics?.source ?? "unknown",
+          stage: "tts-fallback",
+          requestedRoute: "provider",
+          actualRoute: "local",
+          language: localResult.resolvedLanguage,
+          provider,
+          voice: voice || null,
+          textLength: text.trim().length,
+          fallbackReason:
+            providerError instanceof Error
+              ? providerError.message
+              : "Provider synthesis failed.",
+        });
         return localResult.audioPath;
       }
     } catch {
       // Provider remains the primary mode here; fall through to native fallback upstream.
     }
+
+    recordSpeechDiagnostic({
+      requestId,
+      source: diagnostics?.source ?? "unknown",
+      stage: "tts-failed",
+      requestedRoute: "provider",
+      actualRoute: "provider",
+      provider,
+      voice: voice || null,
+      textLength: text.trim().length,
+      message:
+        providerError instanceof Error
+          ? providerError.message
+          : String(providerError),
+    });
 
     throw providerError;
   }
@@ -658,6 +823,7 @@ export async function synthesizeSpeechSequence(params: {
   language: AppLanguage;
   listenLanguages?: TtsListenLanguage[];
   localVoices?: LocalTtsVoiceSelections;
+  diagnostics?: SpeechDiagnosticsContext;
 }) {
   if (params.mode !== "provider") {
     const maxChars =
