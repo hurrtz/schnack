@@ -6,6 +6,7 @@ import { getTogetherTtsLanguageCode } from "../utils/speechLanguage";
 
 let ttsCounter = 0;
 export const PROVIDER_TTS_MAX_INPUT_CHARS = 3500;
+export const PROVIDER_TTS_TIMEOUT_MS = 15000;
 
 export class TtsRequestError extends Error {
   readonly provider: Provider;
@@ -408,6 +409,55 @@ function buildTtsRequestError(params: {
   });
 }
 
+function createTtsTimeoutError(params: {
+  provider: Provider;
+  language: AppLanguage;
+}) {
+  return new Error(
+    translate(params.language, "ttsTimeout", {
+      provider: PROVIDER_LABELS[params.provider],
+    })
+  );
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs: number,
+  onTimeout: () => Error
+) {
+  const controller = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      controller.abort();
+      reject(onTimeout());
+    }, timeoutMs);
+  });
+
+  const fetchPromise = fetch(input, {
+    ...init,
+    signal: controller.signal,
+  }).catch((error) => {
+    if (
+      error instanceof Error &&
+      (error.name === "AbortError" || error.message.toLowerCase().includes("aborted"))
+    ) {
+      throw onTimeout();
+    }
+
+    throw error;
+  });
+
+  try {
+    return await Promise.race([fetchPromise, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
 export async function synthesizeSpeech(params: {
   text: string;
   voice: string;
@@ -440,7 +490,9 @@ export async function synthesizeSpeech(params: {
     voice || config.voiceFallback || PROVIDER_DEFAULT_TTS_VOICES[provider] || "";
 
   if (config.kind === "gemini") {
-    const response = await fetch(config.endpoint, {
+    const response = await fetchWithTimeout(
+      config.endpoint,
+      {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -467,7 +519,10 @@ export async function synthesizeSpeech(params: {
           },
         },
       }),
-    });
+      },
+      PROVIDER_TTS_TIMEOUT_MS,
+      () => createTtsTimeoutError({ provider, language })
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -530,14 +585,19 @@ export async function synthesizeSpeech(params: {
             response_format: "mp3",
           };
 
-  const response = await fetch(config.endpoint, {
+  const response = await fetchWithTimeout(
+    config.endpoint,
+    {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${requireProviderKey(provider, apiKey, language)}`,
     },
     body: JSON.stringify(requestBody),
-  });
+    },
+    PROVIDER_TTS_TIMEOUT_MS,
+    () => createTtsTimeoutError({ provider, language })
+  );
 
   if (!response.ok) {
     const errorText = await response.text();

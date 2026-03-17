@@ -98,7 +98,7 @@ export function MainScreen() {
   );
   const [memoryVisible, setMemoryVisible] = useState(false);
   const [pipelinePhase, setPipelinePhase] = useState<
-    "idle" | "transcribing" | "thinking"
+    "idle" | "transcribing" | "thinking" | "synthesizing"
   >("idle");
   const [streamingText, setStreamingText] = useState("");
   const [toast, setToast] = useState<{
@@ -564,6 +564,9 @@ export function MainScreen() {
             },
             onResponseDone: (fullText) => {
               setStreamingText("");
+              setPipelinePhase(
+                settings.ttsMode === "provider" ? "synthesizing" : "idle"
+              );
               lastCompletedReplyRef.current = fullText;
               addMessage({
                 role: "assistant",
@@ -938,6 +941,8 @@ export function MainScreen() {
   const statusTitle =
     visualPhase === "recording"
       ? t("listening")
+      : pipelinePhase === "synthesizing"
+        ? t("voiceOutput")
       : visualPhase === "transcribing"
         ? t("parsing")
         : visualPhase === "thinking"
@@ -948,6 +953,10 @@ export function MainScreen() {
   const statusDetail =
     visualPhase === "recording"
       ? t("listeningToYourVoice")
+      : pipelinePhase === "synthesizing"
+        ? t("preparingVoiceWithProvider", {
+            provider: ttsProvider ? PROVIDER_LABELS[ttsProvider] : providerLabel,
+          })
       : visualPhase === "transcribing"
         ? t("parsingYourVoiceInput")
         : visualPhase === "thinking"

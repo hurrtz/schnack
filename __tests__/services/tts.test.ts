@@ -1,4 +1,5 @@
 import {
+  PROVIDER_TTS_TIMEOUT_MS,
   synthesizeSpeech,
   synthesizeSpeechSequence,
   TtsRequestError,
@@ -212,5 +213,30 @@ describe("synthesizeSpeech", () => {
           "OpenAI speech output rejected the reply because it was too long.",
       })
     );
+  });
+
+  it("times out a hanging provider TTS request with a readable error", async () => {
+    jest.useFakeTimers();
+    try {
+      (fetch as jest.Mock).mockImplementation(() => new Promise(() => undefined));
+
+      const pending = synthesizeSpeech({
+        text: "Hello world",
+        voice: "alloy",
+        mode: "provider",
+        provider: "openai",
+        apiKey: "sk-test",
+        language: "en",
+      });
+      const expectation = expect(pending).rejects.toThrow(
+        "OpenAI speech output took too long."
+      );
+
+      await jest.advanceTimersByTimeAsync(PROVIDER_TTS_TIMEOUT_MS + 1);
+
+      await expectation;
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

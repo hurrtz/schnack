@@ -193,6 +193,7 @@ const translations = {
     listeningToYourVoice: "Listening to your voice",
     parsingYourVoiceInput: "Parsing your voice input",
     waitingForProvider: ({ provider }) => `Waiting for ${provider}`,
+    preparingVoiceWithProvider: ({ provider }) => `Preparing voice with ${provider}`,
     speakingBackToYou: "Speaking back to you",
     readyForNextThought: "Ready for the next thought",
     freshSession: "Fresh session",
@@ -319,6 +320,8 @@ const translations = {
       `${provider} TTS error (${status}): ${errorText}`,
     ttsReplyTooLong: ({ provider }) =>
       `${provider} speech output rejected the reply because it was too long.`,
+    ttsTimeout: ({ provider }) =>
+      `${provider} speech output took too long.`,
     ttsDidNotReturnAudio: ({ provider }) => `${provider} TTS did not return audio.`,
     nativeSttHandledInApp: "Native STT is handled directly in the app.",
     chooseSpeechToTextProviderInSettings:
@@ -538,6 +541,7 @@ const translations = {
     listeningToYourVoice: "Ich hoere dir zu",
     parsingYourVoiceInput: "Deine Sprache wird verarbeitet",
     waitingForProvider: ({ provider }) => `Warte auf ${provider}`,
+    preparingVoiceWithProvider: ({ provider }) => `Bereite Stimme mit ${provider} vor`,
     speakingBackToYou: "Antwort wird gesprochen",
     readyForNextThought: "Bereit fuer den naechsten Gedanken",
     freshSession: "Neue Sitzung",
@@ -668,6 +672,8 @@ const translations = {
       `TTS-Fehler bei ${provider} (${status}): ${errorText}`,
     ttsReplyTooLong: ({ provider }) =>
       `${provider} hat die Sprachausgabe abgelehnt, weil die Antwort zu lang war.`,
+    ttsTimeout: ({ provider }) =>
+      `Die Sprachausgabe bei ${provider} hat zu lange gedauert.`,
     ttsDidNotReturnAudio: ({ provider }) =>
       `${provider} hat kein Audio zurueckgegeben.`,
     nativeSttHandledInApp:
