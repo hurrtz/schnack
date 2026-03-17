@@ -103,8 +103,11 @@ export function MainScreen() {
   const recorder = useAudioRecorder();
   const nativeStt = useNativeSpeechRecognizer();
   const player = useAudioPlayer();
-  const { packStates: localTtsPackStates, installLanguagePack } =
-    useLocalTtsPacks(settings);
+  const {
+    packStates: localTtsPackStates,
+    installLanguagePack,
+    refreshPackStates: refreshLocalTtsPackStates,
+  } = useLocalTtsPacks(settings);
 
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [settingsFocusProvider, setSettingsFocusProvider] = useState<
@@ -795,12 +798,14 @@ export function MainScreen() {
 
         if (!localStatus.installed) {
           showToast(
-            t("downloadSelectedLocalVoiceFirst", {
-              languageLabel: getTtsListenLanguageLabel(
-                request.localLanguage,
-                language,
-              ),
-            }),
+            localStatus.downloaded
+              ? localStatus.verificationError || t("localTtsPackBroken")
+              : t("downloadSelectedLocalVoiceFirst", {
+                  languageLabel: getTtsListenLanguageLabel(
+                    request.localLanguage,
+                    language,
+                  ),
+                }),
           );
           return;
         }
@@ -819,11 +824,15 @@ export function MainScreen() {
             requestId: createSpeechRequestId("preview"),
             source: "preview",
           },
+          strictLocalVoice: true,
         });
 
         player.enqueueAudio(audioUri);
         await player.waitForDrain();
       } catch (error) {
+        if (request.mode === "local") {
+          await refreshLocalTtsPackStates();
+        }
         const message =
           error instanceof Error ? error.message : t("couldntPreviewVoice");
         showToast(message);
@@ -835,6 +844,7 @@ export function MainScreen() {
       player,
       settings.apiKeys,
       settings.localTtsVoices,
+      refreshLocalTtsPackStates,
       showToast,
       t,
       language,

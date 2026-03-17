@@ -90,9 +90,12 @@ interface SettingsModalProps {
       TtsListenLanguage,
       {
         supported: boolean;
+        downloaded: boolean;
+        verified: boolean;
         installed: boolean;
         downloading: boolean;
         progress: number;
+        error: string | null;
       }
     >
   >;
@@ -1404,9 +1407,12 @@ function LocalPackSection({
       TtsListenLanguage,
       {
         supported: boolean;
+        downloaded: boolean;
+        verified: boolean;
         installed: boolean;
         downloading: boolean;
         progress: number;
+        error: string | null;
       }
     >
   >;
@@ -1437,9 +1443,12 @@ function LocalPackSection({
         const state = packStates[entry];
         const supported =
           state?.supported ?? LOCAL_TTS_SUPPORTED_LANGUAGES.includes(entry);
+        const downloaded = state?.downloaded ?? false;
+        const verified = state?.verified ?? false;
         const installed = state?.installed ?? false;
         const downloading = state?.downloading ?? false;
         const progress = state?.progress ?? 0;
+        const error = state?.error ?? null;
         const voiceOptions = getLocalTtsVoiceOptions(entry);
         const selectedVoice =
           settings.localTtsVoices[entry] || voiceOptions[0]?.value || "";
@@ -1469,15 +1478,27 @@ function LocalPackSection({
                   ]}
                 >
                   {supported
-                    ? installed
-                      ? t("localTtsPackReady")
-                      : downloading
-                        ? t("downloadingLocalTtsPack", {
-                            progress: `${Math.round(progress * 100)}`,
-                          })
-                        : t("localTtsPackMissing")
+                    ? downloading
+                      ? t("downloadingLocalTtsPack", {
+                          progress: `${Math.round(progress * 100)}`,
+                        })
+                      : installed
+                        ? t("localTtsPackReady")
+                        : downloaded
+                          ? t("localTtsPackBroken")
+                          : t("localTtsPackMissing")
                     : t("localTtsUnsupportedLanguageFallback")}
                 </Text>
+                {supported && downloaded && !verified && error ? (
+                  <Text
+                    style={[
+                      styles.previewHint,
+                      { color: colors.textMuted, marginTop: 4 },
+                    ]}
+                  >
+                    {error}
+                  </Text>
+                ) : null}
               </View>
 
               {supported && !installed ? (
@@ -1506,7 +1527,11 @@ function LocalPackSection({
                       color="#F4F8FF"
                     />
                     <Text style={styles.localPackButtonText}>
-                      {downloading ? t("downloadingShort") : t("download")}
+                      {downloading
+                        ? t("downloadingShort")
+                        : downloaded
+                          ? t("retry")
+                          : t("download")}
                     </Text>
                   </LinearGradient>
                 </TouchableOpacity>

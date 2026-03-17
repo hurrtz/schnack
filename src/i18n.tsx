@@ -164,6 +164,8 @@ const translations = {
     nativeVoiceUnavailable:
       "This device did not report any native system voices for preview.",
     localTtsPackReady: "Installed on this device.",
+    localTtsPackBroken:
+      "Downloaded, but this voice failed local verification on this device. Re-download it or choose another voice.",
     localTtsPackMissing:
       "Not installed yet. Cloud TTS or the system voice will be used until you download it.",
     localTtsUnsupportedLanguageFallback:
@@ -587,6 +589,8 @@ const translations = {
     nativeVoiceUnavailable:
       "Dieses Gerät hat keine nativen Systemstimmen für die Vorschau gemeldet.",
     localTtsPackReady: "Auf diesem Gerät installiert.",
+    localTtsPackBroken:
+      "Heruntergeladen, aber diese Stimme hat die lokale Prüfung auf diesem Gerät nicht bestanden. Lade sie erneut herunter oder wähle eine andere Stimme.",
     localTtsPackMissing:
       "Noch nicht installiert. Bis zum Download werden Cloud-TTS oder die Systemstimme genutzt.",
     localTtsUnsupportedLanguageFallback:

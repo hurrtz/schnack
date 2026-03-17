@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
-import { installLocalTtsPack, getLocalTtsInstallStatus } from "../services/localTts";
+import {
+  installLocalTtsPack,
+  getLocalTtsInstallStatus,
+} from "../services/localTts";
 import { Settings, TtsListenLanguage } from "../types";
 
 type LocalPackState = {
   supported: boolean;
+  downloaded: boolean;
+  verified: boolean;
   installed: boolean;
   downloading: boolean;
   progress: number;
+  error: string | null;
 };
 
 type LocalPackStateMap = Partial<Record<TtsListenLanguage, LocalPackState>>;
@@ -33,12 +39,15 @@ export function useLocalTtsPacks(settings: Settings) {
           language,
           {
             supported: status.supported,
+            downloaded: status.downloaded,
+            verified: status.verified,
             installed: status.installed,
             downloading: false,
             progress: 0,
+            error: status.verificationError,
           },
         ] as const;
-      })
+      }),
     );
 
     setPackStates(Object.fromEntries(entries) as LocalPackStateMap);
@@ -55,7 +64,10 @@ export function useLocalTtsPacks(settings: Settings) {
         [language]: {
           ...(previous[language] ?? {
             supported: true,
+            downloaded: false,
+            verified: false,
             installed: false,
+            error: null,
           }),
           downloading: true,
           progress: 0,
@@ -72,7 +84,10 @@ export function useLocalTtsPacks(settings: Settings) {
               [language]: {
                 ...(previous[language] ?? {
                   supported: true,
+                  downloaded: false,
+                  verified: false,
                   installed: false,
+                  error: null,
                 }),
                 downloading: true,
                 progress,
@@ -88,14 +103,14 @@ export function useLocalTtsPacks(settings: Settings) {
 
         if (!status.installed) {
           throw new Error(
-            "The local voice pack download finished, but the files could not be verified on this device."
+            "The local voice pack download finished, but the files could not be verified on this device.",
           );
         }
       } finally {
         await refreshPackStates();
       }
     },
-    [refreshPackStates, settings.localTtsVoices]
+    [refreshPackStates, settings.localTtsVoices],
   );
 
   return {

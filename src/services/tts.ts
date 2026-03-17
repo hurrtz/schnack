@@ -436,6 +436,7 @@ async function trySynthesizeResolvedLocalSpeech(params: {
   listenLanguages?: TtsListenLanguage[];
   localVoices?: LocalTtsVoiceSelections;
   diagnostics?: SpeechDiagnosticsContext;
+  strictLocalVoice?: boolean;
 }) {
   const selection = getResolvedLocalTtsSelection(params);
 
@@ -443,14 +444,16 @@ async function trySynthesizeResolvedLocalSpeech(params: {
     return null;
   }
 
-  const candidateVoices = [
-    selection.localVoice,
-    ...getLocalTtsVoiceOptions(selection.resolvedLanguage).map(
-      (option) => option.value,
-    ),
-  ].filter((voice, index, values): voice is string => {
-    return !!voice && values.indexOf(voice) === index;
-  });
+  const candidateVoices = params.strictLocalVoice
+    ? [selection.localVoice].filter((voice): voice is string => !!voice)
+    : [
+        selection.localVoice,
+        ...getLocalTtsVoiceOptions(selection.resolvedLanguage).map(
+          (option) => option.value,
+        ),
+      ].filter((voice, index, values): voice is string => {
+        return !!voice && values.indexOf(voice) === index;
+      });
 
   let lastError: unknown = null;
 
@@ -478,6 +481,7 @@ async function trySynthesizeResolvedLocalSpeech(params: {
 
       return {
         resolvedLanguage: selection.resolvedLanguage,
+        voice,
         audioPath: await synthesizeLocalSpeech({
           text: params.text,
           language: selection.resolvedLanguage,
@@ -566,6 +570,7 @@ export async function synthesizeSpeech(params: {
   listenLanguages?: TtsListenLanguage[];
   localVoices?: LocalTtsVoiceSelections;
   diagnostics?: SpeechDiagnosticsContext;
+  strictLocalVoice?: boolean;
 }): Promise<string> {
   const {
     text,
@@ -577,6 +582,7 @@ export async function synthesizeSpeech(params: {
     listenLanguages,
     localVoices,
     diagnostics,
+    strictLocalVoice,
   } = params;
   const requestId = diagnostics?.requestId ?? createSpeechRequestId("tts");
 
@@ -616,6 +622,7 @@ export async function synthesizeSpeech(params: {
           requestId,
           source: diagnostics?.source,
         },
+        strictLocalVoice,
       });
 
       if (localResult) {
@@ -626,10 +633,7 @@ export async function synthesizeSpeech(params: {
           requestedRoute: "local",
           actualRoute: "local",
           language: localResult.resolvedLanguage,
-          voice:
-            localVoices?.[localResult.resolvedLanguage] ??
-            getLocalTtsVoiceOptions(localResult.resolvedLanguage)[0]?.value ??
-            null,
+          voice: localResult.voice,
           textLength: text.trim().length,
         });
         return localResult.audioPath;
@@ -717,6 +721,7 @@ export async function synthesizeSpeech(params: {
           requestId,
           source: diagnostics?.source,
         },
+        strictLocalVoice,
       });
 
       if (localResult) {
@@ -771,6 +776,7 @@ export async function synthesizeSpeech(params: {
           requestId,
           source: diagnostics?.source,
         },
+        strictLocalVoice,
       });
 
       if (localResult) {

@@ -67,7 +67,10 @@ function mockInstalledLocalVoice(language: string, voice: string) {
       voice: string;
     }) => ({
       supported: true,
+      downloaded: candidateLanguage === language && candidateVoice === voice,
+      verified: candidateLanguage === language && candidateVoice === voice,
       installed: candidateLanguage === language && candidateVoice === voice,
+      verificationError: null,
     }),
   );
 }
@@ -165,7 +168,10 @@ describe("synthesizeSpeech", () => {
     jest.clearAllMocks();
     getLocalTtsInstallStatus.mockResolvedValue({
       supported: true,
+      downloaded: false,
+      verified: false,
       installed: false,
+      verificationError: null,
     });
   });
 
@@ -371,8 +377,13 @@ describe("synthesizeSpeech", () => {
     getLocalTtsInstallStatus.mockImplementation(
       async ({ language, voice }: { language: string; voice: string }) => ({
         supported: true,
+        downloaded:
+          language === "en" && (voice === "af_bella" || voice === "af_heart"),
+        verified:
+          language === "en" && (voice === "af_bella" || voice === "af_heart"),
         installed:
           language === "en" && (voice === "af_bella" || voice === "af_heart"),
+        verificationError: null,
       }),
     );
     synthesizeLocalSpeech
@@ -405,6 +416,52 @@ describe("synthesizeSpeech", () => {
       voice: "af_heart",
     });
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("does not switch to another local voice when strict local voice mode is enabled", async () => {
+    getLocalTtsInstallStatus.mockImplementation(
+      async ({ language, voice }: { language: string; voice: string }) => ({
+        supported: true,
+        downloaded:
+          language === "en" && (voice === "af_bella" || voice === "af_heart"),
+        verified:
+          language === "en" && (voice === "af_bella" || voice === "af_heart"),
+        installed:
+          language === "en" && (voice === "af_bella" || voice === "af_heart"),
+        verificationError: null,
+      }),
+    );
+    synthesizeLocalSpeech.mockRejectedValueOnce(
+      new Error("selected voice failed"),
+    );
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(["fake-audio"])),
+    });
+
+    const result = await synthesizeSpeech({
+      text: "Preview this exact voice.",
+      voice: "alloy",
+      mode: "local",
+      provider: "openai",
+      apiKey: "sk-test",
+      language: "en",
+      listenLanguages: ["en"],
+      localVoices: {
+        ...localVoices,
+        en: "af_bella",
+      },
+      strictLocalVoice: true,
+    });
+
+    expect(result).toMatch(/^\/tmp\/tts-/);
+    expect(synthesizeLocalSpeech).toHaveBeenCalledTimes(1);
+    expect(synthesizeLocalSpeech).toHaveBeenCalledWith({
+      text: "Preview this exact voice.",
+      language: "en",
+      voice: "af_bella",
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it("falls back to a matching local voice when provider synthesis fails", async () => {

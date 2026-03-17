@@ -7,10 +7,9 @@ jest.mock("../../src/services/localTts", () => ({
   getLocalTtsInstallStatus: jest.fn(),
 }));
 
-const {
-  installLocalTtsPack,
-  getLocalTtsInstallStatus,
-} = jest.requireMock("../../src/services/localTts") as {
+const { installLocalTtsPack, getLocalTtsInstallStatus } = jest.requireMock(
+  "../../src/services/localTts",
+) as {
   installLocalTtsPack: jest.Mock;
   getLocalTtsInstallStatus: jest.Mock;
 };
@@ -28,12 +27,15 @@ describe("useLocalTtsPacks", () => {
   it("clears the downloading state when install verification fails", async () => {
     getLocalTtsInstallStatus.mockResolvedValue({
       supported: true,
+      downloaded: false,
+      verified: false,
       installed: false,
+      verificationError: null,
     });
     installLocalTtsPack.mockImplementation(
       async ({ onProgress }: { onProgress?: (progress: number) => void }) => {
         onProgress?.(1);
-      }
+      },
     );
 
     const { result } = renderHook(() => useLocalTtsPacks(settings));
@@ -55,9 +57,12 @@ describe("useLocalTtsPacks", () => {
     await waitFor(() => {
       expect(result.current.packStates.en).toEqual({
         supported: true,
+        downloaded: false,
+        verified: false,
         installed: false,
         downloading: false,
         progress: 0,
+        error: null,
       });
     });
   });
@@ -66,20 +71,29 @@ describe("useLocalTtsPacks", () => {
     getLocalTtsInstallStatus
       .mockResolvedValueOnce({
         supported: true,
+        downloaded: false,
+        verified: false,
         installed: false,
+        verificationError: null,
       })
       .mockResolvedValueOnce({
         supported: true,
+        downloaded: true,
+        verified: true,
         installed: true,
+        verificationError: null,
       })
       .mockResolvedValueOnce({
         supported: true,
+        downloaded: true,
+        verified: true,
         installed: true,
+        verificationError: null,
       });
     installLocalTtsPack.mockImplementation(
       async ({ onProgress }: { onProgress?: (progress: number) => void }) => {
         onProgress?.(1);
-      }
+      },
     );
 
     const { result } = renderHook(() => useLocalTtsPacks(settings));
@@ -95,9 +109,36 @@ describe("useLocalTtsPacks", () => {
     await waitFor(() => {
       expect(result.current.packStates.en).toEqual({
         supported: true,
+        downloaded: true,
+        verified: true,
         installed: true,
         downloading: false,
         progress: 0,
+        error: null,
+      });
+    });
+  });
+
+  it("surfaces a downloaded but broken pack as not installed", async () => {
+    getLocalTtsInstallStatus.mockResolvedValue({
+      supported: true,
+      downloaded: true,
+      verified: false,
+      installed: false,
+      verificationError: "The local voice pack failed verification.",
+    });
+
+    const { result } = renderHook(() => useLocalTtsPacks(settings));
+
+    await waitFor(() => {
+      expect(result.current.packStates.en).toEqual({
+        supported: true,
+        downloaded: true,
+        verified: false,
+        installed: false,
+        downloading: false,
+        progress: 0,
+        error: "The local voice pack failed verification.",
       });
     });
   });
