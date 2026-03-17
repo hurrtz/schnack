@@ -13,6 +13,7 @@ jest.mock("../../src/services/llm", () => ({
 }));
 
 jest.mock("../../src/services/tts", () => ({
+  LOCAL_TTS_MAX_INPUT_CHARS: 420,
   PROVIDER_TTS_MAX_INPUT_CHARS: 3500,
   splitTextForTts: (text: string, maxChars = 3500) => {
     const normalized = text.trim();

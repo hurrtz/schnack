@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { PROVIDER_ORDER } from "../constants/models";
 import {
+  LocalTtsVoiceSelections,
   Provider,
   ProviderApiKeys,
   ProviderModelSelections,
@@ -10,6 +11,7 @@ import {
   ReplyPlayback,
   Settings,
   DEFAULT_SETTINGS,
+  getDefaultTtsListenLanguages,
   getDefaultAssistantInstructions,
   isDefaultAssistantInstructions,
 } from "../types";
@@ -110,6 +112,25 @@ function extractStoredProviderTtsVoices(
   }, {} as Partial<ProviderTtsVoiceSelections>);
 }
 
+function extractStoredLocalTtsVoices(
+  storedSettings?: LegacyStoredSettings
+): Partial<LocalTtsVoiceSelections> {
+  if (!storedSettings?.localTtsVoices) {
+    return {};
+  }
+
+  return Object.entries(storedSettings.localTtsVoices).reduce(
+    (accumulator, [language, value]) => {
+      if (typeof value === "string" && value.trim()) {
+        accumulator[language as keyof LocalTtsVoiceSelections] = value.trim();
+      }
+
+      return accumulator;
+    },
+    {} as Partial<LocalTtsVoiceSelections>
+  );
+}
+
 function mergeSettings(
   storedSettings?: LegacyStoredSettings,
   storedApiKeys?: Partial<ProviderApiKeys>
@@ -119,6 +140,12 @@ function mergeSettings(
     storedSettings?.ttsPlayback ??
     DEFAULT_SETTINGS.replyPlayback;
   const language = storedSettings?.language ?? DEFAULT_SETTINGS.language;
+  const storedTtsListenLanguages = Array.isArray(storedSettings?.ttsListenLanguages)
+    ? storedSettings.ttsListenLanguages.filter(
+        (value): value is Settings["ttsListenLanguages"][number] =>
+          typeof value === "string" && value.length > 0
+      )
+    : [];
   const assistantInstructions =
     typeof storedSettings?.assistantInstructions === "string" &&
     storedSettings.assistantInstructions.trim()
@@ -138,6 +165,10 @@ function mergeSettings(
     ...storedSettings,
     language,
     replyPlayback,
+    ttsListenLanguages:
+      storedTtsListenLanguages.length > 0
+        ? storedTtsListenLanguages
+        : getDefaultTtsListenLanguages(language),
     setupGuideDismissed:
       typeof storedSettings?.setupGuideDismissed === "boolean"
         ? storedSettings.setupGuideDismissed
@@ -150,6 +181,10 @@ function mergeSettings(
     providerTtsVoices: {
       ...DEFAULT_SETTINGS.providerTtsVoices,
       ...extractStoredProviderTtsVoices(storedSettings),
+    },
+    localTtsVoices: {
+      ...DEFAULT_SETTINGS.localTtsVoices,
+      ...extractStoredLocalTtsVoices(storedSettings),
     },
     apiKeys: mergedApiKeys,
   };
@@ -216,10 +251,16 @@ export function useSettings() {
         partial.language &&
         partial.assistantInstructions === undefined &&
         isDefaultAssistantInstructions(prev.assistantInstructions);
+      const nextTtsListenLanguages =
+        partial.ttsListenLanguages ??
+        (partial.language && prev.ttsListenLanguages.join("|") === getDefaultTtsListenLanguages(prev.language).join("|")
+          ? getDefaultTtsListenLanguages(nextLanguage)
+          : prev.ttsListenLanguages);
 
       const next = mergeSettings({
         ...prev,
         ...partial,
+        ttsListenLanguages: nextTtsListenLanguages,
         assistantInstructions: shouldRefreshAssistantInstructions
           ? getDefaultAssistantInstructions(nextLanguage)
           : partial.assistantInstructions ?? prev.assistantInstructions,
@@ -259,6 +300,23 @@ export function useSettings() {
     });
   }, []);
 
+  const updateLocalTtsVoice = useCallback(
+    (language: keyof LocalTtsVoiceSelections, value: string) => {
+      setSettings((prev) => {
+        const next = {
+          ...prev,
+          localTtsVoices: {
+            ...prev.localTtsVoices,
+            [language]: value,
+          },
+        };
+        void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toPublicSettings(next)));
+        return next;
+      });
+    },
+    []
+  );
+
   const updateApiKey = useCallback((provider: Provider, value: string) => {
     const nextValue = value.trim();
 
@@ -278,6 +336,7 @@ export function useSettings() {
     updateSettings,
     updateProviderModel,
     updateProviderTtsVoice,
+    updateLocalTtsVoice,
     updateApiKey,
     loaded,
   };

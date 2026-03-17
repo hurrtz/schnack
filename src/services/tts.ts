@@ -1,11 +1,21 @@
 import * as FileSystem from "expo-file-system/legacy";
+import { getTtsListenLanguageLabel } from "../constants/localTts";
 import { PROVIDER_DEFAULT_TTS_VOICES, PROVIDER_LABELS } from "../constants/models";
 import { translate } from "../i18n";
-import { AppLanguage, Provider, VoiceBackendMode } from "../types";
+import { synthesizeLocalSpeech } from "./localTts";
+import {
+  AppLanguage,
+  LocalTtsVoiceSelections,
+  Provider,
+  TtsBackendMode,
+  TtsListenLanguage,
+} from "../types";
 import { getTogetherTtsLanguageCode } from "../utils/speechLanguage";
+import { resolveTtsListenLanguage, supportsLocalTtsLanguage } from "../utils/ttsRouting";
 
 let ttsCounter = 0;
 export const PROVIDER_TTS_MAX_INPUT_CHARS = 3500;
+export const LOCAL_TTS_MAX_INPUT_CHARS = 420;
 export const PROVIDER_TTS_TIMEOUT_MS = 15000;
 export const PROVIDER_TTS_TIMEOUT_MS_PER_CHAR = 10;
 export const PROVIDER_TTS_MAX_TIMEOUT_MS = 60000;
@@ -472,21 +482,142 @@ async function fetchWithTimeout(
 export async function synthesizeSpeech(params: {
   text: string;
   voice: string;
-  mode: VoiceBackendMode;
+  mode: TtsBackendMode;
   provider?: Provider | null;
   apiKey?: string;
   language: AppLanguage;
+  listenLanguages?: TtsListenLanguage[];
+  localVoices?: LocalTtsVoiceSelections;
 }): Promise<string> {
-  const { text, voice, mode, provider, apiKey, language } = params;
+  const {
+    text,
+    voice,
+    mode,
+    provider,
+    apiKey,
+    language,
+    listenLanguages,
+    localVoices,
+  } = params;
 
   if (mode === "native") {
     throw new Error(translate(language, "nativeTtsDoesNotSynthesizeAudioFiles"));
+  }
+
+  if (mode === "local") {
+    const resolvedLanguage = resolveTtsListenLanguage({
+      text,
+      preferredLanguages: listenLanguages,
+      appLanguage: language,
+    });
+    const localVoice = localVoices?.[resolvedLanguage] || "";
+
+    if (supportsLocalTtsLanguage(resolvedLanguage) && localVoice) {
+      try {
+        return await synthesizeLocalSpeech({
+          text,
+          language: resolvedLanguage,
+          voice: localVoice,
+        });
+      } catch (error) {
+        if (!provider || !apiKey?.trim()) {
+          throw error;
+        }
+      }
+    }
+
+    if (provider && apiKey?.trim()) {
+      return synthesizeProviderSpeech({
+        text,
+        voice,
+        provider,
+        apiKey,
+        language,
+      });
+    }
+
+    throw new Error(
+      translate(language, "localTtsUnavailableForLanguage", {
+        languageLabel: getTtsListenLanguageLabel(resolvedLanguage, language),
+      })
+    );
   }
 
   if (!provider) {
     throw new Error(translate(language, "chooseTextToSpeechProviderInSettings"));
   }
 
+  return synthesizeProviderSpeech({
+    text,
+    voice,
+    provider,
+    apiKey,
+    language,
+  });
+}
+
+export async function synthesizeSpeechSequence(params: {
+  text: string;
+  voice: string;
+  mode: TtsBackendMode;
+  provider?: Provider | null;
+  apiKey?: string;
+  language: AppLanguage;
+  listenLanguages?: TtsListenLanguage[];
+  localVoices?: LocalTtsVoiceSelections;
+}) {
+  if (params.mode !== "provider") {
+    const maxChars =
+      params.mode === "local"
+        ? LOCAL_TTS_MAX_INPUT_CHARS
+        : PROVIDER_TTS_MAX_INPUT_CHARS;
+    const segments = splitTextForTts(params.text, maxChars);
+
+    if (segments.length === 0) {
+      return [];
+    }
+
+    const audioFiles: string[] = [];
+
+    for (const segment of segments) {
+      audioFiles.push(
+        await synthesizeSpeech({
+          ...params,
+          text: segment,
+        })
+      );
+    }
+
+    return audioFiles;
+  }
+
+  const segments = splitTextForTts(params.text, PROVIDER_TTS_MAX_INPUT_CHARS);
+
+  if (segments.length === 0) {
+    return [];
+  }
+
+  const audioFiles: string[] = [];
+
+  for (const segment of segments) {
+    const audioFile = await synthesizeSpeech({
+      ...params,
+      text: segment,
+    });
+    audioFiles.push(audioFile);
+  }
+
+  return audioFiles;
+}
+
+async function synthesizeProviderSpeech(params: {
+  text: string;
+  voice: string;
+  provider: Provider;
+  apiKey?: string;
+  language: AppLanguage;
+}) {
+  const { text, voice, provider, apiKey, language } = params;
   const config = TTS_PROVIDER_CONFIGS[provider];
   const timeoutMs = getProviderTtsTimeoutMs(text);
 
@@ -505,32 +636,32 @@ export async function synthesizeSpeech(params: {
     const response = await fetchWithTimeout(
       config.endpoint,
       {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": requireProviderKey(provider, apiKey, language),
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: `Read the following text aloud exactly as written without adding or removing words:\n\n${text}`,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: selectedVoice,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": requireProviderKey(provider, apiKey, language),
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `Read the following text aloud exactly as written without adding or removing words:\n\n${text}`,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseModalities: ["AUDIO"],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: selectedVoice,
+                },
               },
             },
           },
-        },
-      }),
+        }),
       },
       timeoutMs,
       () => createTtsTimeoutError({ provider, language })
@@ -559,8 +690,7 @@ export async function synthesizeSpeech(params: {
     }
 
     const mimeType = audioPart?.mimeType as string | undefined;
-    const sampleRate =
-      Number(mimeType?.match(/rate=(\d+)/i)?.[1]) || 24000;
+    const sampleRate = Number(mimeType?.match(/rate=(\d+)/i)?.[1]) || 24000;
     const wavBase64 = buildWavBase64FromPcm({
       pcmBase64,
       sampleRate,
@@ -600,12 +730,12 @@ export async function synthesizeSpeech(params: {
   const response = await fetchWithTimeout(
     config.endpoint,
     {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${requireProviderKey(provider, apiKey, language)}`,
-    },
-    body: JSON.stringify(requestBody),
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${requireProviderKey(provider, apiKey, language)}`,
+      },
+      body: JSON.stringify(requestBody),
     },
     timeoutMs,
     () => createTtsTimeoutError({ provider, language })
@@ -624,35 +754,4 @@ export async function synthesizeSpeech(params: {
   const blob = await response.blob();
   const base64 = await blobToBase64(blob);
   return writeBase64AudioFile(base64, "mp3");
-}
-
-export async function synthesizeSpeechSequence(params: {
-  text: string;
-  voice: string;
-  mode: VoiceBackendMode;
-  provider?: Provider | null;
-  apiKey?: string;
-  language: AppLanguage;
-}) {
-  if (params.mode !== "provider") {
-    return [await synthesizeSpeech(params)];
-  }
-
-  const segments = splitTextForTts(params.text, PROVIDER_TTS_MAX_INPUT_CHARS);
-
-  if (segments.length === 0) {
-    return [];
-  }
-
-  const audioFiles: string[] = [];
-
-  for (const segment of segments) {
-    const audioFile = await synthesizeSpeech({
-      ...params,
-      text: segment,
-    });
-    audioFiles.push(audioFile);
-  }
-
-  return audioFiles;
 }

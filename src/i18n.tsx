@@ -124,6 +124,9 @@ const translations = {
     textToSpeech: "Text to Speech",
     nativeTtsDescription:
       "Use the device speech engine for spoken replies and voice preview.",
+    localTts: "Local",
+    localTtsDescription:
+      "Use downloaded on-device voice packs first, then fall back to cloud TTS or the system voice.",
     providerTtsDescription:
       "Use a configured provider for spoken replies and preview.",
     ttsProvider: "TTS Provider",
@@ -131,14 +134,37 @@ const translations = {
       "Only enabled providers with spoken-reply support appear here.",
     ttsProviderMissingHint:
       "Enable a provider with TTS support in the Providers tab to choose it here.",
+    localTtsCloudFallbackHint:
+      "Local packs are tried first. If a selected language is missing locally, this provider handles the fallback.",
+    localTtsNativeFallbackHint:
+      "Local packs are tried first. If a selected language is missing locally, the system voice handles the fallback.",
     nativeTtsHint:
       "Native TTS uses the system voice stack and does not require a provider key.",
+    localTtsLanguageCoverageHint:
+      "Local packs currently cover English and German. Other selected languages fall back automatically.",
     ttsVoice: "TTS Voice",
     voiceSelection: "Voice Selection",
     nativeVoiceSelectionHint:
       "Native playback uses the device voice chosen by the operating system.",
+    localTtsVoiceSelectionHint: ({ languageLabel }) =>
+      `Local playback currently uses the installed ${languageLabel} voice pack.`,
     providerDefaultVoiceHint:
       "This provider currently uses its default voice for preview and spoken replies.",
+    listenLanguages: "Listen Languages",
+    listenLanguagesHint:
+      "Pick the reply languages you want to sound good. SchnackAI tries them in this order when routing speech output.",
+    localVoicePacks: "Local Voice Packs",
+    localVoicePacksHint:
+      "Install only the language packs you actually care about to keep storage and download time under control.",
+    localTtsPackReady: "Installed on this device.",
+    localTtsPackMissing:
+      "Not installed yet. Cloud TTS or the system voice will be used until you download it.",
+    localTtsUnsupportedLanguageFallback:
+      "A local pack is not available yet for this language. Cloud TTS or the system voice will handle it.",
+    downloadingLocalTtsPack: ({ progress }) =>
+      `Downloading local pack... ${progress}%`,
+    download: "Download",
+    downloadingShort: "Loading...",
     voicePreviewText: "Voice Preview Text",
     voicePreviewPlaceholder: "Type a phrase to hear this voice.",
     voicePreviewHint:
@@ -184,6 +210,14 @@ const translations = {
       "Provider voice failed. Switched this reply to the system voice.",
     providerVoicePreviewFallback:
       "Provider voice failed. Preview switched to the system voice.",
+    localVoiceFallback:
+      "Local voice was unavailable. Switched this reply to the best fallback voice.",
+    localVoicePreviewFallback:
+      "Local voice was unavailable. Preview switched to the best fallback voice.",
+    localTtsPackInstalled: ({ languageLabel }) =>
+      `${languageLabel} local voice pack installed.`,
+    localTtsPackInstallFailed:
+      "Couldn't install the local voice pack.",
     liveInput: "Live Input",
     parsingInput: "Parsing Input",
     awaitingModel: "Awaiting Model",
@@ -313,6 +347,8 @@ const translations = {
     noBase64DecoderAvailable: "No base64 decoder available.",
     nativeTtsDoesNotSynthesizeAudioFiles:
       "Native TTS does not synthesize audio files.",
+    localTtsUnavailableForLanguage: ({ languageLabel }) =>
+      `No local or cloud voice route is ready for ${languageLabel}.`,
     chooseTextToSpeechProviderInSettings:
       "Choose a text-to-speech provider in Settings.",
     ttsNotSupportedYet: ({ provider }) => `${provider} TTS is not supported yet.`,
@@ -469,6 +505,9 @@ const translations = {
     textToSpeech: "Text zu Sprache",
     nativeTtsDescription:
       "Verwende die Sprachengine des Geraets fuer gesprochene Antworten und die Stimmvorschau.",
+    localTts: "Lokal",
+    localTtsDescription:
+      "Verwende zuerst heruntergeladene Sprachpakete auf dem Geraet und falle dann auf Cloud-TTS oder die Systemstimme zurueck.",
     providerTtsDescription:
       "Verwende einen konfigurierten Anbieter fuer gesprochene Antworten und Vorschau.",
     ttsProvider: "TTS-Anbieter",
@@ -476,14 +515,37 @@ const translations = {
       "Hier erscheinen nur aktivierte Anbieter mit Sprachausgabe-Unterstuetzung.",
     ttsProviderMissingHint:
       "Aktiviere im Tab Anbieter einen Dienst mit TTS-Unterstuetzung, um ihn hier auszuwaehlen.",
+    localTtsCloudFallbackHint:
+      "Lokale Sprachpakete werden zuerst genutzt. Fehlt eine Sprache lokal, uebernimmt dieser Anbieter den Fallback.",
+    localTtsNativeFallbackHint:
+      "Lokale Sprachpakete werden zuerst genutzt. Fehlt eine Sprache lokal, uebernimmt die Systemstimme den Fallback.",
     nativeTtsHint:
       "Native TTS nutzt die Systemstimmen des Geraets und benoetigt keinen Anbieter-Schluessel.",
+    localTtsLanguageCoverageHint:
+      "Lokale Sprachpakete decken aktuell Englisch und Deutsch ab. Andere ausgewaehlte Sprachen fallen automatisch zurueck.",
     ttsVoice: "TTS-Stimme",
     voiceSelection: "Stimmenauswahl",
     nativeVoiceSelectionHint:
       "Native Wiedergabe nutzt die vom Betriebssystem ausgewaehlte Geraetestimme.",
+    localTtsVoiceSelectionHint: ({ languageLabel }) =>
+      `Lokale Wiedergabe nutzt aktuell das installierte ${languageLabel}-Sprachpaket.`,
     providerDefaultVoiceHint:
       "Dieser Anbieter nutzt aktuell seine Standardstimme fuer Vorschau und Sprachausgabe.",
+    listenLanguages: "Sprachen zum Hoeren",
+    listenLanguagesHint:
+      "Waehle die Antwortsprachen aus, die gut klingen sollen. SchnackAI probiert sie in dieser Reihenfolge fuer die Sprachausgabe.",
+    localVoicePacks: "Lokale Sprachpakete",
+    localVoicePacksHint:
+      "Installiere nur die Sprachpakete, die dir wirklich wichtig sind, damit Speicher und Downloadzeit klein bleiben.",
+    localTtsPackReady: "Auf diesem Geraet installiert.",
+    localTtsPackMissing:
+      "Noch nicht installiert. Bis zum Download werden Cloud-TTS oder die Systemstimme genutzt.",
+    localTtsUnsupportedLanguageFallback:
+      "Fuer diese Sprache gibt es lokal noch kein Paket. Cloud-TTS oder die Systemstimme uebernehmen.",
+    downloadingLocalTtsPack: ({ progress }) =>
+      `Lokales Paket wird geladen... ${progress}%`,
+    download: "Download",
+    downloadingShort: "Laedt...",
     voicePreviewText: "Text fuer Stimmvorschau",
     voicePreviewPlaceholder:
       "Gib einen Satz ein, um diese Stimme zu hoeren.",
@@ -532,6 +594,14 @@ const translations = {
       "Die Anbieter-Stimme ist ausgefallen. Diese Antwort wird mit der Systemstimme abgespielt.",
     providerVoicePreviewFallback:
       "Die Anbieter-Stimme ist ausgefallen. Die Vorschau nutzt jetzt die Systemstimme.",
+    localVoiceFallback:
+      "Die lokale Stimme war nicht verfuegbar. Diese Antwort nutzt jetzt die beste verfuegbare Ersatzstimme.",
+    localVoicePreviewFallback:
+      "Die lokale Stimme war nicht verfuegbar. Die Vorschau nutzt jetzt die beste verfuegbare Ersatzstimme.",
+    localTtsPackInstalled: ({ languageLabel }) =>
+      `Lokales Sprachpaket fuer ${languageLabel} installiert.`,
+    localTtsPackInstallFailed:
+      "Das lokale Sprachpaket konnte nicht installiert werden.",
     liveInput: "Live-Eingabe",
     parsingInput: "Eingabe wird verarbeitet",
     awaitingModel: "Modell wartet",
@@ -664,6 +734,8 @@ const translations = {
     noBase64DecoderAvailable: "Kein Base64-Decoder verfuegbar.",
     nativeTtsDoesNotSynthesizeAudioFiles:
       "Native TTS erzeugt keine Audiodateien.",
+    localTtsUnavailableForLanguage: ({ languageLabel }) =>
+      `Fuer ${languageLabel} ist aktuell weder lokal noch in der Cloud eine Sprachroute bereit.`,
     chooseTextToSpeechProviderInSettings:
       "Waehle in den Einstellungen einen Text-zu-Sprache-Anbieter.",
     ttsNotSupportedYet: ({ provider }) =>

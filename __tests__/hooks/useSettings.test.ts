@@ -186,6 +186,38 @@ describe("useSettings", () => {
     expect(result.current.settings.providerTtsVoices.gemini).toBe("Aoede");
   });
 
+  it("persists local TTS voice selections", async () => {
+    const { result } = renderHook(() => useSettings());
+    await flushSettingsLoad();
+
+    await act(async () => {
+      result.current.updateLocalTtsVoice("en", "af_bella");
+    });
+
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      "@schnackai/settings",
+      expect.stringContaining('"en":"af_bella"')
+    );
+    expect(result.current.settings.localTtsVoices.en).toBe("af_bella");
+  });
+
+  it("migrates blank stored German local voices to the new default", async () => {
+    const stored = {
+      ...DEFAULT_SETTINGS,
+      localTtsVoices: {
+        ...DEFAULT_SETTINGS.localTtsVoices,
+        de: "",
+      },
+    };
+
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify(stored));
+
+    const { result } = renderHook(() => useSettings());
+    await flushSettingsLoad();
+
+    expect(result.current.settings.localTtsVoices.de).toBe("thorsten-medium");
+  });
+
   it("persists provider api keys in SecureStore", async () => {
     const { result } = renderHook(() => useSettings());
     await flushSettingsLoad();

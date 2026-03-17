@@ -1,6 +1,7 @@
 import { transcribeAudio } from "./whisper";
 import { streamChat, summarizeConversationContext } from "./llm";
 import {
+  LOCAL_TTS_MAX_INPUT_CHARS,
   PROVIDER_TTS_MAX_INPUT_CHARS,
   splitTextForTts,
   synthesizeSpeech,
@@ -10,10 +11,13 @@ import {
   AppLanguage,
   AssistantResponseLength,
   AssistantResponseTone,
+  LocalTtsVoiceSelections,
   Message,
   Provider,
   ReplyPlayback,
-  VoiceBackendMode,
+  SttBackendMode,
+  TtsBackendMode,
+  TtsListenLanguage,
 } from "../types";
 
 export function splitIntoSentences(text: string): string[] {
@@ -71,13 +75,15 @@ export async function runVoicePipeline(params: {
   model: string;
   provider: Provider;
   providerApiKey: string;
-  sttMode: VoiceBackendMode;
+  sttMode: SttBackendMode;
   sttProvider?: Provider | null;
   sttApiKey?: string;
-  ttsMode: VoiceBackendMode;
+  ttsMode: TtsBackendMode;
   ttsProvider?: Provider | null;
   ttsApiKey?: string;
   ttsVoice: string;
+  ttsListenLanguages?: TtsListenLanguage[];
+  localTtsVoices?: LocalTtsVoiceSelections;
   replyPlayback: ReplyPlayback;
   contextSummary?: string;
   summarizedMessageCount?: number;
@@ -102,6 +108,8 @@ export async function runVoicePipeline(params: {
     ttsProvider,
     ttsApiKey,
     ttsVoice,
+    ttsListenLanguages,
+    localTtsVoices,
     replyPlayback,
     contextSummary,
     summarizedMessageCount,
@@ -212,6 +220,8 @@ export async function runVoicePipeline(params: {
           provider: ttsProvider,
           apiKey: ttsApiKey,
           language,
+          listenLanguages: ttsListenLanguages,
+          localVoices: localTtsVoices,
         });
 
         if (!abortSignal?.aborted) {
@@ -236,12 +246,17 @@ export async function runVoicePipeline(params: {
   };
 
   const enqueueTts = (text: string) => {
-    if (ttsMode !== "provider") {
+    if (ttsMode === "native") {
       enqueueTtsChunk(text);
       return;
     }
 
-    const segments = splitTextForTts(text, PROVIDER_TTS_MAX_INPUT_CHARS);
+    const segments = splitTextForTts(
+      text,
+      ttsMode === "local"
+        ? LOCAL_TTS_MAX_INPUT_CHARS
+        : PROVIDER_TTS_MAX_INPUT_CHARS
+    );
 
     if (segments.length === 0) {
       return;

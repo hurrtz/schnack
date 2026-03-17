@@ -1,3 +1,5 @@
+import { LOCAL_TTS_DEFAULT_VOICES } from "./constants/localTts";
+
 export type Provider =
   | "openai"
   | "anthropic"
@@ -14,7 +16,9 @@ export type ReplyPlayback = "stream" | "wait";
 export type TtsPlayback = ReplyPlayback;
 export type ThemeMode = "light" | "dark" | "system";
 export type AppLanguage = "en" | "de";
-export type VoiceBackendMode = "native" | "provider";
+export type TtsListenLanguage = "en" | "de" | "es" | "fr" | "it" | "pt" | "ja";
+export type SttBackendMode = "native" | "provider";
+export type TtsBackendMode = "native" | "provider" | "local";
 export type AssistantResponseLength = "brief" | "normal" | "thorough";
 export type AssistantResponseTone =
   | "professional"
@@ -26,6 +30,7 @@ export type AssistantResponseTone =
 export type ProviderApiKeys = Record<Provider, string>;
 export type ProviderModelSelections = Record<Provider, string>;
 export type ProviderTtsVoiceSelections = Record<Provider, string>;
+export type LocalTtsVoiceSelections = Record<TtsListenLanguage, string>;
 export type VoiceVisualPhase =
   | "idle"
   | "recording"
@@ -42,10 +47,12 @@ export interface Settings {
   theme: ThemeMode;
   setupGuideDismissed: boolean;
   lastProvider: Provider;
-  sttMode: VoiceBackendMode;
+  sttMode: SttBackendMode;
   sttProvider: Provider | null;
-  ttsMode: VoiceBackendMode;
+  ttsMode: TtsBackendMode;
   ttsProvider: Provider | null;
+  ttsListenLanguages: TtsListenLanguage[];
+  localTtsVoices: LocalTtsVoiceSelections;
   assistantInstructions: string;
   responseLength: AssistantResponseLength;
   responseTone: AssistantResponseTone;
@@ -68,6 +75,12 @@ export function getDefaultAssistantInstructions(language: AppLanguage) {
 
 export function isDefaultAssistantInstructions(value: string) {
   return Object.values(DEFAULT_ASSISTANT_INSTRUCTIONS_BY_LANGUAGE).includes(value);
+}
+
+export function getDefaultTtsListenLanguages(
+  language: AppLanguage
+): TtsListenLanguage[] {
+  return [language];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -105,6 +118,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sttProvider: "openai",
   ttsMode: "provider",
   ttsProvider: "openai",
+  ttsListenLanguages: getDefaultTtsListenLanguages("en"),
+  localTtsVoices: LOCAL_TTS_DEFAULT_VOICES,
   assistantInstructions: getDefaultAssistantInstructions("en"),
   responseLength: "normal",
   responseTone: "professional",

@@ -22,6 +22,12 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  getLocalTtsVoiceOptions,
+  getTtsListenLanguageLabel,
+  LOCAL_TTS_SUPPORTED_LANGUAGES,
+  TTS_LISTEN_LANGUAGE_OPTIONS,
+} from "../constants/localTts";
+import {
   PROVIDER_DEFAULT_TTS_VOICES,
   PROVIDER_API_KEY_URLS,
   PROVIDER_LABELS,
@@ -41,11 +47,14 @@ import {
   AssistantResponseLength,
   AssistantResponseTone,
   InputMode,
+  LocalTtsVoiceSelections,
   Provider,
   ReplyPlayback,
   Settings,
   ThemeMode,
-  VoiceBackendMode,
+  SttBackendMode,
+  TtsBackendMode,
+  TtsListenLanguage,
 } from "../types";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
@@ -60,7 +69,23 @@ interface SettingsModalProps {
   onUpdate: (partial: Partial<Omit<Settings, "apiKeys" | "providerModels">>) => void;
   onUpdateProviderModel: (provider: Provider, model: string) => void;
   onUpdateProviderTtsVoice: (provider: Provider, voice: string) => void;
+  onUpdateLocalTtsVoice: (
+    language: keyof LocalTtsVoiceSelections,
+    voice: string
+  ) => void;
   onUpdateApiKey: (provider: Provider, apiKey: string) => void;
+  localTtsPackStates: Partial<
+    Record<
+      TtsListenLanguage,
+      {
+        supported: boolean;
+        installed: boolean;
+        downloading: boolean;
+        progress: number;
+      }
+    >
+  >;
+  onInstallLocalTtsLanguagePack: (language: TtsListenLanguage) => Promise<void>;
   onPreviewVoice: (text: string) => Promise<void>;
   onValidateProvider: (provider: Provider) => Promise<void>;
   onClose: () => void;
@@ -890,8 +915,12 @@ function TtsPreviewSection({
   ttsProvider,
   voiceOptions,
   selectedVoice,
+  localVoiceOptions,
+  selectedLocalVoice,
+  selectedListenLanguage,
   settings,
   onUpdateProviderTtsVoice,
+  onUpdateLocalTtsVoice,
   onTextInputFocus,
 }: {
   previewText: string;
@@ -901,14 +930,23 @@ function TtsPreviewSection({
   ttsProvider: Provider | null;
   voiceOptions: { value: string; label: string }[];
   selectedVoice: string;
+  localVoiceOptions: { value: string; label: string }[];
+  selectedLocalVoice: string;
+  selectedListenLanguage: TtsListenLanguage;
   settings: Settings;
   onUpdateProviderTtsVoice: (provider: Provider, voice: string) => void;
+  onUpdateLocalTtsVoice: (
+    language: keyof LocalTtsVoiceSelections,
+    voice: string
+  ) => void;
   onTextInputFocus: TextInputFocusHandler;
 }) {
   const { colors } = useTheme();
-  const { t } = useLocalization();
+  const { t, language } = useLocalization();
   const canPickProviderVoice =
     settings.ttsMode === "provider" && !!ttsProvider && voiceOptions.length > 0;
+  const canPickLocalVoice =
+    settings.ttsMode === "local" && localVoiceOptions.length > 0;
 
   return (
     <PickerSection>
@@ -918,6 +956,15 @@ function TtsPreviewSection({
           value={selectedVoice}
           options={voiceOptions}
           onChange={(value) => onUpdateProviderTtsVoice(ttsProvider!, value)}
+        />
+      ) : canPickLocalVoice ? (
+        <Picker
+          label={t("ttsVoice")}
+          value={selectedLocalVoice}
+          options={localVoiceOptions}
+          onChange={(value) =>
+            onUpdateLocalTtsVoice(selectedListenLanguage, value)
+          }
         />
       ) : (
         <View
@@ -937,6 +984,13 @@ function TtsPreviewSection({
           <Text style={[styles.previewHint, { color: colors.textMuted, marginTop: 0 }]}>
             {settings.ttsMode === "native"
               ? t("nativeVoiceSelectionHint")
+              : settings.ttsMode === "local"
+                ? t("localTtsVoiceSelectionHint", {
+                    languageLabel: getTtsListenLanguageLabel(
+                      selectedListenLanguage,
+                      language
+                    ),
+                  })
               : t("providerDefaultVoiceHint")}
           </Text>
         </View>
@@ -1007,6 +1061,159 @@ function TtsPreviewSection({
   );
 }
 
+function ListenLanguageSelector({
+  selectedLanguages,
+  onToggleLanguage,
+}: {
+  selectedLanguages: TtsListenLanguage[];
+  onToggleLanguage: (language: TtsListenLanguage) => void;
+}) {
+  const { colors } = useTheme();
+  const { t, language } = useLocalization();
+
+  return (
+    <PickerSection>
+      <Text style={[styles.groupLabel, { color: colors.textSecondary }]}>
+        {t("listenLanguages")}
+      </Text>
+      <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+        {t("listenLanguagesHint")}
+      </Text>
+      <View style={styles.languageChipRow}>
+        {TTS_LISTEN_LANGUAGE_OPTIONS.map((entry) => {
+          const selected = selectedLanguages.includes(entry);
+
+          return (
+            <Pressable
+              key={entry}
+              onPress={() => onToggleLanguage(entry)}
+              style={[
+                styles.languageChip,
+                {
+                  backgroundColor: selected ? colors.accentSoft : colors.surface,
+                  borderColor: selected ? colors.accent : colors.border,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.languageChipText,
+                  { color: selected ? colors.accent : colors.textSecondary },
+                ]}
+              >
+                {getTtsListenLanguageLabel(entry, language)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </PickerSection>
+  );
+}
+
+function LocalPackSection({
+  settings,
+  packStates,
+  onInstallLocalTtsLanguagePack,
+}: {
+  settings: Settings;
+  packStates: Partial<
+    Record<
+      TtsListenLanguage,
+      {
+        supported: boolean;
+        installed: boolean;
+        downloading: boolean;
+        progress: number;
+      }
+    >
+  >;
+  onInstallLocalTtsLanguagePack: (language: TtsListenLanguage) => Promise<void>;
+}) {
+  const { colors } = useTheme();
+  const { t, language } = useLocalization();
+
+  return (
+    <PickerSection>
+      <Text style={[styles.groupLabel, { color: colors.textSecondary }]}>
+        {t("localVoicePacks")}
+      </Text>
+      <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+        {t("localVoicePacksHint")}
+      </Text>
+
+      {settings.ttsListenLanguages.map((entry) => {
+        const state = packStates[entry];
+        const supported = state?.supported ?? LOCAL_TTS_SUPPORTED_LANGUAGES.includes(entry);
+        const installed = state?.installed ?? false;
+        const downloading = state?.downloading ?? false;
+        const progress = state?.progress ?? 0;
+
+        return (
+          <View
+            key={entry}
+            style={[
+              styles.localPackCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={styles.localPackHeader}>
+              <View style={styles.localPackCopy}>
+                <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
+                  {getTtsListenLanguageLabel(entry, language)}
+                </Text>
+                <Text style={[styles.previewHint, { color: colors.textMuted, marginTop: 4 }]}>
+                  {supported
+                    ? installed
+                      ? t("localTtsPackReady")
+                      : downloading
+                        ? t("downloadingLocalTtsPack", {
+                            progress: `${Math.round(progress * 100)}`,
+                          })
+                        : t("localTtsPackMissing")
+                    : t("localTtsUnsupportedLanguageFallback")}
+                </Text>
+              </View>
+
+              {supported && !installed ? (
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => {
+                    void onInstallLocalTtsLanguagePack(entry);
+                  }}
+                  disabled={downloading}
+                >
+                  <LinearGradient
+                    colors={[colors.accentGradientStart, colors.accentGradientEnd]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[
+                      styles.localPackButton,
+                      downloading ? styles.previewButtonDisabled : null,
+                    ]}
+                  >
+                    <Feather
+                      name={downloading ? "loader" : "download-cloud"}
+                      size={16}
+                      color="#F4F8FF"
+                    />
+                    <Text style={styles.localPackButtonText}>
+                      {downloading ? t("downloadingShort") : t("download")}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+        );
+      })}
+    </PickerSection>
+  );
+}
+
 function renderProviderPickerOptions(providers: Provider[]) {
   return providers.map((provider) => ({
     value: provider,
@@ -1021,7 +1228,10 @@ export function SettingsModal({
   onUpdate,
   onUpdateProviderModel,
   onUpdateProviderTtsVoice,
+  onUpdateLocalTtsVoice,
   onUpdateApiKey,
+  localTtsPackStates,
+  onInstallLocalTtsLanguagePack,
   onPreviewVoice,
   onValidateProvider,
   onClose,
@@ -1097,7 +1307,7 @@ export function SettingsModal({
   }, [enabledSttProviders, onUpdate, settings.sttMode, settings.sttProvider, visible]);
 
   useEffect(() => {
-    if (!visible || settings.ttsMode !== "provider") {
+    if (!visible || settings.ttsMode === "native") {
       return;
     }
 
@@ -1112,7 +1322,7 @@ export function SettingsModal({
   }, [enabledTtsProviders, onUpdate, settings.ttsMode, settings.ttsProvider, visible]);
 
   useEffect(() => {
-    if (!visible || settings.ttsMode !== "provider" || !settings.ttsProvider) {
+    if (!visible || !settings.ttsProvider) {
       return;
     }
 
@@ -1134,8 +1344,38 @@ export function SettingsModal({
     language,
     onUpdateProviderTtsVoice,
     settings.providerTtsVoices,
-    settings.ttsMode,
     settings.ttsProvider,
+    visible,
+  ]);
+
+  const currentLocalVoiceLanguage =
+    settings.ttsListenLanguages.find(
+      (entry) => getLocalTtsVoiceOptions(entry).length > 0
+    ) ?? settings.ttsListenLanguages[0] ?? "en";
+  const localVoiceOptions = getLocalTtsVoiceOptions(currentLocalVoiceLanguage);
+  const selectedLocalVoice =
+    settings.localTtsVoices[currentLocalVoiceLanguage] ||
+    localVoiceOptions[0]?.value ||
+    "";
+
+  useEffect(() => {
+    if (!visible || settings.ttsMode !== "local" || localVoiceOptions.length === 0) {
+      return;
+    }
+
+    const isValid = localVoiceOptions.some(
+      (option) => option.value === settings.localTtsVoices[currentLocalVoiceLanguage]
+    );
+
+    if (!isValid) {
+      onUpdateLocalTtsVoice(currentLocalVoiceLanguage, localVoiceOptions[0].value);
+    }
+  }, [
+    currentLocalVoiceLanguage,
+    localVoiceOptions,
+    onUpdateLocalTtsVoice,
+    settings.localTtsVoices,
+    settings.ttsMode,
     visible,
   ]);
 
@@ -1234,7 +1474,7 @@ export function SettingsModal({
   const providerPickerDisabled =
     settings.sttMode !== "provider" || enabledSttProviders.length === 0;
   const ttsProviderPickerDisabled =
-    settings.ttsMode !== "provider" || enabledTtsProviders.length === 0;
+    settings.ttsMode === "native" || enabledTtsProviders.length === 0;
   const sttLanguageNote =
     settings.sttMode === "native"
       ? getNativeSttLanguageNote(language)
@@ -1244,6 +1484,8 @@ export function SettingsModal({
   const ttsLanguageNote =
     settings.ttsMode === "native"
       ? getNativeTtsLanguageNote(language)
+      : settings.ttsMode === "local"
+        ? t("localTtsLanguageCoverageHint")
       : settings.ttsProvider
         ? getProviderTtsLanguageNote(settings.ttsProvider, language)
         : null;
@@ -1261,6 +1503,19 @@ export function SettingsModal({
       : currentTtsProvider
         ? PROVIDER_DEFAULT_TTS_VOICES[currentTtsProvider] ?? ""
         : "";
+  const toggleListenLanguage = (value: TtsListenLanguage) => {
+    const exists = settings.ttsListenLanguages.includes(value);
+
+    if (exists && settings.ttsListenLanguages.length === 1) {
+      return;
+    }
+
+    onUpdate({
+      ttsListenLanguages: exists
+        ? settings.ttsListenLanguages.filter((entry) => entry !== value)
+        : [...settings.ttsListenLanguages, value],
+    });
+  };
 
   return (
     <Modal visible={visible} transparent animationType="none">
@@ -1408,7 +1663,7 @@ export function SettingsModal({
                   onChange={(value) => onUpdate({ inputMode: value })}
                 />
 
-                <RadioGroup<VoiceBackendMode>
+                <RadioGroup<SttBackendMode>
                   label={t("speechToText")}
                   options={[
                     {
@@ -1472,13 +1727,18 @@ export function SettingsModal({
                   onChange={(value) => onUpdate({ replyPlayback: value })}
                 />
 
-                <RadioGroup<VoiceBackendMode>
+                <RadioGroup<TtsBackendMode>
                   label={t("textToSpeech")}
                   options={[
                     {
                       value: "native",
                       label: t("appNative"),
                       description: t("nativeTtsDescription"),
+                    },
+                    {
+                      value: "local",
+                      label: t("localTts"),
+                      description: t("localTtsDescription"),
                     },
                     {
                       value: "provider",
@@ -1505,6 +1765,10 @@ export function SettingsModal({
                       ? enabledTtsProviders.length > 0
                         ? t("ttsProviderEnabledHint")
                         : t("ttsProviderMissingHint")
+                      : settings.ttsMode === "local"
+                        ? enabledTtsProviders.length > 0
+                          ? t("localTtsCloudFallbackHint")
+                          : t("localTtsNativeFallbackHint")
                       : t("nativeTtsHint")}
                   </Text>
                   {ttsLanguageNote ? (
@@ -1514,6 +1778,20 @@ export function SettingsModal({
                   ) : null}
                 </PickerSection>
 
+                {settings.ttsMode === "local" ? (
+                  <>
+                    <ListenLanguageSelector
+                      selectedLanguages={settings.ttsListenLanguages}
+                      onToggleLanguage={toggleListenLanguage}
+                    />
+                    <LocalPackSection
+                      settings={settings}
+                      packStates={localTtsPackStates}
+                      onInstallLocalTtsLanguagePack={onInstallLocalTtsLanguagePack}
+                    />
+                  </>
+                ) : null}
+
                 <TtsPreviewSection
                   previewText={previewText}
                   setPreviewText={setPreviewText}
@@ -1522,8 +1800,12 @@ export function SettingsModal({
                   ttsProvider={currentTtsProvider}
                   voiceOptions={ttsVoiceOptions}
                   selectedVoice={selectedTtsVoice}
+                  localVoiceOptions={localVoiceOptions}
+                  selectedLocalVoice={selectedLocalVoice}
+                  selectedListenLanguage={currentLocalVoiceLanguage}
                   settings={settings}
                   onUpdateProviderTtsVoice={onUpdateProviderTtsVoice}
+                  onUpdateLocalTtsVoice={onUpdateLocalTtsVoice}
                   onTextInputFocus={handleTextInputFocus}
                 />
               </>
@@ -1910,6 +2192,60 @@ const styles = StyleSheet.create({
   previewButtonText: {
     color: "#F4F8FF",
     fontSize: 14,
+    fontFamily: fonts.display,
+  },
+  groupLabel: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 1.1,
+    marginBottom: 8,
+    fontFamily: fonts.mono,
+  },
+  languageChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 10,
+  },
+  languageChip: {
+    minHeight: 38,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  languageChipText: {
+    fontSize: 13,
+    fontFamily: fonts.display,
+  },
+  localPackCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    marginTop: 10,
+  },
+  localPackHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  localPackCopy: {
+    flex: 1,
+  },
+  localPackButton: {
+    minHeight: 42,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  localPackButtonText: {
+    color: "#F4F8FF",
+    fontSize: 13,
     fontFamily: fonts.display,
   },
   radioRow: {

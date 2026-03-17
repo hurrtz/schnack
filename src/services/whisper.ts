@@ -5,7 +5,7 @@ import {
   buildProviderHttpError,
   normalizeProviderTransportError,
 } from "./providerErrors";
-import { AppLanguage, Provider, VoiceBackendMode } from "../types";
+import { AppLanguage, Provider, SttBackendMode } from "../types";
 import {
   getDeviceLocale,
   getFileAudioMimeType,
@@ -88,7 +88,7 @@ function extractTextFromGeminiResponse(data: any) {
 
 export async function transcribeAudio(params: {
   fileUri: string;
-  mode: VoiceBackendMode;
+  mode: SttBackendMode;
   provider?: Provider | null;
   apiKey?: string;
   language: AppLanguage;

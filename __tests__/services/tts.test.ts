@@ -9,6 +9,10 @@ import {
 
 global.fetch = jest.fn();
 
+jest.mock("../../src/services/localTts", () => ({
+  synthesizeLocalSpeech: jest.fn(),
+}));
+
 jest.mock("expo-file-system/legacy", () => ({
   cacheDirectory: "/tmp/",
   writeAsStringAsync: jest.fn(() => Promise.resolve()),
@@ -29,6 +33,20 @@ Object.defineProperty(global, "FileReader", {
   value: MockFileReader,
   writable: true,
 });
+
+const { synthesizeLocalSpeech } = jest.requireMock("../../src/services/localTts") as {
+  synthesizeLocalSpeech: jest.Mock;
+};
+
+const localVoices = {
+  en: "af_heart",
+  de: "thorsten-medium",
+  es: "",
+  fr: "",
+  it: "",
+  pt: "",
+  ja: "",
+};
 
 describe("synthesizeSpeech", () => {
   beforeEach(() => {
@@ -136,6 +154,54 @@ describe("synthesizeSpeech", () => {
     expect(
       body.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName
     ).toBe("Aoede");
+  });
+
+  it("uses the German local voice pack before any fallback", async () => {
+    synthesizeLocalSpeech.mockResolvedValueOnce("/tmp/local-de.wav");
+
+    const result = await synthesizeSpeech({
+      text: "Ich glaube, das ist die richtige Antwort.",
+      voice: "alloy",
+      mode: "local",
+      language: "en",
+      listenLanguages: ["en", "de"],
+      localVoices,
+    });
+
+    expect(result).toBe("/tmp/local-de.wav");
+    expect(synthesizeLocalSpeech).toHaveBeenCalledWith({
+      text: "Ich glaube, das ist die richtige Antwort.",
+      language: "de",
+      voice: "thorsten-medium",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("falls back to provider TTS when German local synthesis fails", async () => {
+    synthesizeLocalSpeech.mockRejectedValueOnce(new Error("local failure"));
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(["fake-audio"])),
+    });
+
+    const result = await synthesizeSpeech({
+      text: "Ich glaube, das ist die richtige Antwort.",
+      voice: "alloy",
+      mode: "local",
+      provider: "openai",
+      apiKey: "sk-test",
+      language: "en",
+      listenLanguages: ["de"],
+      localVoices,
+    });
+
+    expect(result).toMatch(/^\/tmp\/tts-/);
+    expect(synthesizeLocalSpeech).toHaveBeenCalledWith({
+      text: "Ich glaube, das ist die richtige Antwort.",
+      language: "de",
+      voice: "thorsten-medium",
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it("calls xAI TTS with provider-specific fields", async () => {

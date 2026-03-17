@@ -23,6 +23,7 @@ import { Toast } from "../components/Toast";
 import { ProviderIcon } from "../components/ProviderIcon";
 import { WaveformBar } from "../components/WaveformBar";
 import { WaveformCircle } from "../components/WaveformCircle";
+import { getTtsListenLanguageLabel } from "../constants/localTts";
 import {
   getTtsVoiceLabel,
   getProviderModelName,
@@ -31,6 +32,7 @@ import {
 } from "../constants/models";
 import { useSharedSettings } from "../context/SettingsContext";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
+import { useLocalTtsPacks } from "../hooks/useLocalTtsPacks";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useNativeSpeechRecognizer } from "../hooks/useNativeSpeechRecognizer";
 import { useConversations } from "../hooks/useConversations";
@@ -40,11 +42,15 @@ import { runVoicePipeline } from "../services/voicePipeline";
 import {
   synthesizeSpeech,
   synthesizeSpeechSequence,
-  TtsRequestError,
 } from "../services/tts";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
-import { Conversation, Provider, VoiceVisualPhase } from "../types";
+import {
+  Conversation,
+  Provider,
+  TtsListenLanguage,
+  VoiceVisualPhase,
+} from "../types";
 import {
   formatConversationForCopy,
 } from "../utils/conversationExport";
@@ -63,6 +69,7 @@ export function MainScreen() {
     updateSettings,
     updateProviderModel,
     updateProviderTtsVoice,
+    updateLocalTtsVoice,
     updateApiKey,
     loaded,
   } = useSharedSettings();
@@ -85,6 +92,7 @@ export function MainScreen() {
   const recorder = useAudioRecorder();
   const nativeStt = useNativeSpeechRecognizer();
   const player = useAudioPlayer();
+  const { packStates: localTtsPackStates, installLanguagePack } = useLocalTtsPacks(settings);
 
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [settingsFocusProvider, setSettingsFocusProvider] = useState<Provider | undefined>();
@@ -118,7 +126,7 @@ export function MainScreen() {
   const availableSttProviders = getEnabledSttProviders(settings);
   const availableTtsProviders = getEnabledTtsProviders(settings);
   const sttProvider = settings.sttMode === "provider" ? settings.sttProvider : null;
-  const ttsProvider = settings.ttsMode === "provider" ? settings.ttsProvider : null;
+  const ttsProvider = settings.ttsProvider;
   const sttApiKey = sttProvider ? settings.apiKeys[sttProvider].trim() : "";
   const ttsApiKey = ttsProvider ? settings.apiKeys[ttsProvider].trim() : "";
   const sttStatusLabel =
@@ -144,6 +152,10 @@ export function MainScreen() {
   const ttsStatusLabel =
     settings.ttsMode === "native"
       ? t("systemVoice")
+      : settings.ttsMode === "local"
+        ? `${t("localTts")} · ${settings.ttsListenLanguages
+            .map((entry) => getTtsListenLanguageLabel(entry, language))
+            .join(", ")}`
       : ttsProvider
         ? `${PROVIDER_LABELS[ttsProvider]} · ${getTtsVoiceLabel(
             ttsProvider,
@@ -177,6 +189,24 @@ export function MainScreen() {
       setToast({ message, onRetry });
     },
     []
+  );
+
+  const handleInstallLocalTtsLanguage = useCallback(
+    async (languageCode: TtsListenLanguage) => {
+      try {
+        await installLanguagePack(languageCode);
+        showToast(
+          t("localTtsPackInstalled", {
+            languageLabel: getTtsListenLanguageLabel(languageCode, language),
+          })
+        );
+      } catch (error) {
+        showToast(
+          error instanceof Error ? error.message : t("localTtsPackInstallFailed")
+        );
+      }
+    },
+    [installLanguagePack, language, showToast, t]
   );
 
   const copyText = useCallback(
@@ -306,7 +336,7 @@ export function MainScreen() {
         return;
       }
 
-      if (!ttsProvider || !ttsApiKey) {
+      if (settings.ttsMode === "provider" && (!ttsProvider || !ttsApiKey)) {
         showToast(t("chooseTtsBeforeSpokenReplies"));
         return;
       }
@@ -318,13 +348,15 @@ export function MainScreen() {
         provider: ttsProvider,
         apiKey: ttsApiKey,
         language,
-      }).catch(async (error) => {
-        if (!(error instanceof TtsRequestError)) {
-          throw error;
-        }
-
+        listenLanguages: settings.ttsListenLanguages,
+        localVoices: settings.localTtsVoices,
+      }).catch(async () => {
         player.speakText(trimmed);
-        showToast(t("providerVoiceFallback"));
+        showToast(
+          settings.ttsMode === "local"
+            ? t("localVoiceFallback")
+            : t("providerVoiceFallback")
+        );
         return null;
       });
 
@@ -339,6 +371,8 @@ export function MainScreen() {
     [
       player,
       settings.ttsMode,
+      settings.ttsListenLanguages,
+      settings.localTtsVoices,
       selectedTtsVoice,
       showToast,
       t,
@@ -534,6 +568,8 @@ export function MainScreen() {
           ttsProvider,
           ttsApiKey,
           ttsVoice: selectedTtsVoice,
+          ttsListenLanguages: settings.ttsListenLanguages,
+          localTtsVoices: settings.localTtsVoices,
           replyPlayback: settings.replyPlayback,
           assistantInstructions: settings.assistantInstructions,
           responseLength: settings.responseLength,
@@ -565,7 +601,7 @@ export function MainScreen() {
             onResponseDone: (fullText) => {
               setStreamingText("");
               setPipelinePhase(
-                settings.ttsMode === "provider" ? "synthesizing" : "idle"
+                settings.ttsMode === "native" ? "idle" : "synthesizing"
               );
               lastCompletedReplyRef.current = fullText;
               addMessage({
@@ -587,22 +623,24 @@ export function MainScreen() {
               }
 
               ttsFallbackToastShownRef.current = true;
-              showToast(t("providerVoiceFallback"));
+              showToast(
+                settings.ttsMode === "local"
+                  ? t("localVoiceFallback")
+                  : t("providerVoiceFallback")
+              );
             },
             onError: (error) => {
               setPipelinePhase("idle");
-              const retryAction =
-                error instanceof TtsRequestError &&
-                lastCompletedReplyRef.current.trim()
-                  ? () => {
-                      void handleRepeatLastReply(lastCompletedReplyRef.current);
-                    }
-                  : () => {
-                      void handleVoiceCaptureDone({
-                        audioUri,
-                        transcriptionOverride,
-                      });
-                    };
+              const retryAction = lastCompletedReplyRef.current.trim()
+                ? () => {
+                    void handleRepeatLastReply(lastCompletedReplyRef.current);
+                  }
+                : () => {
+                    void handleVoiceCaptureDone({
+                      audioUri,
+                      transcriptionOverride,
+                    });
+                  };
 
               showToast(error.message, retryAction);
             },
@@ -630,6 +668,8 @@ export function MainScreen() {
       selectedTtsVoice,
       settings.sttMode,
       settings.ttsMode,
+      settings.ttsListenLanguages,
+      settings.localTtsVoices,
       settings.assistantInstructions,
       settings.responseLength,
       settings.responseTone,
@@ -848,7 +888,7 @@ export function MainScreen() {
           return;
         }
 
-        if (!ttsProvider || !ttsApiKey) {
+        if (settings.ttsMode === "provider" && (!ttsProvider || !ttsApiKey)) {
           showToast(t("chooseTtsToPreviewVoices"));
           return;
         }
@@ -860,13 +900,15 @@ export function MainScreen() {
           provider: ttsProvider,
           apiKey: ttsApiKey,
           language,
-        }).catch((error) => {
-          if (!(error instanceof TtsRequestError)) {
-            throw error;
-          }
-
+          listenLanguages: settings.ttsListenLanguages,
+          localVoices: settings.localTtsVoices,
+        }).catch(() => {
           player.speakText(text);
-          showToast(t("providerVoicePreviewFallback"));
+          showToast(
+            settings.ttsMode === "local"
+              ? t("localVoicePreviewFallback")
+              : t("providerVoicePreviewFallback")
+          );
           return null;
         });
 
@@ -886,6 +928,8 @@ export function MainScreen() {
       isRecording,
       player,
       settings.ttsMode,
+      settings.ttsListenLanguages,
+      settings.localTtsVoices,
       selectedTtsVoice,
       showToast,
       t,
@@ -1737,7 +1781,10 @@ export function MainScreen() {
         onUpdate={updateSettings}
         onUpdateProviderModel={updateProviderModel}
         onUpdateProviderTtsVoice={updateProviderTtsVoice}
+        onUpdateLocalTtsVoice={updateLocalTtsVoice}
         onUpdateApiKey={updateApiKey}
+        localTtsPackStates={localTtsPackStates}
+        onInstallLocalTtsLanguagePack={handleInstallLocalTtsLanguage}
         onPreviewVoice={handlePreviewVoice}
         onValidateProvider={handleValidateProvider}
         onClose={closeSettings}
