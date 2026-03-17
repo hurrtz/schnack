@@ -99,7 +99,16 @@ function scoreLanguage(text: string, language: TtsListenLanguage) {
   if (language === "pt") {
     let score = /[ãõçáéíóú]/i.test(text) ? 2 : 0;
 
-    for (const token of [" não ", " você ", " que ", " de ", " uma ", " para "]) {
+    for (const token of [
+      " não ",
+      " nao ",
+      " você ",
+      " voce ",
+      " que ",
+      " de ",
+      " uma ",
+      " para ",
+    ]) {
       if (normalized.includes(token)) {
         score += 1;
       }

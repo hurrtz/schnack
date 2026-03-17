@@ -42,11 +42,11 @@ const localVoices = {
   en: "af_heart",
   de: "thorsten-medium",
   zh: "zf_xiaoxiao",
-  es: "",
-  pt: "",
-  hi: "",
-  fr: "",
-  it: "",
+  es: "vits-piper-es_ES-davefx-medium",
+  pt: "vits-piper-pt_BR-faber-medium",
+  hi: "vits-piper-hi_IN-priyamvada-medium",
+  fr: "vits-piper-fr_FR-siwis-medium",
+  it: "vits-piper-it_IT-paola-medium",
   ja: "",
 };
 
@@ -175,6 +175,27 @@ describe("synthesizeSpeech", () => {
       text: "Ich glaube, das ist die richtige Antwort.",
       language: "de",
       voice: "thorsten-medium",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("uses the Spanish local voice pack before any fallback", async () => {
+    synthesizeLocalSpeech.mockResolvedValueOnce("/tmp/local-es.wav");
+
+    const result = await synthesizeSpeech({
+      text: "Creo que esta es la respuesta correcta.",
+      voice: "alloy",
+      mode: "local",
+      language: "en",
+      listenLanguages: ["es"],
+      localVoices,
+    });
+
+    expect(result).toBe("/tmp/local-es.wav");
+    expect(synthesizeLocalSpeech).toHaveBeenCalledWith({
+      text: "Creo que esta es la respuesta correcta.",
+      language: "es",
+      voice: "vits-piper-es_ES-davefx-medium",
     });
     expect(fetch).not.toHaveBeenCalled();
   });

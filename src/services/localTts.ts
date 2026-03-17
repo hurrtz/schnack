@@ -56,6 +56,31 @@ const KOKORO_CHINESE_VOICES = {
   zm_yunyang: { sid: 31 },
 } as const;
 
+const SHERPA_VITS_LANGUAGE_MODEL_IDS = {
+  es: [
+    "vits-piper-es_ES-davefx-medium",
+    "vits-piper-es_MX-claude-high",
+  ],
+  pt: [
+    "vits-piper-pt_BR-faber-medium",
+    "vits-piper-pt_PT-tugao-medium",
+  ],
+  hi: [
+    "vits-piper-hi_IN-priyamvada-medium",
+    "vits-piper-hi_IN-pratham-medium",
+  ],
+  fr: [
+    "vits-piper-fr_FR-siwis-medium",
+    "vits-piper-fr_FR-tom-medium",
+  ],
+  it: [
+    "vits-piper-it_IT-paola-medium",
+    "vits-piper-it_IT-dii-high",
+  ],
+} as const;
+
+type SherpaVitsLanguage = keyof typeof SHERPA_VITS_LANGUAGE_MODEL_IDS;
+
 type KokoroSessionState = {
   session: any;
   modelPath: string;
@@ -119,6 +144,41 @@ function getKokoroChineseVoiceConfig(voice: string) {
   return KOKORO_CHINESE_VOICES[
     voice as keyof typeof KOKORO_CHINESE_VOICES
   ] ?? null;
+}
+
+function isSherpaVitsLanguage(language: TtsListenLanguage): language is SherpaVitsLanguage {
+  return language in SHERPA_VITS_LANGUAGE_MODEL_IDS;
+}
+
+function getSherpaVitsModelId(language: SherpaVitsLanguage, voice: string) {
+  return SHERPA_VITS_LANGUAGE_MODEL_IDS[language].some(
+    (modelId) => modelId === voice
+  )
+    ? voice
+    : null;
+}
+
+function getLocalPackLanguageLabel(language: TtsListenLanguage) {
+  switch (language) {
+    case "de":
+      return "German";
+    case "zh":
+      return "Simplified Chinese";
+    case "es":
+      return "Spanish";
+    case "pt":
+      return "Portuguese";
+    case "hi":
+      return "Hindi";
+    case "fr":
+      return "French";
+    case "it":
+      return "Italian";
+    case "ja":
+      return "Japanese";
+    default:
+      return "English";
+  }
 }
 
 async function directoryContainsFiles(path: string, files: string[]) {
@@ -518,6 +578,50 @@ async function getKokoroChineseSession() {
   return promise;
 }
 
+async function getSherpaVitsSession(modelId: string) {
+  const rootPath = await getLocalModelPathByCategory(ModelCategory.Tts, modelId);
+
+  if (!rootPath) {
+    throw new Error("The local voice pack is not installed yet.");
+  }
+
+  const cached = sherpaSessionCache.get(rootPath);
+
+  if (cached) {
+    return cached instanceof Promise ? cached : cached;
+  }
+
+  const promise = (async () => {
+    const [{ createTTS }, { fileModelPath }] = await Promise.all([
+      import("react-native-sherpa-onnx/tts"),
+      import("react-native-sherpa-onnx"),
+    ]);
+
+    const engine = await createTTS({
+      modelPath: fileModelPath(rootPath),
+      modelType: "vits",
+      numThreads: 2,
+      debug: false,
+    });
+
+    return {
+      engine,
+      rootPath,
+    };
+  })()
+    .then((state) => {
+      sherpaSessionCache.set(rootPath, state);
+      return state;
+    })
+    .catch((error) => {
+      sherpaSessionCache.delete(rootPath);
+      throw error;
+    });
+
+  sherpaSessionCache.set(rootPath, promise);
+  return promise;
+}
+
 async function installPiperVoicePack(params: {
   voice: string;
   onProgress?: (progress: number) => void;
@@ -573,6 +677,28 @@ async function installKokoroChineseVoicePack(params: {
   });
 
   await ensureKokoroChineseModelRootPath();
+  params.onProgress?.(1);
+}
+
+async function installSherpaVitsVoicePack(params: {
+  language: SherpaVitsLanguage;
+  voice: string;
+  onProgress?: (progress: number) => void;
+}) {
+  const modelId = getSherpaVitsModelId(params.language, params.voice);
+
+  if (!modelId) {
+    throw new Error(
+      `A local ${getLocalPackLanguageLabel(params.language)} voice pack is not configured for this voice.`
+    );
+  }
+
+  await downloadModelByCategory(ModelCategory.Tts, modelId, {
+    onProgress: (progress) => {
+      params.onProgress?.(progress.percent / 100);
+    },
+  });
+
   params.onProgress?.(1);
 }
 
@@ -636,6 +762,42 @@ async function synthesizeKokoroChineseSpeech(params: {
   return writeWaveformFile(Float32Array.from(audio.samples), audio.sampleRate);
 }
 
+async function synthesizeSherpaVitsSpeech(params: {
+  language: SherpaVitsLanguage;
+  text: string;
+  voice: string;
+}) {
+  const modelId = getSherpaVitsModelId(params.language, params.voice);
+  const languageLabel = getLocalPackLanguageLabel(params.language);
+
+  if (!modelId) {
+    throw new Error(
+      `A local ${languageLabel} voice pack is not configured for this voice.`
+    );
+  }
+
+  const status = await getLocalTtsInstallStatus({
+    language: params.language,
+    voice: params.voice,
+  });
+
+  if (!status.installed) {
+    throw new Error(`The ${languageLabel} local voice pack is not installed yet.`);
+  }
+
+  const sessionState = await getSherpaVitsSession(modelId);
+  const audio = await sessionState.engine.generateSpeech(normalizeText(params.text), {
+    sid: 0,
+    speed: 1,
+  });
+
+  if (!audio?.samples || !audio?.sampleRate) {
+    throw new Error(`The local ${languageLabel} voice model did not return audio.`);
+  }
+
+  return writeWaveformFile(Float32Array.from(audio.samples), audio.sampleRate);
+}
+
 export async function getLocalTtsInstallStatus(params: {
   language: TtsListenLanguage;
   voice: string;
@@ -689,6 +851,19 @@ export async function getLocalTtsInstallStatus(params: {
       modelInstalled: modelInfo.exists,
       configInstalled: configInfo.exists,
       dataInstalled,
+    };
+  }
+
+  if (isSherpaVitsLanguage(params.language)) {
+    const modelId = getSherpaVitsModelId(params.language, params.voice);
+    const modelInstalled = modelId
+      ? await isModelDownloadedByCategory(ModelCategory.Tts, modelId)
+      : false;
+
+    return {
+      supported: true,
+      installed: modelInstalled,
+      modelInstalled,
     };
   }
 
@@ -758,6 +933,15 @@ export async function installLocalTtsPack(params: {
     return;
   }
 
+  if (isSherpaVitsLanguage(params.language)) {
+    await installSherpaVitsVoicePack({
+      language: params.language,
+      voice: params.voice,
+      onProgress: params.onProgress,
+    });
+    return;
+  }
+
   if (params.language === "zh") {
     await installKokoroChineseVoicePack({
       voice: params.voice,
@@ -817,6 +1001,14 @@ export async function synthesizeLocalSpeech(params: {
 
   if (params.language === "de") {
     return synthesizePiperSpeech({
+      text: params.text,
+      voice: params.voice,
+    });
+  }
+
+  if (isSherpaVitsLanguage(params.language)) {
+    return synthesizeSherpaVitsSpeech({
+      language: params.language,
       text: params.text,
       voice: params.voice,
     });

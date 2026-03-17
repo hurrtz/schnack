@@ -16,17 +16,22 @@ export const LOCAL_TTS_SUPPORTED_LANGUAGES: TtsListenLanguage[] = [
   "en",
   "de",
   "zh",
+  "es",
+  "pt",
+  "hi",
+  "fr",
+  "it",
 ];
 export const LOCAL_TTS_KOKORO_MODEL_ID = "model_q8f16.onnx";
 export const LOCAL_TTS_DEFAULT_VOICES: Record<TtsListenLanguage, string> = {
   en: "af_heart",
   de: "thorsten-medium",
   zh: "zf_xiaoxiao",
-  es: "",
-  pt: "",
-  hi: "",
-  fr: "",
-  it: "",
+  es: "vits-piper-es_ES-davefx-medium",
+  pt: "vits-piper-pt_BR-faber-medium",
+  hi: "vits-piper-hi_IN-priyamvada-medium",
+  fr: "vits-piper-fr_FR-siwis-medium",
+  it: "vits-piper-it_IT-paola-medium",
   ja: "",
 };
 
@@ -54,11 +59,56 @@ export const LOCAL_TTS_VOICE_OPTIONS: Record<
     { value: "zm_yunxia", label: "Kokoro Yunxia" },
     { value: "zm_yunyang", label: "Kokoro Yunyang" },
   ],
-  es: [],
-  pt: [],
-  hi: [],
-  fr: [],
-  it: [],
+  es: [
+    {
+      value: "vits-piper-es_ES-davefx-medium",
+      label: "Piper Davefx Medium (Spain)",
+    },
+    {
+      value: "vits-piper-es_MX-claude-high",
+      label: "Piper Claude High (Mexico)",
+    },
+  ],
+  pt: [
+    {
+      value: "vits-piper-pt_BR-faber-medium",
+      label: "Piper Faber Medium (Brazil)",
+    },
+    {
+      value: "vits-piper-pt_PT-tugao-medium",
+      label: "Piper Tugao Medium (Portugal)",
+    },
+  ],
+  hi: [
+    {
+      value: "vits-piper-hi_IN-priyamvada-medium",
+      label: "Piper Priyamvada Medium",
+    },
+    {
+      value: "vits-piper-hi_IN-pratham-medium",
+      label: "Piper Pratham Medium",
+    },
+  ],
+  fr: [
+    {
+      value: "vits-piper-fr_FR-siwis-medium",
+      label: "Piper Siwis Medium",
+    },
+    {
+      value: "vits-piper-fr_FR-tom-medium",
+      label: "Piper Tom Medium",
+    },
+  ],
+  it: [
+    {
+      value: "vits-piper-it_IT-paola-medium",
+      label: "Piper Paola Medium",
+    },
+    {
+      value: "vits-piper-it_IT-dii-high",
+      label: "Piper Dii High",
+    },
+  ],
   ja: [],
 };
 

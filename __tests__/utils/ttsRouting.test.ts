@@ -53,13 +53,28 @@ describe("resolveTtsListenLanguage", () => {
       })
     ).toBe("hi");
   });
+
+  it("prefers Portuguese when Portuguese markers are present", () => {
+    expect(
+      resolveTtsListenLanguage({
+        text: "Você não precisa responder agora, mas eu não concordo com isso.",
+        preferredLanguages: ["es", "pt"],
+        appLanguage: "en",
+      })
+    ).toBe("pt");
+  });
 });
 
 describe("supportsLocalTtsLanguage", () => {
-  it("currently supports English, German, and Simplified Chinese", () => {
+  it("currently supports every configured local language except Japanese", () => {
     expect(supportsLocalTtsLanguage("en")).toBe(true);
     expect(supportsLocalTtsLanguage("de")).toBe(true);
     expect(supportsLocalTtsLanguage("zh")).toBe(true);
-    expect(supportsLocalTtsLanguage("hi")).toBe(false);
+    expect(supportsLocalTtsLanguage("es")).toBe(true);
+    expect(supportsLocalTtsLanguage("pt")).toBe(true);
+    expect(supportsLocalTtsLanguage("hi")).toBe(true);
+    expect(supportsLocalTtsLanguage("fr")).toBe(true);
+    expect(supportsLocalTtsLanguage("it")).toBe(true);
+    expect(supportsLocalTtsLanguage("ja")).toBe(false);
   });
 });
