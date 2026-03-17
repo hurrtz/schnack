@@ -194,6 +194,7 @@ export async function runVoicePipeline(params: {
   let sentenceBuffer = "";
   let ttsChain = Promise.resolve();
   const ttsQueue: Promise<void>[] = [];
+  const effectiveReplyPlayback = ttsMode === "local" ? "wait" : replyPlayback;
 
   const enqueueTtsChunk = (text: string) => {
     const trimmed = text.trim();
@@ -283,7 +284,7 @@ export async function runVoicePipeline(params: {
     onChunk: (text) => {
       if (abortSignal?.aborted) return;
       callbacks.onChunk(text);
-      if (replyPlayback === "stream") {
+      if (effectiveReplyPlayback === "stream") {
         sentenceBuffer += text;
         const { completeSentences, remainder } = extractCompleteSentences(sentenceBuffer);
         for (const sentence of completeSentences) {
@@ -295,7 +296,7 @@ export async function runVoicePipeline(params: {
     onDone: async (fullText) => {
       if (abortSignal?.aborted) return;
       callbacks.onResponseDone(fullText);
-      if (replyPlayback === "stream") {
+      if (effectiveReplyPlayback === "stream") {
         if (sentenceBuffer.trim()) {
           enqueueStreamPlayback(sentenceBuffer);
         }

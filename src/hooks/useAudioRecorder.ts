@@ -23,11 +23,12 @@ const RECORDING_OPTIONS = {
   isMeteringEnabled: true,
   numberOfChannels: 1,
 };
+const RECORDER_STATUS_INTERVAL_MS = 150;
 
 export function useAudioRecorder() {
   const { t } = useLocalization();
   const recorder = useExpoAudioRecorder(RECORDING_OPTIONS);
-  const recorderState = useAudioRecorderState(recorder, 100);
+  const recorderState = useAudioRecorderState(recorder, RECORDER_STATUS_INTERVAL_MS);
   const startTimeRef = useRef<number>(0);
   const [waveformData, setWaveformData] = useState(EMPTY_VISUAL_LEVELS);
 

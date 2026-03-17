@@ -15,6 +15,9 @@ import {
   levelToMetering,
 } from "../utils/audioVisualization";
 
+const PLAYER_STATUS_INTERVAL_MS = 250;
+const VISUAL_UPDATE_INTERVAL_MS = 150;
+
 export interface PlayerState {
   isPlaying: boolean;
   meteringData: number;
@@ -23,8 +26,8 @@ export interface PlayerState {
 
 export function useAudioPlayer() {
   const player = useExpoAudioPlayer(null, {
-    updateInterval: 100,
-    keepAudioSessionActive: true,
+    updateInterval: PLAYER_STATUS_INTERVAL_MS,
+    keepAudioSessionActive: false,
   });
   const status = useAudioPlayerStatus(player);
   const [meteringData, setMeteringData] = useState(-160);
@@ -33,6 +36,7 @@ export function useAudioPlayer() {
   const playingRef = useRef(false);
   const startingRef = useRef(false);
   const cancelledRef = useRef(false);
+  const loadedSourceRef = useRef(false);
   const nativeQueueRef = useRef<Array<{ text: string; voice?: string }>>([]);
   const nativeSpeakingRef = useRef(false);
   const nativeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -50,6 +54,15 @@ export function useAudioPlayer() {
     }
   }, []);
 
+  const removeLoadedAudio = useCallback(() => {
+    if (!loadedSourceRef.current) {
+      return;
+    }
+
+    player.remove();
+    loadedSourceRef.current = false;
+  }, [player]);
+
   const startNativeMetering = useCallback(() => {
     stopNativeMetering();
 
@@ -58,7 +71,7 @@ export function useAudioPlayer() {
       const levels = buildFallbackSpeechLevels(baseTime + Date.now() / 700);
       setWaveformData(levels);
       setMeteringData(levelToMetering(averageLevels(levels)));
-    }, 80);
+    }, VISUAL_UPDATE_INTERVAL_MS);
   }, [stopNativeMetering]);
 
   const playNextNative = useCallback(function playNextNativeInner() {
@@ -70,6 +83,7 @@ export function useAudioPlayer() {
 
     if (!next) {
       stopNativeMetering();
+      removeLoadedAudio();
       resetVisualState();
       return;
     }
@@ -110,7 +124,7 @@ export function useAudioPlayer() {
         },
       });
     });
-  }, [resetVisualState, startNativeMetering, stopNativeMetering]);
+  }, [removeLoadedAudio, resetVisualState, startNativeMetering, stopNativeMetering]);
 
   useAudioSampleListener(player, (sample) => {
     const levels = buildSampleLevels(sample.channels);
@@ -127,6 +141,7 @@ export function useAudioPlayer() {
     const audioUri = queueRef.current.shift();
 
     if (!audioUri) {
+      removeLoadedAudio();
       resetVisualState();
       return;
     }
@@ -144,12 +159,13 @@ export function useAudioPlayer() {
       }
 
       player.replace(audioUri);
+      loadedSourceRef.current = true;
       player.play();
       playingRef.current = true;
     } finally {
       startingRef.current = false;
     }
-  }, [player, resetVisualState]);
+  }, [player, removeLoadedAudio, resetVisualState]);
 
   useEffect(() => {
     playingRef.current = status.playing;
@@ -160,10 +176,11 @@ export function useAudioPlayer() {
       }
 
       if (!startingRef.current) {
+        removeLoadedAudio();
         resetVisualState();
       }
     }
-  }, [nativeSpeaking, playNext, resetVisualState, status.playing]);
+  }, [nativeSpeaking, playNext, removeLoadedAudio, resetVisualState, status.playing]);
 
   useEffect(() => {
     if (nativeSpeaking) {
@@ -186,7 +203,7 @@ export function useAudioPlayer() {
       const levels = buildFallbackSpeechLevels(baseTime + elapsed);
       setWaveformData(levels);
       setMeteringData(levelToMetering(averageLevels(levels)));
-    }, 80);
+    }, VISUAL_UPDATE_INTERVAL_MS);
 
     return () => {
       clearInterval(interval);
@@ -220,6 +237,7 @@ export function useAudioPlayer() {
     queueRef.current = [];
     nativeQueueRef.current = [];
     player.pause();
+    removeLoadedAudio();
     await Speech.stop();
     stopNativeMetering();
     nativeSpeakingRef.current = false;
@@ -227,7 +245,7 @@ export function useAudioPlayer() {
     startingRef.current = false;
     playingRef.current = false;
     resetVisualState();
-  }, [player, resetVisualState, stopNativeMetering]);
+  }, [player, removeLoadedAudio, resetVisualState, stopNativeMetering]);
 
   const resetCancellation = useCallback(() => {
     cancelledRef.current = false;
@@ -238,8 +256,9 @@ export function useAudioPlayer() {
     startingRef.current = false;
     playingRef.current = false;
     player.pause();
+    removeLoadedAudio();
     resetVisualState();
-  }, [player, resetVisualState]);
+  }, [player, removeLoadedAudio, resetVisualState]);
 
   useEffect(() => {
     return () => {

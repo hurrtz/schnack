@@ -5,6 +5,7 @@ const mockPlayer = {
   currentTime: 0,
   isAudioSamplingSupported: false,
   pause: jest.fn(),
+  remove: jest.fn(),
   replace: jest.fn(),
   play: jest.fn(),
 };

@@ -8,6 +8,7 @@ import { useLocalization } from "../i18n";
 import { EMPTY_VISUAL_LEVELS, appendMeterHistory } from "../utils/audioVisualization";
 
 const MIN_RECOGNITION_DURATION_MS = 300;
+const RECOGNITION_METER_INTERVAL_MS = 150;
 
 function getRecognitionLocale() {
   return Intl.DateTimeFormat().resolvedOptions().locale || "en-US";
@@ -220,7 +221,7 @@ export function useNativeSpeechRecognizer() {
         iosVoiceProcessingEnabled: true,
         volumeChangeEventOptions: {
           enabled: true,
-          intervalMillis: 80,
+          intervalMillis: RECOGNITION_METER_INTERVAL_MS,
         },
       });
     } catch (error) {

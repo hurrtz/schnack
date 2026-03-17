@@ -24,6 +24,7 @@ const KOKORO_VOICE_URL_BASE =
 const KOKORO_SAMPLE_RATE = 24000;
 const KOKORO_STYLE_DIM = 256;
 const KOKORO_MULTILINGUAL_MODEL_ID = "kokoro-multi-lang-v1_0";
+const LOCAL_TTS_IDLE_RELEASE_MS = 45000;
 
 const PIPER_GERMAN_VOICES = {
   "thorsten-medium": {
@@ -105,6 +106,21 @@ const sherpaSessionCache = new Map<
   Promise<SherpaSessionState> | SherpaSessionState
 >();
 const huggingFaceRepoFilesCache = new Map<string, Promise<string[]>>();
+let localTtsIdleReleaseTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function cancelLocalTtsIdleRelease() {
+  if (localTtsIdleReleaseTimeout) {
+    clearTimeout(localTtsIdleReleaseTimeout);
+    localTtsIdleReleaseTimeout = null;
+  }
+}
+
+function scheduleLocalTtsIdleRelease() {
+  cancelLocalTtsIdleRelease();
+  localTtsIdleReleaseTimeout = setTimeout(() => {
+    void releaseLocalTtsResources();
+  }, LOCAL_TTS_IDLE_RELEASE_MS);
+}
 
 function getLocalTtsRootPath() {
   return `${FileSystem.documentDirectory}local-tts`;
@@ -382,6 +398,7 @@ async function getKokoroVoiceData(voice: string) {
 }
 
 async function getKokoroSession() {
+  cancelLocalTtsIdleRelease();
   const modelPath = getKokoroModelPath();
 
   if (kokoroSessionState?.modelPath === modelPath) {
@@ -501,6 +518,7 @@ async function listHuggingFaceRepoFiles(repoId: string) {
 }
 
 async function getPiperSession(voice: string) {
+  cancelLocalTtsIdleRelease();
   const rootPath = getPiperVoiceRootPath(voice);
   const cached = sherpaSessionCache.get(rootPath);
 
@@ -540,6 +558,7 @@ async function getPiperSession(voice: string) {
 }
 
 async function getKokoroChineseSession() {
+  cancelLocalTtsIdleRelease();
   const rootPath = await ensureKokoroChineseModelRootPath();
   const cached = sherpaSessionCache.get(rootPath);
 
@@ -579,6 +598,7 @@ async function getKokoroChineseSession() {
 }
 
 async function getSherpaVitsSession(modelId: string) {
+  cancelLocalTtsIdleRelease();
   const rootPath = await getLocalModelPathByCategory(ModelCategory.Tts, modelId);
 
   if (!rootPath) {
@@ -953,73 +973,117 @@ export async function installLocalTtsPack(params: {
   throw new Error("A local voice pack is not available for this language yet.");
 }
 
+export async function releaseLocalTtsResources() {
+  cancelLocalTtsIdleRelease();
+
+  const sherpaStates = Array.from(sherpaSessionCache.values());
+  sherpaSessionCache.clear();
+
+  const sherpaCleanup = sherpaStates.map(async (entry) => {
+    try {
+      const state = await entry;
+      await state.engine.destroy?.();
+    } catch {
+      // Ignore teardown failures; battery wins matter more than perfect cleanup here.
+    }
+  });
+
+  const kokoroState = kokoroSessionState;
+  const kokoroPromise = kokoroSessionPromise;
+  kokoroSessionState = null;
+  kokoroSessionPromise = null;
+  voiceCache.clear();
+
+  const kokoroCleanup = kokoroPromise
+    ? kokoroPromise
+        .then(async (state) => {
+          await state.session.release?.();
+        })
+        .catch(() => undefined)
+    : kokoroState
+      ? (async () => {
+          try {
+            await kokoroState.session.release?.();
+          } catch {
+            // Ignore teardown failures.
+          }
+        })()
+      : undefined;
+
+  await Promise.all([...sherpaCleanup, ...(kokoroCleanup ? [kokoroCleanup] : [])]);
+}
+
 export async function synthesizeLocalSpeech(params: {
   text: string;
   language: TtsListenLanguage;
   voice: string;
 }) {
-  if (params.language === "en") {
-    const status = await getLocalTtsInstallStatus({
-      language: params.language,
-      voice: params.voice,
-    });
+  try {
+    if (params.language === "en") {
+      const status = await getLocalTtsInstallStatus({
+        language: params.language,
+        voice: params.voice,
+      });
 
-    if (!status.installed) {
-      throw new Error("The local voice pack is not installed yet.");
+      if (!status.installed) {
+        throw new Error("The local voice pack is not installed yet.");
+      }
+
+      const tokens = tokenizeKokoroEnglish(params.text);
+      const numTokens = Math.min(Math.max(tokens.length - 2, 0), 509);
+      const voiceData = await getKokoroVoiceData(params.voice);
+      const offset = numTokens * KOKORO_STYLE_DIM;
+      const styleData = voiceData.slice(offset, offset + KOKORO_STYLE_DIM);
+      const sessionState = await getKokoroSession();
+      const { Tensor } = await import("onnxruntime-react-native");
+
+      let inputIds: any;
+
+      try {
+        inputIds = new Tensor("int64", new Int32Array(tokens), [1, tokens.length]);
+      } catch {
+        inputIds = new Tensor("int64", tokens, [1, tokens.length]);
+      }
+
+      const outputs = await sessionState.session.run({
+        input_ids: inputIds,
+        style: new Tensor("float32", new Float32Array(styleData), [1, KOKORO_STYLE_DIM]),
+        speed: new Tensor("float32", new Float32Array([1]), [1]),
+      });
+
+      const waveform = outputs?.waveform?.data;
+
+      if (!waveform) {
+        throw new Error("The local voice model did not return audio.");
+      }
+
+      return writeWaveformFile(new Float32Array(waveform), KOKORO_SAMPLE_RATE);
     }
 
-    const tokens = tokenizeKokoroEnglish(params.text);
-    const numTokens = Math.min(Math.max(tokens.length - 2, 0), 509);
-    const voiceData = await getKokoroVoiceData(params.voice);
-    const offset = numTokens * KOKORO_STYLE_DIM;
-    const styleData = voiceData.slice(offset, offset + KOKORO_STYLE_DIM);
-    const sessionState = await getKokoroSession();
-    const { Tensor } = await import("onnxruntime-react-native");
-
-    let inputIds: any;
-
-    try {
-      inputIds = new Tensor("int64", new Int32Array(tokens), [1, tokens.length]);
-    } catch {
-      inputIds = new Tensor("int64", tokens, [1, tokens.length]);
+    if (params.language === "de") {
+      return synthesizePiperSpeech({
+        text: params.text,
+        voice: params.voice,
+      });
     }
 
-    const outputs = await sessionState.session.run({
-      input_ids: inputIds,
-      style: new Tensor("float32", new Float32Array(styleData), [1, KOKORO_STYLE_DIM]),
-      speed: new Tensor("float32", new Float32Array([1]), [1]),
-    });
-
-    const waveform = outputs?.waveform?.data;
-
-    if (!waveform) {
-      throw new Error("The local voice model did not return audio.");
+    if (isSherpaVitsLanguage(params.language)) {
+      return synthesizeSherpaVitsSpeech({
+        language: params.language,
+        text: params.text,
+        voice: params.voice,
+      });
     }
 
-    return writeWaveformFile(new Float32Array(waveform), KOKORO_SAMPLE_RATE);
-  }
+    if (params.language === "zh") {
+      return synthesizeKokoroChineseSpeech({
+        text: params.text,
+        voice: params.voice,
+      });
+    }
 
-  if (params.language === "de") {
-    return synthesizePiperSpeech({
-      text: params.text,
-      voice: params.voice,
-    });
+    throw new Error("A local voice pack is not available for this language yet.");
+  } finally {
+    scheduleLocalTtsIdleRelease();
   }
-
-  if (isSherpaVitsLanguage(params.language)) {
-    return synthesizeSherpaVitsSpeech({
-      language: params.language,
-      text: params.text,
-      voice: params.voice,
-    });
-  }
-
-  if (params.language === "zh") {
-    return synthesizeKokoroChineseSpeech({
-      text: params.text,
-      voice: params.voice,
-    });
-  }
-
-  throw new Error("A local voice pack is not available for this language yet.");
 }

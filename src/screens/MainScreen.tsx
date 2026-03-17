@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
+  AppState,
   Modal,
   ScrollView,
   Share,
@@ -38,6 +39,7 @@ import { useNativeSpeechRecognizer } from "../hooks/useNativeSpeechRecognizer";
 import { useConversations } from "../hooks/useConversations";
 import { useLocalization } from "../i18n";
 import { validateProviderConnection } from "../services/llm";
+import { releaseLocalTtsResources } from "../services/localTts";
 import { runVoicePipeline } from "../services/voicePipeline";
 import {
   synthesizeSpeech,
@@ -491,6 +493,37 @@ export function MainScreen() {
     showToast(nativeStt.lastError);
     nativeStt.clearLastError();
   }, [nativeStt.clearLastError, nativeStt.lastError, showToast]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState !== "background") {
+        return;
+      }
+
+      void (async () => {
+        abortRef.current?.abort();
+        setPipelinePhase("idle");
+        setStreamingText("");
+
+        try {
+          if (settings.sttMode === "native") {
+            await nativeStt.abortRecognition();
+          } else {
+            await recorder.stopRecording();
+          }
+        } catch {
+          // Ignore background-stop failures.
+        }
+
+        await releaseLocalTtsResources();
+      })();
+    });
+
+    return () => {
+      subscription.remove();
+      void releaseLocalTtsResources();
+    };
+  }, [nativeStt, recorder, settings.sttMode]);
 
   const ensureVoiceSessionReady = useCallback(() => {
     if (!providerApiKey) {

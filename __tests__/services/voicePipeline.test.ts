@@ -222,6 +222,87 @@ describe("runVoicePipeline", () => {
     expect(callbacks.onSpeechTextReady).not.toHaveBeenCalled();
   });
 
+  it("batches local TTS until the full reply is done even in stream mode", async () => {
+    (streamChat as jest.Mock).mockImplementation(
+      async ({
+        onChunk,
+        onDone,
+      }: {
+        onChunk: (text: string) => void;
+        onDone: (text: string) => Promise<void>;
+      }) => {
+        onChunk("Sentence one. Sentence two.");
+        await Promise.resolve();
+        expect(synthesizeSpeech).not.toHaveBeenCalled();
+        await onDone("Sentence one. Sentence two.");
+      }
+    );
+
+    (synthesizeSpeech as jest.Mock).mockResolvedValueOnce("/tmp/local-tts-1.wav");
+
+    const callbacks = {
+      onTranscription: jest.fn(),
+      onChunk: jest.fn(),
+      onResponseDone: jest.fn(),
+      onAudioReady: jest.fn(),
+      onSpeechTextReady: jest.fn(),
+      onError: jest.fn(),
+    };
+
+    await runVoicePipeline({
+      transcriptionOverride: "Explain glass.",
+      messages: [],
+      model: "gpt-5.4",
+      provider: "openai",
+      providerApiKey: "sk-test",
+      sttMode: "native",
+      ttsMode: "local",
+      ttsVoice: "alloy",
+      ttsListenLanguages: ["en"],
+      localTtsVoices: {
+        en: "af_bella",
+        de: "thorsten-medium",
+        zh: "zf_xiaobei",
+        es: "vits-piper-es_ES-davefx-medium",
+        pt: "vits-piper-pt_BR-faber-medium",
+        hi: "vits-piper-hi_IN-priyamvada-medium",
+        fr: "vits-piper-fr_FR-siwis-medium",
+        it: "vits-piper-it_IT-paola-medium",
+        ja: "",
+      },
+      replyPlayback: "stream",
+      assistantInstructions: "You are a voice assistant.",
+      responseLength: "normal",
+      responseTone: "professional",
+      language: "en",
+      callbacks,
+    });
+
+    expect(synthesizeSpeech).toHaveBeenCalledTimes(1);
+    expect(synthesizeSpeech).toHaveBeenCalledWith({
+      text: "Sentence one. Sentence two.",
+      voice: "alloy",
+      mode: "local",
+      provider: undefined,
+      apiKey: undefined,
+      language: "en",
+      listenLanguages: ["en"],
+      localVoices: {
+        en: "af_bella",
+        de: "thorsten-medium",
+        zh: "zf_xiaobei",
+        es: "vits-piper-es_ES-davefx-medium",
+        pt: "vits-piper-pt_BR-faber-medium",
+        hi: "vits-piper-hi_IN-priyamvada-medium",
+        fr: "vits-piper-fr_FR-siwis-medium",
+        it: "vits-piper-it_IT-paola-medium",
+        ja: "",
+      },
+    });
+    expect(callbacks.onAudioReady).toHaveBeenCalledTimes(1);
+    expect(callbacks.onSpeechTextReady).not.toHaveBeenCalled();
+  });
+
   it("flushes a trailing partial sentence for provider TTS when the stream finishes", async () => {
     (streamChat as jest.Mock).mockImplementation(
       async ({

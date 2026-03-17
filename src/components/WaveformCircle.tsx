@@ -1,5 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  AppState,
+  type AppStateStatus,
   View,
   TouchableOpacity,
   StyleSheet,
@@ -16,6 +18,7 @@ import Animated, {
   withSequence,
   Easing,
   interpolate,
+  cancelAnimation,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalization } from "../i18n";
@@ -40,14 +43,24 @@ interface WaveformCircleProps {
 function ProcessingDot({
   delay,
   color,
+  isAnimating,
 }: {
   delay: number;
   color: string;
+  isAnimating: boolean;
 }) {
   const opacity = useSharedValue(0.32);
   const scale = useSharedValue(0.76);
 
   useEffect(() => {
+    if (!isAnimating) {
+      cancelAnimation(opacity);
+      cancelAnimation(scale);
+      opacity.value = 0.32;
+      scale.value = 0.76;
+      return;
+    }
+
     opacity.value = withDelay(
       delay,
       withRepeat(
@@ -70,7 +83,7 @@ function ProcessingDot({
         false
       )
     );
-  }, [delay, opacity, scale]);
+  }, [delay, isAnimating, opacity, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -91,9 +104,11 @@ function ProcessingDot({
 function ProcessingIndicator({
   phase,
   providerLabel,
+  isAnimating,
 }: {
   phase: VoiceVisualPhase;
   providerLabel: string;
+  isAnimating: boolean;
 }) {
   const isThinking = phase === "thinking";
   const { t } = useLocalization();
@@ -101,9 +116,21 @@ function ProcessingIndicator({
   return (
     <View style={styles.processingWrap}>
       <View style={styles.processingDots}>
-        <ProcessingDot delay={0} color="rgba(255, 255, 255, 0.96)" />
-        <ProcessingDot delay={170} color="rgba(255, 255, 255, 0.9)" />
-        <ProcessingDot delay={340} color="rgba(255, 255, 255, 0.84)" />
+        <ProcessingDot
+          delay={0}
+          color="rgba(255, 255, 255, 0.96)"
+          isAnimating={isAnimating}
+        />
+        <ProcessingDot
+          delay={170}
+          color="rgba(255, 255, 255, 0.9)"
+          isAnimating={isAnimating}
+        />
+        <ProcessingDot
+          delay={340}
+          color="rgba(255, 255, 255, 0.84)"
+          isAnimating={isAnimating}
+        />
       </View>
       <Text style={styles.processingLabel}>
         {isThinking ? t("waitingForReply") : t("parsingYourVoice")}
@@ -115,7 +142,17 @@ function ProcessingIndicator({
   );
 }
 
-function RippleRing({ delay, color, isActive, intensity }: { delay: number; color: string; isActive: boolean; intensity: number }) {
+function RippleRing({
+  delay,
+  color,
+  isActive,
+  intensity,
+}: {
+  delay: number;
+  color: string;
+  isActive: boolean;
+  intensity: number;
+}) {
   const isActiveSV = useSharedValue(isActive);
   const intensitySV = useSharedValue(intensity);
   useEffect(() => { isActiveSV.value = isActive; }, [isActive]);
@@ -150,26 +187,50 @@ export function WaveformCircle({
   const intensity = normalizeMetering(metering);
   const isProcessing = phase === "transcribing" || phase === "thinking";
   const isSpeaking = phase === "speaking";
+  const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
   const pulse = useSharedValue(0);
   const orbit = useSharedValue(0);
   const energy = useSharedValue(intensity);
+  const shouldAnimate = appState === "active" && isActive;
 
   useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      setAppState(nextAppState);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!shouldAnimate) {
+      cancelAnimation(orbit);
+      orbit.value = 0;
+      return;
+    }
+
     orbit.value = withRepeat(
       withTiming(1, { duration: 4600, easing: Easing.inOut(Easing.ease) }),
       -1,
       true
     );
-  }, [orbit]);
+  }, [orbit, shouldAnimate]);
 
   useEffect(() => {
-    energy.value = withTiming(intensity, {
+    energy.value = withTiming(shouldAnimate ? intensity : 0, {
       duration: 120,
       easing: Easing.out(Easing.ease),
     });
-  }, [energy, intensity]);
+  }, [energy, intensity, shouldAnimate]);
 
   useEffect(() => {
+    if (!shouldAnimate) {
+      cancelAnimation(pulse);
+      pulse.value = 0;
+      return;
+    }
+
     const highPoint =
       phase === "idle"
         ? 0.38
@@ -201,7 +262,7 @@ export function WaveformCircle({
       -1,
       false
     );
-  }, [phase, pulse]);
+  }, [phase, pulse, shouldAnimate]);
 
   const interactionHint =
     phase === "recording"
@@ -226,51 +287,51 @@ export function WaveformCircle({
 
   const outerRingStyle = useAnimatedStyle(() => ({
     opacity: 0.38 + pulse.value * 0.15,
-    transform: [{ scale: 0.98 + pulse.value * 0.03 + energy.value * 0.03 }],
+    transform: [{ scale: 0.98 + pulse.value * 0.03 + energy.value * 0.03 } as const],
   }));
 
   const innerRingStyle = useAnimatedStyle(() => ({
     opacity: 0.52 + pulse.value * 0.12,
-    transform: [{ scale: 0.995 + pulse.value * 0.025 + energy.value * 0.02 }],
+    transform: [{ scale: 0.995 + pulse.value * 0.025 + energy.value * 0.02 } as const],
   }));
 
   const circleShellStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 0.992 + pulse.value * 0.028 + energy.value * 0.025 }],
+    transform: [{ scale: 0.992 + pulse.value * 0.028 + energy.value * 0.025 } as const],
   }));
 
   const topAuraStyle = useAnimatedStyle(() => ({
     opacity: 0.16 + pulse.value * 0.14 + energy.value * 0.12,
     transform: [
-      { translateX: interpolate(orbit.value, [0, 1], [-12, 12]) },
-      { translateY: interpolate(orbit.value, [0, 1], [6, -8]) },
-      { scale: 1 + pulse.value * 0.08 + energy.value * 0.08 },
-    ],
+      { translateX: interpolate(orbit.value, [0, 1], [-12, 12]) } as const,
+      { translateY: interpolate(orbit.value, [0, 1], [6, -8]) } as const,
+      { scale: 1 + pulse.value * 0.08 + energy.value * 0.08 } as const,
+    ] as any,
   }));
 
   const bottomAuraStyle = useAnimatedStyle(() => ({
     opacity: 0.18 + pulse.value * 0.1 + energy.value * 0.12,
     transform: [
-      { translateX: interpolate(orbit.value, [0, 1], [10, -10]) },
-      { translateY: interpolate(orbit.value, [0, 1], [-8, 10]) },
-      { scale: 1.04 + pulse.value * 0.06 + energy.value * 0.06 },
-    ],
+      { translateX: interpolate(orbit.value, [0, 1], [10, -10]) } as const,
+      { translateY: interpolate(orbit.value, [0, 1], [-8, 10]) } as const,
+      { scale: 1.04 + pulse.value * 0.06 + energy.value * 0.06 } as const,
+    ] as any,
   }));
 
   const sheenStyle = useAnimatedStyle(() => ({
     opacity: 0.16 + pulse.value * 0.08,
     transform: [
-      { translateX: interpolate(orbit.value, [0, 1], [-20, 16]) },
-      { rotate: `${interpolate(orbit.value, [0, 1], [-8, 8])}deg` },
-    ],
+      { translateX: interpolate(orbit.value, [0, 1], [-20, 16]) } as const,
+      { rotate: `${interpolate(orbit.value, [0, 1], [-8, 8])}deg` } as const,
+    ] as any,
   }));
 
   const badgeStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: interpolate(orbit.value, [0, 1], [0, -2]) }],
+    transform: [{ translateY: interpolate(orbit.value, [0, 1], [0, -2]) } as const],
   }));
 
   const waveformStyle = useAnimatedStyle(() => ({
     opacity: 0.88 + energy.value * 0.12,
-    transform: [{ translateY: -2 - energy.value * 4 }],
+    transform: [{ translateY: -2 - energy.value * 4 } as const],
   }));
 
   return (
@@ -291,9 +352,24 @@ export function WaveformCircle({
           innerRingStyle,
         ]}
       />
-      <RippleRing delay={0} color={ringColor} isActive={isActive} intensity={intensity} />
-      <RippleRing delay={500} color={ringColor} isActive={isActive} intensity={intensity} />
-      <RippleRing delay={1000} color={ringColor} isActive={isActive} intensity={intensity} />
+      <RippleRing
+        delay={0}
+        color={ringColor}
+        isActive={shouldAnimate}
+        intensity={intensity}
+      />
+      <RippleRing
+        delay={500}
+        color={ringColor}
+        isActive={shouldAnimate}
+        intensity={intensity}
+      />
+      <RippleRing
+        delay={1000}
+        color={ringColor}
+        isActive={shouldAnimate}
+        intensity={intensity}
+      />
       <Animated.View style={circleShellStyle}>
         <TouchableOpacity
           activeOpacity={0.9}
@@ -357,7 +433,11 @@ export function WaveformCircle({
               <Text style={styles.innerBadgeText}>{interactionHint}</Text>
             </Animated.View>
             {isProcessing ? (
-              <ProcessingIndicator phase={phase} providerLabel={providerLabel} />
+              <ProcessingIndicator
+                phase={phase}
+                providerLabel={providerLabel}
+                isAnimating={shouldAnimate}
+              />
             ) : (
               <Animated.View style={[styles.waveformWrap, waveformStyle]}>
                 <Waveform
