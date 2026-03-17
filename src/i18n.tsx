@@ -576,12 +576,12 @@ const translations = {
     couldntShareText: "Der Text konnte nicht geteilt werden.",
     couldntReplayReply: "Die Antwort konnte nicht erneut abgespielt werden.",
     messageCopied: "Nachricht kopiert.",
-    noConversationToCopyYet: "Noch keine Unterhaltung zum Kopieren.",
-    noConversationToShareYet: "Noch keine Unterhaltung zum Teilen.",
+    noConversationToCopyYet: "Noch kein Schnack zum Kopieren.",
+    noConversationToShareYet: "Noch kein Schnack zum Teilen.",
     noReplyToRepeatYet: "Noch keine Antwort zum Wiederholen.",
-    threadCopied: "Verlauf kopiert.",
-    threadRenamed: "Verlauf umbenannt.",
-    threadPinned: "Verlauf angeheftet.",
+    threadCopied: "Schnack kopiert.",
+    threadRenamed: "Schnack umbenannt.",
+    threadPinned: "Schnack angeheftet.",
     threadUnpinned: "Nicht mehr angeheftet.",
     addProviderKeyToUseProvider: ({ provider }) =>
       `Füge in den Einstellungen deinen API-Schlüssel für ${provider} hinzu, um diesen Anbieter zu nutzen.`,
@@ -635,21 +635,21 @@ const translations = {
     speechInputRoute: ({ route }) => `Sprache rein: ${route}`,
     replyModelRoute: ({ route }) => `Antwortmodell: ${route}`,
     voiceOutputRoute: ({ route }) => `Stimme raus: ${route}`,
-    conversation: "Unterhaltung",
+    conversation: "Schnack",
     show: "Anzeigen",
     open: "Öffnen",
-    copyThread: "Verlauf kopieren",
-    shareThread: "Verlauf teilen",
+    copyThread: "Schnack kopieren",
+    shareThread: "Schnack teilen",
     repeatReply: "Antwort wiederholen",
-    renameThread: "Verlauf umbenennen",
+    renameThread: "Schnack umbenennen",
     renameThreadHint:
-      "Gib dieser Unterhaltung einen Titel, den du später schnell wiederfindest.",
-    threadTitle: "Verlaufstitel",
+      "Gib diesem Schnack einen Titel, den du später schnell wiederfindest.",
+    threadTitle: "Schnack-Titel",
     noTranscriptYet: "Noch kein Transkript",
     previewTranscriptEmptyDescription:
       "Starte oben mit der Sprachsteuerung. Deine Nachrichten und die Modellantwort erscheinen hier sofort.",
     transcript: "Transkript",
-    noConversationYet: "Noch keine Unterhaltung",
+    noConversationYet: "Noch kein Schnack",
     expandedTranscriptEmptyDescription:
       "Sprich über die Steuerung oben. Schließe diesen Bildschirm, wenn du zur Hauptansicht zurückkehren willst.",
     transcriptSelectionHint:
@@ -659,18 +659,18 @@ const translations = {
       "Groq bietet einen kostenlosen Tarif und ist damit der schnellste Weg, die App freizuschalten. Füge in den Einstellungen den API-Schlüssel hinzu – der Anbieter-Umschalter erscheint dann sofort hier.",
     live: "Live",
     idle: "Bereit",
-    yourConversationAppearsHere: "Deine Unterhaltung erscheint hier",
+    yourConversationAppearsHere: "Dein Schnack erscheint hier",
     defaultTranscriptEmptyDescription:
-      "Halte die Sprachsteuerung gedrückt und sprich ganz natürlich. SchnackAI behält den Verlauf und antwortet dir per Stimme.",
+      "Halte die Sprachsteuerung gedrückt und sprich ganz natürlich. SchnackAI behält den Schnack und antwortet dir per Stimme.",
     delete: "Löschen",
     memory: "Speicher",
-    conversations: "Unterhaltungen",
+    conversations: "Schnacks",
     drawerSubtitle:
-      "Wechsle zwischen aktiven Verläufen oder starte einen neuen Raum.",
+      "Wechsle zwischen aktiven Schnacks oder starte einen neuen Raum.",
     newSession: "Neue Sitzung",
-    noSavedConversationsYet: "Noch keine gespeicherten Unterhaltungen",
+    noSavedConversationsYet: "Noch keine gespeicherten Schnacks",
     drawerEmptyDescription:
-      "Sprich in der Hauptansicht los und SchnackAI erstellt automatisch eine Sitzung.",
+      "Sprich in der Hauptansicht los und SchnackAI erstellt automatisch einen Schnack.",
     setupGuideTitle: "Wähle ein Start-Setup",
     setupGuideSubtitle:
       "Such dir zuerst einen Stack aus. Später kannst du jede Route in den Einstellungen ändern.",
@@ -686,15 +686,15 @@ const translations = {
     notNow: "Jetzt nicht",
     searchConversationsPlaceholder:
       "Suche nach Titeln, Modellen und Nachrichtentext",
-    noMatchingConversations: "Keine passenden Unterhaltungen",
+    noMatchingConversations: "Keine passenden Schnacks",
     noMatchingConversationsDescription:
       "Versuch es mit einem anderen Titel, Anbieter, Modell oder Satz aus dem Transkript.",
-    memoryModalTitle: "Gesprächsspeicher",
+    memoryModalTitle: "Schnack-Speicher",
     memoryModalDescription:
-      "Das ist die kompakte Zusammenfassung, die SchnackAI weiterträgt, sobald ein Verlauf lang genug wird und ältere Beiträge zusammengefasst werden.",
+      "Das ist die kompakte Zusammenfassung, die SchnackAI weiterträgt, sobald ein Schnack lang genug wird und ältere Beiträge zusammengefasst werden.",
     memorySummary: "Gespeicherte Zusammenfassung",
     memorySummaryEmpty:
-      "Noch kein kompakter Speicher. Sobald dieser Verlauf länger wird, werden ältere Beiträge hier zusammengefasst.",
+      "Noch kein kompakter Speicher. Sobald dieser Schnack länger wird, werden ältere Beiträge hier zusammengefasst.",
     summarizedTurnsCount: ({ count }) =>
       Number(count) === 1
         ? "1 zusammengefasster Beitrag"
@@ -702,8 +702,8 @@ const translations = {
     copyMemory: "Speicher kopieren",
     forgetMemory: "Speicher vergessen",
     memoryCopied: "Speicher kopiert.",
-    memoryCleared: "Gesprächsspeicher gelöscht.",
-    noConversationToManageYet: "Noch kein Gesprächsspeicher verfügbar.",
+    memoryCleared: "Schnack-Speicher gelöscht.",
+    noConversationToManageYet: "Noch kein Schnack-Speicher verfügbar.",
     yesterday: "Gestern",
     noProviderYet: "Noch kein Anbieter",
     noModelYet: "Noch kein Modell",
@@ -739,7 +739,7 @@ const translations = {
     providerTemporaryError: ({ provider, action }) =>
       `${provider} hatte während ${action} ein vorübergehendes Problem. Versuch es in Kürze erneut.`,
     providerContextTooLong: ({ provider }) =>
-      `${provider} hat die Antwort abgelehnt, weil die Unterhaltung zu lang geworden ist. Starte einen neuen Verlauf oder kürze die Anfrage.`,
+      `${provider} hat die Antwort abgelehnt, weil der Schnack zu lang geworden ist. Starte einen neuen Schnack oder kürze die Anfrage.`,
     providerRequestRejected: ({ provider, action, detail }) =>
       detail
         ? `${provider} hat die Anfrage für ${action} abgelehnt: ${detail}`
@@ -779,8 +779,8 @@ const translations = {
     user: "Nutzer",
     you: "Du",
     assistant: "Assistent",
-    untitledConversation: "Unbenannte Unterhaltung",
-    conversationExportHeader: ({ title }) => `Unterhaltung: ${title}`,
+    untitledConversation: "Unbenannter Schnack",
+    conversationExportHeader: ({ title }) => `Schnack: ${title}`,
     speechRecognitionPermissionNotGranted:
       "Berechtigung für Spracherkennung wurde nicht erteilt.",
     speechRecognitionUnavailableForDeviceLanguage:
