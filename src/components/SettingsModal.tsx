@@ -77,6 +77,23 @@ const TABS: SettingsTab[] = [
   "ui",
 ];
 
+const SETTINGS_HEADER_TOP_PADDING = 22;
+const SETTINGS_HEADER_BOTTOM_PADDING = 18;
+const SETTINGS_HEADER_CONTROL_SIZE = 40;
+const SETTINGS_HEADER_HEIGHT =
+  SETTINGS_HEADER_TOP_PADDING +
+  SETTINGS_HEADER_BOTTOM_PADDING +
+  SETTINGS_HEADER_CONTROL_SIZE;
+const SETTINGS_TAB_ROW_TOP_PADDING = 16;
+const SETTINGS_TAB_ROW_BOTTOM_PADDING = 14;
+const SETTINGS_TAB_BUTTON_HEIGHT = 38;
+const SETTINGS_TAB_SECTION_HEIGHT =
+  SETTINGS_TAB_ROW_TOP_PADDING +
+  SETTINGS_TAB_ROW_BOTTOM_PADDING +
+  SETTINGS_TAB_BUTTON_HEIGHT;
+const SETTINGS_HERO_GLOW_HEIGHT =
+  SETTINGS_HEADER_HEIGHT + SETTINGS_TAB_SECTION_HEIGHT;
+
 function getTabLabel(
   tab: SettingsTab,
   t: ReturnType<typeof useLocalization>["t"]
@@ -1573,7 +1590,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 180,
+    height: SETTINGS_HERO_GLOW_HEIGHT,
   },
   header: {
     flexDirection: "row",
@@ -1581,8 +1598,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 16,
     paddingHorizontal: 22,
-    paddingTop: 22,
-    paddingBottom: 18,
+    paddingTop: SETTINGS_HEADER_TOP_PADDING,
+    paddingBottom: SETTINGS_HEADER_BOTTOM_PADDING,
     borderBottomWidth: 1,
   },
   headerCopy: {
@@ -1595,26 +1612,26 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,
   },
   closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: SETTINGS_HEADER_CONTROL_SIZE,
+    height: SETTINGS_HEADER_CONTROL_SIZE,
+    borderRadius: SETTINGS_HEADER_CONTROL_SIZE / 2,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
   },
   tabRow: {
     paddingHorizontal: 18,
-    paddingTop: 16,
-    paddingBottom: 14,
+    paddingTop: SETTINGS_TAB_ROW_TOP_PADDING,
+    paddingBottom: SETTINGS_TAB_ROW_BOTTOM_PADDING,
     gap: 10,
     alignItems: "center",
   },
   tabScroll: {
     flexGrow: 0,
-    minHeight: 68,
+    minHeight: SETTINGS_TAB_SECTION_HEIGHT,
   },
   tabButton: {
-    minHeight: 38,
+    minHeight: SETTINGS_TAB_BUTTON_HEIGHT,
     paddingHorizontal: 14,
     borderRadius: 16,
     borderWidth: 1,
