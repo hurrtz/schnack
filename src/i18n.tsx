@@ -689,7 +689,7 @@ const translations = {
     usageStatsHiddenDescription:
       "Blende Token- und Kostenschätzungen im Transkript aus.",
     usageStatsVisibleDescription:
-      "Zeige geschätzte Token-Nutzung und geschätzte Kosten pro Antwort sowie für die gesamte Unterhaltung.",
+      "Zeige geschätzte Token-Nutzung und geschätzte Kosten pro Antwort sowie für den gesamten Schnack.",
     estimatedUsageTitle: "Geschätzte Nutzung",
     estimatedUsageCounts: ({ replies, summaries }) =>
       `${replies} Antworten · ${summaries} Speicher-Updates`,
