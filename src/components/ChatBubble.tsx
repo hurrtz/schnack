@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { PROVIDER_LABELS } from "../constants/models";
+import { getProviderModelName, PROVIDER_LABELS } from "../constants/models";
 import { useLocalization } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
@@ -29,6 +29,10 @@ export function ChatBubble({
   const providerLabel = message.provider
     ? PROVIDER_LABELS[message.provider]
     : null;
+  const modelLabel =
+    message.provider && message.model
+      ? getProviderModelName(message.provider, message.model)
+      : message.model;
 
   const bubbleContent = (
     <>
@@ -46,7 +50,7 @@ export function ChatBubble({
             {providerLabel}
           </Text>
           <Text style={[styles.modelLabel, { color: colors.textSecondary }]}>
-            {message.model}
+            {modelLabel}
           </Text>
         </View>
       )}
@@ -195,7 +199,7 @@ export function ChatBubble({
 }
 
 const styles = StyleSheet.create({
-  wrapper: { marginVertical: 5, paddingHorizontal: 18 },
+  wrapper: { marginVertical: 5 },
   wrapperUser: { alignItems: "flex-end" },
   wrapperAssistant: { alignItems: "flex-start" },
   bubble: {

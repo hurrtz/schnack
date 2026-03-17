@@ -25,6 +25,7 @@ import { WaveformBar } from "../components/WaveformBar";
 import { WaveformCircle } from "../components/WaveformCircle";
 import {
   getTtsVoiceLabel,
+  getProviderModelName,
   PROVIDER_DEFAULT_TTS_VOICES,
   PROVIDER_LABELS,
 } from "../constants/models";
@@ -88,6 +89,7 @@ export function MainScreen() {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [settingsFocusProvider, setSettingsFocusProvider] = useState<Provider | undefined>();
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [statusDetailsVisible, setStatusDetailsVisible] = useState(false);
   const [transcriptVisible, setTranscriptVisible] = useState(false);
   const [conversationMenuVisible, setConversationMenuVisible] = useState(false);
   const [setupGuideVisible, setSetupGuideVisible] = useState(false);
@@ -131,6 +133,7 @@ export function MainScreen() {
       ""
     : "";
   const providerLabel = PROVIDER_LABELS[provider];
+  const modelLabel = getProviderModelName(provider, model);
   const isBusy = pipelinePhase !== "idle";
   const isRecording =
     settings.sttMode === "native" ? nativeStt.isRecording : recorder.isRecording;
@@ -928,10 +931,32 @@ export function MainScreen() {
       ]
     : baseMessages;
 
-  const sessionMeta = activeConversation
-    ? `${t("messageCount", { count: messages.length })} · ${providerLabel} · ${model}`
-    : `${providerLabel} · ${model}`;
-  const routeModelLabel = `${providerLabel} · ${model}`;
+  const messageCountLabel = messages.length > 0
+    ? t("messageCount", { count: messages.length })
+    : null;
+  const routeModelLabel = `${providerLabel} · ${modelLabel}`;
+  const statusTitle =
+    visualPhase === "recording"
+      ? t("listening")
+      : visualPhase === "transcribing"
+        ? t("parsing")
+        : visualPhase === "thinking"
+          ? t("thinking")
+          : visualPhase === "speaking"
+            ? t("speaking")
+            : t("idle");
+  const statusDetail =
+    visualPhase === "recording"
+      ? t("listeningToYourVoice")
+      : visualPhase === "transcribing"
+        ? t("parsingYourVoiceInput")
+        : visualPhase === "thinking"
+          ? t("waitingForProvider", { provider: providerLabel })
+          : visualPhase === "speaking"
+            ? t("speakingBackToYou")
+            : messageCountLabel ?? t("freshSession");
+  const activeConversationTitle =
+    activeConversation?.title.trim() || t("untitledConversation");
 
   const openMemory = useCallback(
     async (conversationId?: string) => {
@@ -987,6 +1012,14 @@ export function MainScreen() {
     setTranscriptVisible(false);
   }, []);
 
+  const openStatusDetails = useCallback(() => {
+    setStatusDetailsVisible(true);
+  }, []);
+
+  const closeStatusDetails = useCallback(() => {
+    setStatusDetailsVisible(false);
+  }, []);
+
   const closeConversationMenu = useCallback(() => {
     setConversationMenuVisible(false);
   }, []);
@@ -994,6 +1027,12 @@ export function MainScreen() {
   const toggleConversationMenu = useCallback(() => {
     setConversationMenuVisible((previous) => !previous);
   }, []);
+
+  useEffect(() => {
+    if (messages.length === 0 && transcriptVisible) {
+      closeTranscript();
+    }
+  }, [closeTranscript, messages.length, transcriptVisible]);
 
   const renderTopBar = (compact = false) => (
     <View style={styles.topBar}>
@@ -1258,7 +1297,7 @@ export function MainScreen() {
             />
             <View
               style={[
-                styles.statusCard,
+                styles.statusStrip,
                 {
                   backgroundColor: colors.surface,
                   borderColor: colors.border,
@@ -1266,25 +1305,11 @@ export function MainScreen() {
                 },
               ]}
             >
-              <View style={styles.statusCardHeader}>
-                <View style={styles.statusHeaderCopy}>
-                  <Text style={[styles.statusTitle, { color: colors.text }]}>
-                    {t("controlRoom")}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.livePill,
-                    styles.controlRoomPill,
-                    {
-                      backgroundColor: colors.surfaceElevated,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
+              <View style={styles.statusStripCopy}>
+                <View style={styles.statusStripLead}>
                   <View
                     style={[
-                      styles.liveDot,
+                      styles.statusStripDot,
                       {
                         backgroundColor: isActive
                           ? colors.success
@@ -1292,41 +1317,136 @@ export function MainScreen() {
                       },
                     ]}
                   />
-                  <Text
-                    style={[
-                      styles.livePillText,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    {isActive ? t("live") : t("idle")}
+                  <Text style={[styles.statusStripTitle, { color: colors.text }]}>
+                    {statusTitle}
                   </Text>
                 </View>
-              </View>
-              <View style={styles.statusMetaRow}>
-                <Text style={[styles.statusMeta, { color: colors.textMuted }]}>
-                  {sessionMeta}
-                </Text>
-                <Text style={[styles.statusMeta, { color: colors.textMuted }]}>
-                  {ttsStatusLabel}
-                </Text>
-              </View>
-              <View style={styles.statusRouteList}>
-                <Text style={[styles.statusRouteText, { color: colors.textMuted }]}>
-                  {t("speechInputRoute", { route: sttStatusLabel })}
-                </Text>
-                <Text style={[styles.statusRouteText, { color: colors.textMuted }]}>
-                  {t("replyModelRoute", { route: routeModelLabel })}
-                </Text>
-                <Text style={[styles.statusRouteText, { color: colors.textMuted }]}>
-                  {t("voiceOutputRoute", { route: ttsStatusLabel })}
+                <Text
+                  style={[
+                    styles.statusStripDetail,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {statusDetail}
                 </Text>
               </View>
+              <TouchableOpacity
+                style={[
+                  styles.statusStripInfoButton,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+                onPress={openStatusDetails}
+                activeOpacity={0.85}
+              >
+                <Feather name="info" size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
           </View>
 
+          {messages.length > 0 ? (
+            <View
+              style={[
+                styles.transcriptShell,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  shadowColor: colors.glow,
+                },
+              ]}
+            >
+              {renderConversationMenu("preview")}
+
+              <LinearGradient
+                pointerEvents="none"
+                colors={[
+                  colors.surface,
+                  `${colors.surface}F2`,
+                  `${colors.surface}E0`,
+                  `${colors.surface}80`,
+                  `${colors.surface}00`,
+                ]}
+                locations={[0, 0.2, 0.46, 0.72, 1]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={styles.transcriptTopFade}
+              />
+
+              <View style={styles.transcriptHeader}>
+                <View style={styles.transcriptTopActions}>
+                  <TouchableOpacity
+                    style={[
+                      styles.expandButton,
+                      {
+                        backgroundColor: colors.surfaceElevated,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                    onPress={openTranscript}
+                  >
+                    <Text
+                      style={[styles.expandButtonText, { color: colors.text }]}
+                    >
+                      {t("show")}
+                    </Text>
+                    <Feather
+                      name="arrow-up-right"
+                      size={15}
+                      color={colors.accent}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.menuIconButton,
+                      {
+                        backgroundColor: colors.surfaceElevated,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                    onPress={toggleConversationMenu}
+                    activeOpacity={0.85}
+                  >
+                    <Feather
+                      name="more-horizontal"
+                      size={18}
+                      color={colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <ChatTranscript
+                messages={messages}
+                emptyTitle={t("noTranscriptYet")}
+                emptyDescription={t("previewTranscriptEmptyDescription")}
+                contentContainerStyle={styles.previewTranscriptContent}
+                scrollEnabled={false}
+                onCopyMessage={(message) => {
+                  void handleCopyMessage(message.content);
+                }}
+              />
+            </View>
+          ) : null}
+        </ScrollView>
+      </View>
+
+      <Modal
+        visible={statusDetailsVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeStatusDetails}
+      >
+        <SafeAreaView style={styles.statusDetailsOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            onPress={closeStatusDetails}
+            activeOpacity={1}
+          />
           <View
             style={[
-              styles.transcriptShell,
+              styles.statusDetailsCard,
               {
                 backgroundColor: colors.surface,
                 borderColor: colors.border,
@@ -1334,69 +1454,145 @@ export function MainScreen() {
               },
             ]}
           >
-            {renderConversationMenu("preview")}
-
-            <View style={styles.transcriptHeader}>
-              <View style={styles.transcriptHeaderCopy}>
-                <Text style={[styles.transcriptTitle, { color: colors.text }]}>
-                  {t("conversation")}
+            <View style={styles.statusDetailsHeader}>
+              <View style={styles.statusDetailsHeaderCopy}>
+                <Text style={[styles.statusDetailsTitle, { color: colors.text }]}>
+                  {t("currentSetup")}
+                </Text>
+                <Text
+                  style={[
+                    styles.statusDetailsSubtitle,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {statusDetail}
                 </Text>
               </View>
-              <View style={styles.transcriptTopActions}>
-                <TouchableOpacity
-                  style={[
-                    styles.expandButton,
-                    {
-                      backgroundColor: colors.surfaceElevated,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={openTranscript}
-                >
-                  <Text
-                    style={[styles.expandButtonText, { color: colors.text }]}
-                  >
-                    {t("show")}
-                  </Text>
-                  <Feather
-                    name="arrow-up-right"
-                    size={15}
-                    color={colors.accent}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.menuIconButton,
-                    {
-                      backgroundColor: colors.surfaceElevated,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={toggleConversationMenu}
-                  activeOpacity={0.85}
-                >
-                  <Feather
-                    name="more-horizontal"
-                    size={18}
-                    color={colors.textSecondary}
-                  />
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={[
+                  styles.menuIconButton,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+                onPress={closeStatusDetails}
+                activeOpacity={0.85}
+              >
+                <Feather name="x" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
 
-            <ChatTranscript
-              messages={messages}
-              emptyTitle={t("noTranscriptYet")}
-              emptyDescription={t("previewTranscriptEmptyDescription")}
-              contentContainerStyle={styles.previewTranscriptContent}
-              scrollEnabled={false}
-              onCopyMessage={(message) => {
-                void handleCopyMessage(message.content);
-              }}
-            />
+            <View style={styles.statusDetailsBadges}>
+              <View
+                style={[
+                  styles.livePill,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.liveDot,
+                    {
+                      backgroundColor: isActive
+                        ? colors.success
+                        : colors.accentWarm,
+                    },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.livePillText,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {statusTitle}
+                </Text>
+              </View>
+              {messageCountLabel ? (
+                <View
+                  style={[
+                    styles.statusDetailsBadge,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusDetailsBadgeText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {messageCountLabel}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.statusDetailsList}>
+              <View
+                style={[
+                  styles.statusDetailsItem,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusDetailsItemLabel,
+                    { color: colors.textMuted },
+                  ]}
+                >
+                  {t("speechInputRoute", { route: sttStatusLabel })}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.statusDetailsItem,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusDetailsItemLabel,
+                    { color: colors.textMuted },
+                  ]}
+                >
+                  {t("replyModelRoute", { route: routeModelLabel })}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.statusDetailsItem,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusDetailsItemLabel,
+                    { color: colors.textMuted },
+                  ]}
+                >
+                  {t("voiceOutputRoute", { route: ttsStatusLabel })}
+                </Text>
+              </View>
+            </View>
           </View>
-        </ScrollView>
-      </View>
+        </SafeAreaView>
+      </Modal>
 
       <Modal
         visible={transcriptVisible}
@@ -1466,6 +1662,15 @@ export function MainScreen() {
               ]}
             >
               <View style={styles.expandedTranscriptHeader}>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.expandedTranscriptTitle,
+                    { color: colors.text },
+                  ]}
+                >
+                  {activeConversationTitle}
+                </Text>
                 <TouchableOpacity
                   style={[
                     styles.menuIconButton,
@@ -1655,7 +1860,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: 1,
     padding: 10,
-    marginBottom: 8,
+    marginBottom: 28,
     overflow: "hidden",
     shadowOffset: { width: 0, height: 22 },
     shadowOpacity: 0.12,
@@ -1736,14 +1941,11 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     fontFamily: fonts.mono,
   },
-  controlRoomPill: {
-    marginLeft: "auto",
-  },
   stageBlock: {
     width: "100%",
     alignItems: "center",
-    paddingTop: 0,
-    paddingBottom: 18,
+    paddingTop: 20,
+    paddingBottom: 22,
   },
   stageHalo: {
     position: "absolute",
@@ -1752,61 +1954,60 @@ const styles = StyleSheet.create({
     borderRadius: 140,
     opacity: 0.18,
   },
-  statusCard: {
+  statusStrip: {
     width: "100%",
     maxWidth: 360,
-    marginTop: 18,
-    borderRadius: 28,
+    marginTop: 36,
+    borderRadius: 24,
     borderWidth: 1,
-    padding: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.12,
     shadowRadius: 30,
     elevation: 8,
   },
-  statusCardHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    marginBottom: 2,
-  },
-  statusHeaderCopy: {
+  statusStripCopy: {
     flex: 1,
     minWidth: 0,
+    gap: 4,
   },
-  statusTitle: {
-    fontSize: 24,
-    lineHeight: 28,
+  statusStripLead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  statusStripDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  statusStripTitle: {
+    fontSize: 17,
+    lineHeight: 22,
     fontFamily: fonts.display,
   },
-  statusMetaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-    marginTop: 14,
-  },
-  statusMeta: {
-    fontSize: 11,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    fontFamily: fonts.mono,
-  },
-  statusRouteList: {
-    marginTop: 12,
-    gap: 6,
-  },
-  statusRouteText: {
+  statusStripDetail: {
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 18,
     fontFamily: fonts.body,
+  },
+  statusStripInfoButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   transcriptShell: {
     height: 288,
     borderRadius: 32,
     borderWidth: 1,
     position: "relative",
-    paddingTop: 18,
-    paddingHorizontal: 16,
     overflow: "hidden",
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.12,
@@ -1827,27 +2028,28 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   transcriptHeader: {
+    position: "absolute",
+    top: 14,
+    right: 16,
     flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+    alignItems: "center",
+    justifyContent: "flex-end",
     gap: 12,
-    marginBottom: 8,
-  },
-  transcriptHeaderCopy: {
-    flex: 1,
-    gap: 4,
+    zIndex: 2,
   },
   transcriptTopActions: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
     gap: 8,
-    marginTop: -2,
   },
-  transcriptTitle: {
-    fontSize: 24,
-    lineHeight: 28,
-    fontFamily: fonts.display,
+  transcriptTopFade: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 112,
+    zIndex: 1,
   },
   menuIconButton: {
     width: 38,
@@ -1907,6 +2109,8 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,
   },
   previewTranscriptContent: {
+    paddingTop: 0,
+    paddingHorizontal: 16,
     paddingBottom: 26,
   },
   expandedTranscriptContent: {
@@ -1919,6 +2123,73 @@ const styles = StyleSheet.create({
   },
   transcriptModal: {
     flex: 1,
+  },
+  statusDetailsOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    backgroundColor: "rgba(0,0,0,0.16)",
+  },
+  statusDetailsCard: {
+    borderRadius: 30,
+    borderWidth: 1,
+    padding: 20,
+    gap: 16,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.12,
+    shadowRadius: 30,
+    elevation: 12,
+  },
+  statusDetailsHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  statusDetailsHeaderCopy: {
+    flex: 1,
+    gap: 6,
+  },
+  statusDetailsTitle: {
+    fontSize: 24,
+    lineHeight: 28,
+    fontFamily: fonts.display,
+  },
+  statusDetailsSubtitle: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: fonts.body,
+  },
+  statusDetailsBadges: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  statusDetailsBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  statusDetailsBadgeText: {
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    fontFamily: fonts.mono,
+  },
+  statusDetailsList: {
+    gap: 10,
+  },
+  statusDetailsItem: {
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  statusDetailsItemLabel: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: fonts.body,
   },
   expandedTopBar: {
     flexDirection: "row",
@@ -1936,9 +2207,14 @@ const styles = StyleSheet.create({
   expandedTranscriptHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end",
     gap: 12,
     marginBottom: 10,
+  },
+  expandedTranscriptTitle: {
+    flex: 1,
+    fontSize: 18,
+    lineHeight: 24,
+    fontFamily: fonts.display,
   },
   expandedTranscriptHint: {
     fontSize: 13,

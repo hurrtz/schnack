@@ -1,5 +1,5 @@
 import { Conversation, Message } from "../types";
-import { PROVIDER_LABELS } from "../constants/models";
+import { getProviderModelName, PROVIDER_LABELS } from "../constants/models";
 import { AppLanguage } from "../types";
 import { translate } from "../i18n";
 
@@ -9,7 +9,10 @@ function formatSpeakerLabel(message: Message, language: AppLanguage) {
   }
 
   if (message.provider && message.model) {
-    return `${PROVIDER_LABELS[message.provider]} · ${message.model}`;
+    return `${PROVIDER_LABELS[message.provider]} · ${getProviderModelName(
+      message.provider,
+      message.model
+    )}`;
   }
 
   if (message.provider) {

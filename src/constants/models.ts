@@ -328,6 +328,11 @@ export const PROVIDER_MODELS: Record<Provider, ModelInfo[]> = Object.fromEntries
   PROVIDER_ORDER.map((provider) => [provider, PROVIDER_CONFIGS[provider].models])
 ) as Record<Provider, ModelInfo[]>;
 
+export function getProviderModelName(provider: Provider, modelId: string) {
+  const match = PROVIDER_MODELS[provider].find((model) => model.id === modelId);
+  return match?.name ?? modelId;
+}
+
 const NATIVE_STT_LANGUAGE_NOTES_BY_LANGUAGE: Record<AppLanguage, string> = {
   en: NATIVE_STT_LANGUAGE_NOTE,
   de:
