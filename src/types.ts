@@ -16,7 +16,16 @@ export type ReplyPlayback = "stream" | "wait";
 export type TtsPlayback = ReplyPlayback;
 export type ThemeMode = "light" | "dark" | "system";
 export type AppLanguage = "en" | "de";
-export type TtsListenLanguage = "en" | "de" | "es" | "fr" | "it" | "pt" | "ja";
+export type TtsListenLanguage =
+  | "en"
+  | "de"
+  | "zh"
+  | "es"
+  | "pt"
+  | "hi"
+  | "fr"
+  | "it"
+  | "ja";
 export type SttBackendMode = "native" | "provider";
 export type TtsBackendMode = "native" | "provider" | "local";
 export type AssistantResponseLength = "brief" | "normal" | "thorough";

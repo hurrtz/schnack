@@ -9,6 +9,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@dr.pogodin/react-native-fs": "^2.37.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "^55.0.6",
     "expo-audio": "~55.0.8",

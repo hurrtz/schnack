@@ -6,6 +6,14 @@ function detectScriptLanguage(text: string): TtsListenLanguage | null {
     return "ja";
   }
 
+  if (/[\u0900-\u097f]/.test(text)) {
+    return "hi";
+  }
+
+  if (/[\u4e00-\u9fff]/.test(text)) {
+    return "zh";
+  }
+
   return null;
 }
 
@@ -32,6 +40,90 @@ function scoreLanguage(text: string, language: TtsListenLanguage) {
     let score = 0;
 
     for (const token of [" the ", " and ", " you ", " is ", " are ", " this "]) {
+      if (normalized.includes(token)) {
+        score += 1;
+      }
+    }
+
+    return score;
+  }
+
+  if (language === "zh") {
+    let score = /[\u4e00-\u9fff]/.test(text) ? 2 : 0;
+
+    for (const token of ["的", "了", "是", "我", "你", "不"]) {
+      if (text.includes(token)) {
+        score += 1;
+      }
+    }
+
+    return score;
+  }
+
+  if (language === "ja") {
+    let score = /[\u3040-\u30ff]/.test(text) ? 3 : 0;
+
+    for (const token of ["です", "ます", "ない", "して", "この", "その"]) {
+      if (text.includes(token)) {
+        score += 1;
+      }
+    }
+
+    return score;
+  }
+
+  if (language === "hi") {
+    let score = /[\u0900-\u097f]/.test(text) ? 2 : 0;
+
+    for (const token of [" है ", " और ", " नहीं ", " मैं ", " क्या ", " यह "]) {
+      if (normalized.includes(token)) {
+        score += 1;
+      }
+    }
+
+    return score;
+  }
+
+  if (language === "es") {
+    let score = /[áéíóúñ¡¿]/i.test(text) ? 2 : 0;
+
+    for (const token of [" el ", " la ", " que ", " de ", " y ", " no "]) {
+      if (normalized.includes(token)) {
+        score += 1;
+      }
+    }
+
+    return score;
+  }
+
+  if (language === "pt") {
+    let score = /[ãõçáéíóú]/i.test(text) ? 2 : 0;
+
+    for (const token of [" não ", " você ", " que ", " de ", " uma ", " para "]) {
+      if (normalized.includes(token)) {
+        score += 1;
+      }
+    }
+
+    return score;
+  }
+
+  if (language === "fr") {
+    let score = /[àâçéèêëîïôùûüÿœæ]/i.test(text) ? 2 : 0;
+
+    for (const token of [" le ", " la ", " de ", " je ", " pas ", " est "]) {
+      if (normalized.includes(token)) {
+        score += 1;
+      }
+    }
+
+    return score;
+  }
+
+  if (language === "it") {
+    let score = /[àèéìíîòóù]/i.test(text) ? 1 : 0;
+
+    for (const token of [" il ", " che ", " non ", " una ", " per ", " con "]) {
       if (normalized.includes(token)) {
         score += 1;
       }

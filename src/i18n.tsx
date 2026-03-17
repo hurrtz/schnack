@@ -141,7 +141,7 @@ const translations = {
     nativeTtsHint:
       "Native TTS uses the system voice stack and does not require a provider key.",
     localTtsLanguageCoverageHint:
-      "Local packs currently cover English and German. Other selected languages fall back automatically.",
+      "Local packs currently cover English, German, and Simplified Chinese. Other selected languages fall back automatically.",
     ttsVoice: "TTS Voice",
     voiceSelection: "Voice Selection",
     nativeVoiceSelectionHint:
@@ -522,7 +522,7 @@ const translations = {
     nativeTtsHint:
       "Native TTS nutzt die Systemstimmen des Geraets und benoetigt keinen Anbieter-Schluessel.",
     localTtsLanguageCoverageHint:
-      "Lokale Sprachpakete decken aktuell Englisch und Deutsch ab. Andere ausgewaehlte Sprachen fallen automatisch zurueck.",
+      "Lokale Sprachpakete decken aktuell Englisch, Deutsch und vereinfachtes Chinesisch ab. Andere ausgewaehlte Sprachen fallen automatisch zurueck.",
     ttsVoice: "TTS-Stimme",
     voiceSelection: "Stimmenauswahl",
     nativeVoiceSelectionHint:

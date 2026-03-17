@@ -33,11 +33,33 @@ describe("resolveTtsListenLanguage", () => {
       })
     ).toBe("ja");
   });
+
+  it("prefers Simplified Chinese when Han script markers are present", () => {
+    expect(
+      resolveTtsListenLanguage({
+        text: "你好，这是一个本地语音测试。",
+        preferredLanguages: ["en", "zh"],
+        appLanguage: "en",
+      })
+    ).toBe("zh");
+  });
+
+  it("prefers Hindi when Devanagari text is present", () => {
+    expect(
+      resolveTtsListenLanguage({
+        text: "यह एक छोटा स्थानीय आवाज़ परीक्षण है।",
+        preferredLanguages: ["en", "hi"],
+        appLanguage: "en",
+      })
+    ).toBe("hi");
+  });
 });
 
 describe("supportsLocalTtsLanguage", () => {
-  it("currently supports English and German", () => {
+  it("currently supports English, German, and Simplified Chinese", () => {
     expect(supportsLocalTtsLanguage("en")).toBe(true);
     expect(supportsLocalTtsLanguage("de")).toBe(true);
+    expect(supportsLocalTtsLanguage("zh")).toBe(true);
+    expect(supportsLocalTtsLanguage("hi")).toBe(false);
   });
 });

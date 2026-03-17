@@ -41,10 +41,12 @@ const { synthesizeLocalSpeech } = jest.requireMock("../../src/services/localTts"
 const localVoices = {
   en: "af_heart",
   de: "thorsten-medium",
+  zh: "zf_xiaoxiao",
   es: "",
+  pt: "",
+  hi: "",
   fr: "",
   it: "",
-  pt: "",
   ja: "",
 };
 

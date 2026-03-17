@@ -1,5 +1,17 @@
 import * as FileSystem from "expo-file-system/legacy";
 import {
+  copyFile,
+  exists as pathExists,
+  readDir,
+  unlink as unlinkPath,
+} from "@dr.pogodin/react-native-fs";
+import {
+  downloadModelByCategory,
+  getLocalModelPathByCategory,
+  isModelDownloadedByCategory,
+  ModelCategory,
+} from "react-native-sherpa-onnx/download";
+import {
   LOCAL_TTS_KOKORO_MODEL_ID,
   LOCAL_TTS_SUPPORTED_LANGUAGES,
 } from "../constants/localTts";
@@ -11,6 +23,7 @@ const KOKORO_VOICE_URL_BASE =
   "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/voices";
 const KOKORO_SAMPLE_RATE = 24000;
 const KOKORO_STYLE_DIM = 256;
+const KOKORO_MULTILINGUAL_MODEL_ID = "kokoro-multi-lang-v1_0";
 
 const PIPER_GERMAN_VOICES = {
   "thorsten-medium": {
@@ -32,12 +45,23 @@ const PIPER_DATA_MARKERS = [
   "espeak-ng-data/lang/gmw/de",
 ] as const;
 
+const KOKORO_CHINESE_VOICES = {
+  zf_xiaobei: { sid: 24 },
+  zf_xiaoni: { sid: 25 },
+  zf_xiaoxiao: { sid: 26 },
+  zf_xiaoyi: { sid: 27 },
+  zm_yunjian: { sid: 28 },
+  zm_yunxi: { sid: 29 },
+  zm_yunxia: { sid: 30 },
+  zm_yunyang: { sid: 31 },
+} as const;
+
 type KokoroSessionState = {
   session: any;
   modelPath: string;
 };
 
-type PiperSessionState = {
+type SherpaSessionState = {
   engine: any;
   rootPath: string;
 };
@@ -51,7 +75,10 @@ type HuggingFaceModelResponse = {
 let kokoroSessionState: KokoroSessionState | null = null;
 let kokoroSessionPromise: Promise<KokoroSessionState> | null = null;
 const voiceCache = new Map<string, Float32Array>();
-const piperSessionCache = new Map<string, Promise<PiperSessionState> | PiperSessionState>();
+const sherpaSessionCache = new Map<
+  string,
+  Promise<SherpaSessionState> | SherpaSessionState
+>();
 const huggingFaceRepoFilesCache = new Map<string, Promise<string[]>>();
 
 function getLocalTtsRootPath() {
@@ -86,6 +113,92 @@ function getPiperModelPath(voice: string) {
 function getPiperConfigPath(voice: string) {
   const config = getPiperVoiceConfig(voice);
   return config ? `${getPiperVoiceRootPath(voice)}/${config.configFile}` : "";
+}
+
+function getKokoroChineseVoiceConfig(voice: string) {
+  return KOKORO_CHINESE_VOICES[
+    voice as keyof typeof KOKORO_CHINESE_VOICES
+  ] ?? null;
+}
+
+async function directoryContainsFiles(path: string, files: string[]) {
+  if (!(await pathExists(path))) {
+    return false;
+  }
+
+  const entries = await readDir(path);
+  const names = new Set(entries.map((entry) => entry.name));
+  return files.every((file) => names.has(file));
+}
+
+async function findNestedDirectory(
+  path: string,
+  predicate: (candidate: string) => Promise<boolean>,
+  depth = 0
+): Promise<string | null> {
+  if (await predicate(path)) {
+    return path;
+  }
+
+  if (depth >= 3 || !(await pathExists(path))) {
+    return null;
+  }
+
+  const entries = await readDir(path);
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const nested = await findNestedDirectory(entry.path, predicate, depth + 1);
+
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return null;
+}
+
+async function getInstalledKokoroChineseModelRootPath() {
+  const basePath = await getLocalModelPathByCategory(
+    ModelCategory.Tts,
+    KOKORO_MULTILINGUAL_MODEL_ID
+  );
+
+  if (!basePath) {
+    return null;
+  }
+
+  return findNestedDirectory(
+    basePath,
+    (candidate) =>
+      directoryContainsFiles(candidate, [
+        "model.onnx",
+        "voices.bin",
+        "tokens.txt",
+        "lexicon-zh.txt",
+      ])
+  );
+}
+
+async function ensureKokoroChineseModelRootPath() {
+  const rootPath = await getInstalledKokoroChineseModelRootPath();
+
+  if (!rootPath) {
+    throw new Error("The Simplified Chinese local voice pack is not installed yet.");
+  }
+
+  const defaultLexiconPath = `${rootPath}/lexicon.txt`;
+
+  if (await pathExists(defaultLexiconPath)) {
+    await unlinkPath(defaultLexiconPath);
+  }
+
+  await copyFile(`${rootPath}/lexicon-zh.txt`, defaultLexiconPath);
+
+  return rootPath;
 }
 
 async function ensureDirectory(path: string) {
@@ -329,7 +442,7 @@ async function listHuggingFaceRepoFiles(repoId: string) {
 
 async function getPiperSession(voice: string) {
   const rootPath = getPiperVoiceRootPath(voice);
-  const cached = piperSessionCache.get(rootPath);
+  const cached = sherpaSessionCache.get(rootPath);
 
   if (cached) {
     return cached instanceof Promise ? cached : cached;
@@ -354,15 +467,54 @@ async function getPiperSession(voice: string) {
     };
   })()
     .then((state) => {
-      piperSessionCache.set(rootPath, state);
+      sherpaSessionCache.set(rootPath, state);
       return state;
     })
     .catch((error) => {
-      piperSessionCache.delete(rootPath);
+      sherpaSessionCache.delete(rootPath);
       throw error;
     });
 
-  piperSessionCache.set(rootPath, promise);
+  sherpaSessionCache.set(rootPath, promise);
+  return promise;
+}
+
+async function getKokoroChineseSession() {
+  const rootPath = await ensureKokoroChineseModelRootPath();
+  const cached = sherpaSessionCache.get(rootPath);
+
+  if (cached) {
+    return cached instanceof Promise ? cached : cached;
+  }
+
+  const promise = (async () => {
+    const [{ createTTS }, { fileModelPath }] = await Promise.all([
+      import("react-native-sherpa-onnx/tts"),
+      import("react-native-sherpa-onnx"),
+    ]);
+
+    const engine = await createTTS({
+      modelPath: fileModelPath(rootPath),
+      modelType: "kokoro",
+      numThreads: 2,
+      debug: false,
+    });
+
+    return {
+      engine,
+      rootPath,
+    };
+  })()
+    .then((state) => {
+      sherpaSessionCache.set(rootPath, state);
+      return state;
+    })
+    .catch((error) => {
+      sherpaSessionCache.delete(rootPath);
+      throw error;
+    });
+
+  sherpaSessionCache.set(rootPath, promise);
   return promise;
 }
 
@@ -404,6 +556,26 @@ async function installPiperVoicePack(params: {
   params.onProgress?.(1);
 }
 
+async function installKokoroChineseVoicePack(params: {
+  voice: string;
+  onProgress?: (progress: number) => void;
+}) {
+  if (!getKokoroChineseVoiceConfig(params.voice)) {
+    throw new Error(
+      "A local Simplified Chinese voice pack is not configured for this voice."
+    );
+  }
+
+  await downloadModelByCategory(ModelCategory.Tts, KOKORO_MULTILINGUAL_MODEL_ID, {
+    onProgress: (progress) => {
+      params.onProgress?.(progress.percent / 100);
+    },
+  });
+
+  await ensureKokoroChineseModelRootPath();
+  params.onProgress?.(1);
+}
+
 async function synthesizePiperSpeech(params: {
   text: string;
   voice: string;
@@ -425,6 +597,40 @@ async function synthesizePiperSpeech(params: {
 
   if (!audio?.samples || !audio?.sampleRate) {
     throw new Error("The local German voice model did not return audio.");
+  }
+
+  return writeWaveformFile(Float32Array.from(audio.samples), audio.sampleRate);
+}
+
+async function synthesizeKokoroChineseSpeech(params: {
+  text: string;
+  voice: string;
+}) {
+  const voiceConfig = getKokoroChineseVoiceConfig(params.voice);
+
+  if (!voiceConfig) {
+    throw new Error(
+      "A local Simplified Chinese voice pack is not configured for this voice."
+    );
+  }
+
+  const status = await getLocalTtsInstallStatus({
+    language: "zh",
+    voice: params.voice,
+  });
+
+  if (!status.installed) {
+    throw new Error("The Simplified Chinese local voice pack is not installed yet.");
+  }
+
+  const sessionState = await getKokoroChineseSession();
+  const audio = await sessionState.engine.generateSpeech(normalizeText(params.text), {
+    sid: voiceConfig.sid,
+    speed: 1,
+  });
+
+  if (!audio?.samples || !audio?.sampleRate) {
+    throw new Error("The local Simplified Chinese voice model did not return audio.");
   }
 
   return writeWaveformFile(Float32Array.from(audio.samples), audio.sampleRate);
@@ -486,6 +692,36 @@ export async function getLocalTtsInstallStatus(params: {
     };
   }
 
+  if (params.language === "zh") {
+    const voiceConfig = getKokoroChineseVoiceConfig(params.voice);
+
+    if (!voiceConfig) {
+      return {
+        supported: true,
+        installed: false,
+        modelInstalled: false,
+      };
+    }
+
+    const modelInstalled = await isModelDownloadedByCategory(
+      ModelCategory.Tts,
+      KOKORO_MULTILINGUAL_MODEL_ID
+    );
+    const modelRootPath = modelInstalled
+      ? await getInstalledKokoroChineseModelRootPath()
+      : null;
+    const lexiconInstalled = modelRootPath
+      ? await pathExists(`${modelRootPath}/lexicon-zh.txt`)
+      : false;
+
+    return {
+      supported: true,
+      installed: modelInstalled && !!modelRootPath && lexiconInstalled,
+      modelInstalled,
+      lexiconInstalled,
+    };
+  }
+
   return {
     supported: false,
     installed: false,
@@ -516,6 +752,14 @@ export async function installLocalTtsPack(params: {
 
   if (params.language === "de") {
     await installPiperVoicePack({
+      voice: params.voice,
+      onProgress: params.onProgress,
+    });
+    return;
+  }
+
+  if (params.language === "zh") {
+    await installKokoroChineseVoicePack({
       voice: params.voice,
       onProgress: params.onProgress,
     });
@@ -573,6 +817,13 @@ export async function synthesizeLocalSpeech(params: {
 
   if (params.language === "de") {
     return synthesizePiperSpeech({
+      text: params.text,
+      voice: params.voice,
+    });
+  }
+
+  if (params.language === "zh") {
+    return synthesizeKokoroChineseSpeech({
       text: params.text,
       voice: params.voice,
     });
