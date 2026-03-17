@@ -51,12 +51,16 @@ export function ChatTranscript({
       setTimeout(() => {
         listRef.current?.scrollToEnd({ animated: true });
       }, 100);
+      return;
     }
+
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, [messages.length]);
 
   return (
     <FlatList
       ref={listRef}
+      style={styles.listView}
       data={messages}
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
@@ -109,11 +113,16 @@ export function ChatTranscript({
 }
 
 const styles = StyleSheet.create({
+  listView: {
+    flex: 1,
+  },
   list: { paddingVertical: 10, paddingBottom: 24 },
   listEmpty: {
     flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 18,
   },
   emptyCard: {
     borderWidth: 1,
@@ -122,6 +131,7 @@ const styles = StyleSheet.create({
     paddingVertical: 26,
     alignItems: "center",
     gap: 12,
+    marginVertical: 10,
   },
   emptyIcon: {
     width: 48,

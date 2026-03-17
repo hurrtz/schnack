@@ -12,7 +12,7 @@ import * as Clipboard from "expo-clipboard";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatTranscript } from "../components/ChatTranscript";
 import { ConversationMemoryModal } from "../components/ConversationMemoryModal";
 import { ConversationDrawer } from "../components/ConversationDrawer";
@@ -56,6 +56,7 @@ import {
 export function MainScreen() {
   const { colors, isDark } = useTheme();
   const { t, language } = useLocalization();
+  const insets = useSafeAreaInsets();
   const {
     settings,
     updateSettings,
@@ -1069,59 +1070,66 @@ export function MainScreen() {
 
   const renderConversationMenu = (variant: "preview" | "modal") =>
     conversationMenuVisible ? (
-      <View
-        style={[
-          styles.conversationMenu,
-          variant === "modal"
-            ? styles.conversationMenuModal
-            : styles.conversationMenuPreview,
-          {
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-            shadowColor: colors.glow,
-          },
-        ]}
-      >
+      <>
         <TouchableOpacity
-          style={styles.conversationMenuItem}
-          onPress={() => {
-            closeConversationMenu();
-            void openMemory();
-          }}
-          activeOpacity={0.85}
+          style={styles.conversationMenuBackdrop}
+          onPress={closeConversationMenu}
+          activeOpacity={1}
+        />
+        <View
+          style={[
+            styles.conversationMenu,
+            variant === "modal"
+              ? styles.conversationMenuModal
+              : styles.conversationMenuPreview,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              shadowColor: colors.glow,
+            },
+          ]}
         >
-          <Feather name="archive" size={15} color={colors.accent} />
-          <Text style={[styles.conversationMenuText, { color: colors.text }]}>
-            {t("memory")}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.conversationMenuItem}
-          onPress={() => {
-            closeConversationMenu();
-            void handleCopyThread();
-          }}
-          activeOpacity={0.85}
-        >
-          <Feather name="copy" size={15} color={colors.accent} />
-          <Text style={[styles.conversationMenuText, { color: colors.text }]}>
-            {t("copyThread")}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.conversationMenuItem}
-          onPress={() => {
-            closeConversationMenu();
-            void handleShareThread();
-          }}
-          activeOpacity={0.85}
-        >
-          <Feather name="share" size={15} color={colors.accent} />
-          <Text style={[styles.conversationMenuText, { color: colors.text }]}>
-            {t("shareThread")}
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.conversationMenuItem}
+            onPress={() => {
+              closeConversationMenu();
+              void openMemory();
+            }}
+            activeOpacity={0.85}
+          >
+            <Feather name="archive" size={15} color={colors.accent} />
+            <Text style={[styles.conversationMenuText, { color: colors.text }]}>
+              {t("memory")}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.conversationMenuItem}
+            onPress={() => {
+              closeConversationMenu();
+              void handleCopyThread();
+            }}
+            activeOpacity={0.85}
+          >
+            <Feather name="copy" size={15} color={colors.accent} />
+            <Text style={[styles.conversationMenuText, { color: colors.text }]}>
+              {t("copyThread")}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.conversationMenuItem}
+            onPress={() => {
+              closeConversationMenu();
+              void handleShareThread();
+            }}
+            activeOpacity={0.85}
+          >
+            <Feather name="share" size={15} color={colors.accent} />
+            <Text style={[styles.conversationMenuText, { color: colors.text }]}>
+              {t("shareThread")}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </>
     ) : null;
 
   return (
@@ -1348,46 +1356,6 @@ export function MainScreen() {
               },
             ]}
           >
-            <View style={styles.transcriptTopActions}>
-              <TouchableOpacity
-                style={[
-                  styles.expandButton,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-                onPress={openTranscript}
-              >
-                <Text
-                  style={[styles.expandButtonText, { color: colors.text }]}
-                >
-                  {t("show")}
-                </Text>
-                <Feather
-                  name="arrow-up-right"
-                  size={15}
-                  color={colors.accent}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.menuIconButton,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-                onPress={toggleConversationMenu}
-                activeOpacity={0.85}
-              >
-                <Feather
-                  name="more-horizontal"
-                  size={18}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
             {renderConversationMenu("preview")}
 
             <View style={styles.transcriptHeader}>
@@ -1400,6 +1368,46 @@ export function MainScreen() {
                 <Text style={[styles.transcriptTitle, { color: colors.text }]}>
                   {sessionTitle}
                 </Text>
+              </View>
+              <View style={styles.transcriptTopActions}>
+                <TouchableOpacity
+                  style={[
+                    styles.expandButton,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={openTranscript}
+                >
+                  <Text
+                    style={[styles.expandButtonText, { color: colors.text }]}
+                  >
+                    {t("show")}
+                  </Text>
+                  <Feather
+                    name="arrow-up-right"
+                    size={15}
+                    color={colors.accent}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.menuIconButton,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={toggleConversationMenu}
+                  activeOpacity={0.85}
+                >
+                  <Feather
+                    name="more-horizontal"
+                    size={18}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -1424,7 +1432,7 @@ export function MainScreen() {
       >
         <SafeAreaView
           style={[styles.transcriptModal, { backgroundColor: colors.background }]}
-          edges={["top", "left", "right", "bottom"]}
+          edges={["left", "right", "bottom"]}
         >
           <LinearGradient
             colors={[
@@ -1436,50 +1444,30 @@ export function MainScreen() {
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
-          <View style={styles.expandedLayout}>
+          <View
+            style={[
+              styles.expandedLayout,
+              { paddingTop: Math.max(insets.top, 16) },
+            ]}
+          >
             <View style={styles.expandedTopBar}>
-              <View style={styles.expandedTopBarCopy}>
-                <Text style={[styles.eyebrow, { color: colors.textSecondary }]}>
-                  {t("transcript")}
-                </Text>
-                <Text style={[styles.transcriptTitle, { color: colors.text }]}>
-                  {sessionTitle}
-                </Text>
-              </View>
-              <View style={styles.expandedTopBarActions}>
-                <TouchableOpacity
-                  style={[
-                    styles.menuIconButton,
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={toggleConversationMenu}
-                  activeOpacity={0.85}
-                >
-                  <Feather
-                    name="more-horizontal"
-                    size={18}
-                    color={colors.textSecondary}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.menuIconButton,
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={closeTranscript}
-                  activeOpacity={0.85}
-                >
-                  <Feather name="x" size={18} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                {t("conversation")}
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.menuIconButton,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+                onPress={closeTranscript}
+                activeOpacity={0.85}
+              >
+                <Feather name="x" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
-            {renderConversationMenu("modal")}
 
             <View style={styles.expandedStageBar}>
               <WaveformBar
@@ -1504,6 +1492,30 @@ export function MainScreen() {
                 },
               ]}
             >
+              <View style={styles.expandedTranscriptHeader}>
+                <Text style={[styles.transcriptTitle, { color: colors.text }]}>
+                  {sessionTitle}
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.menuIconButton,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={toggleConversationMenu}
+                  activeOpacity={0.85}
+                >
+                  <Feather
+                    name="more-horizontal"
+                    size={18}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+              {renderConversationMenu("modal")}
+
               <Text
                 style={[
                   styles.expandedTranscriptHint,
@@ -1836,6 +1848,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 32,
     borderWidth: 1,
+    position: "relative",
     paddingTop: 10,
     paddingHorizontal: 16,
     overflow: "hidden",
@@ -1846,7 +1859,8 @@ const styles = StyleSheet.create({
   },
   transcriptHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     gap: 12,
     marginBottom: 8,
   },
@@ -1859,6 +1873,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-end",
     gap: 8,
+    marginTop: 2,
   },
   transcriptTitle: {
     fontSize: 20,
@@ -1887,11 +1902,15 @@ const styles = StyleSheet.create({
     shadowRadius: 28,
     elevation: 10,
   },
+  conversationMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 4,
+  },
   conversationMenuPreview: {
     top: 62,
   },
   conversationMenuModal: {
-    top: 56,
+    top: 52,
   },
   conversationMenuItem: {
     flexDirection: "row",
@@ -1934,19 +1953,23 @@ const styles = StyleSheet.create({
   },
   expandedTopBar: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
     marginBottom: 14,
   },
-  expandedTopBarCopy: {
+  modalTitle: {
     flex: 1,
-    gap: 4,
+    fontSize: 22,
+    lineHeight: 28,
+    fontFamily: fonts.display,
   },
-  expandedTopBarActions: {
+  expandedTranscriptHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 10,
   },
   expandedTranscriptHint: {
     fontSize: 13,
