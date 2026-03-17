@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as Speech from "expo-speech";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
@@ -55,10 +56,14 @@ import {
   SttBackendMode,
   TtsBackendMode,
   TtsListenLanguage,
+  VoicePreviewRequest,
 } from "../types";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
-import { getEnabledSttProviders, getEnabledTtsProviders } from "../utils/providerCapabilities";
+import {
+  getEnabledSttProviders,
+  getEnabledTtsProviders,
+} from "../utils/providerCapabilities";
 import { Picker } from "./Picker";
 import { ProviderIcon } from "./ProviderIcon";
 
@@ -66,12 +71,14 @@ interface SettingsModalProps {
   visible: boolean;
   settings: Settings;
   focusProvider?: Provider;
-  onUpdate: (partial: Partial<Omit<Settings, "apiKeys" | "providerModels">>) => void;
+  onUpdate: (
+    partial: Partial<Omit<Settings, "apiKeys" | "providerModels">>,
+  ) => void;
   onUpdateProviderModel: (provider: Provider, model: string) => void;
   onUpdateProviderTtsVoice: (provider: Provider, voice: string) => void;
   onUpdateLocalTtsVoice: (
     language: keyof LocalTtsVoiceSelections,
-    voice: string
+    voice: string,
   ) => void;
   onUpdateApiKey: (provider: Provider, apiKey: string) => void;
   localTtsPackStates: Partial<
@@ -86,21 +93,17 @@ interface SettingsModalProps {
     >
   >;
   onInstallLocalTtsLanguagePack: (language: TtsListenLanguage) => Promise<void>;
-  onPreviewVoice: (text: string) => Promise<void>;
+  onPreviewVoice: (request: VoicePreviewRequest) => Promise<void>;
   onValidateProvider: (provider: Provider) => Promise<void>;
   onClose: () => void;
 }
 
 type SettingsTab = "instructions" | "providers" | "stt" | "tts" | "ui";
-type TextInputFocusHandler = NonNullable<React.ComponentProps<typeof TextInput>["onFocus"]>;
+type TextInputFocusHandler = NonNullable<
+  React.ComponentProps<typeof TextInput>["onFocus"]
+>;
 
-const TABS: SettingsTab[] = [
-  "instructions",
-  "providers",
-  "stt",
-  "tts",
-  "ui",
-];
+const TABS: SettingsTab[] = ["instructions", "providers", "stt", "tts", "ui"];
 
 const SETTINGS_HEADER_TOP_PADDING = 22;
 const SETTINGS_HEADER_BOTTOM_PADDING = 18;
@@ -119,9 +122,29 @@ const SETTINGS_TAB_SECTION_HEIGHT =
 const SETTINGS_HERO_GLOW_HEIGHT =
   SETTINGS_HEADER_HEIGHT + SETTINGS_TAB_SECTION_HEIGHT;
 
+type NativeSpeechVoice = Awaited<
+  ReturnType<typeof Speech.getAvailableVoicesAsync>
+>[number];
+
+const PROVIDER_PREVIEW_SAMPLE_TEXT =
+  "Hello. This is a longer voice preview for SchnackAI, spoken at a calm and steady pace so you can judge clarity, tone, and whether this voice feels pleasant enough for full replies. If you listen for a few seconds, you should get a realistic sense of how this provider voice will sound during everyday conversations.";
+
+const LOCAL_PREVIEW_SAMPLE_TEXT_BY_LANGUAGE: Record<TtsListenLanguage, string> =
+  {
+    en: "Hello. This is a longer voice preview for SchnackAI, spoken at a calm and steady pace so you can judge clarity, tone, and whether this voice feels pleasant enough for full replies. If you listen for a few seconds, you should get a realistic sense of how this local voice will sound during everyday conversations.",
+    de: "Hallo. Dies ist eine etwas laengere Sprachvorschau fuer SchnackAI, ruhig und gleichmaessig gesprochen, damit du Klarheit, Klang und Tempo besser einschaetzen kannst. Wenn du ein paar Sekunden zuhoerst, bekommst du ein gutes Gefuehl dafuer, ob sich diese Stimme fuer alltaegliche Gespraeche angenehm anhoert.",
+    zh: "你好，这是 SchnackAI 的一段较长语音示例，我会用比较自然和平稳的节奏说话，方便你判断这条声音是否清晰、稳定，而且适合较长时间收听。你只要听上几秒钟，就能大致感觉到它在日常对话里听起来是不是舒服。",
+    es: "Hola. Esta es una muestra de voz un poco mas larga para SchnackAI, dicha con un ritmo tranquilo y estable para que puedas juzgar con mas claridad el tono, la nitidez y lo agradable que resulta escucharla durante respuestas completas. Si escuchas unos segundos, deberias hacerte una buena idea de como sonaria esta voz en conversaciones cotidianas.",
+    pt: "Ola. Esta e uma amostra de voz um pouco mais longa para o SchnackAI, falada com um ritmo calmo e estavel para que voce possa avaliar melhor a clareza, o timbre e o conforto desta voz em respostas completas. Se voce ouvir por alguns segundos, ja tera uma boa nocao de como ela soaria em conversas do dia a dia.",
+    hi: "नमस्ते। यह SchnackAI के लिए एक थोड़ी लंबी आवाज़ की झलक है, जिसे शांत और स्थिर गति से बोला जा रहा है, ताकि आप स्पष्टता, लहजे और सुनने के आराम का ठीक से अंदाज़ा लगा सकें। अगर आप कुछ सेकंड ध्यान से सुनें, तो आपको अच्छी तरह महसूस हो जाएगा कि यह आवाज़ रोज़मर्रा की बातचीत में कैसी लगेगी।",
+    fr: "Bonjour. Ceci est un extrait vocal un peu plus long pour SchnackAI, prononce avec un rythme calme et regulier afin que vous puissiez mieux juger la clarte, le timbre et le confort d'ecoute sur des reponses completes. En ecoutant quelques secondes, vous devriez vite sentir si cette voix convient a des conversations du quotidien.",
+    it: "Ciao. Questo e un esempio vocale un po' piu lungo per SchnackAI, pronunciato con un ritmo calmo e regolare cosi puoi valutare meglio chiarezza, timbro e piacevolezza di ascolto su risposte complete. Se ascolti per qualche secondo, dovresti capire abbastanza bene come suonera questa voce nelle conversazioni di tutti i giorni.",
+    ja: "こんにちは。これは SchnackAI の少し長めの音声サンプルで、聞き取りやすさや声の雰囲気、そして長めの返答でも心地よく聞けるかどうかを判断しやすいよう、落ち着いた自然な速さで話します。数秒聞いてみれば、この声が日常の会話でどのように感じられるかをかなり具体的に想像できるはずです。",
+  };
+
 function getTabLabel(
   tab: SettingsTab,
-  t: ReturnType<typeof useLocalization>["t"]
+  t: ReturnType<typeof useLocalization>["t"],
 ) {
   switch (tab) {
     case "instructions":
@@ -139,7 +162,7 @@ function getTabLabel(
 
 function getTabDescription(
   tab: SettingsTab,
-  t: ReturnType<typeof useLocalization>["t"]
+  t: ReturnType<typeof useLocalization>["t"],
 ) {
   switch (tab) {
     case "instructions":
@@ -155,9 +178,7 @@ function getTabDescription(
   }
 }
 
-function getResponseLengthOptions(
-  t: ReturnType<typeof useLocalization>["t"]
-): {
+function getResponseLengthOptions(t: ReturnType<typeof useLocalization>["t"]): {
   value: AssistantResponseLength;
   label: string;
   description: string;
@@ -181,9 +202,7 @@ function getResponseLengthOptions(
   ];
 }
 
-function getResponseToneOptions(
-  t: ReturnType<typeof useLocalization>["t"]
-): {
+function getResponseToneOptions(t: ReturnType<typeof useLocalization>["t"]): {
   value: AssistantResponseTone;
   label: string;
   description: string;
@@ -222,10 +241,18 @@ function getResponseToneOptions(
   ];
 }
 
-function getPreviewSampleText(language: AppLanguage) {
+function getLocalPreviewSampleText(language: TtsListenLanguage) {
+  return LOCAL_PREVIEW_SAMPLE_TEXT_BY_LANGUAGE[language];
+}
+
+function getNativePreviewSampleText(language: AppLanguage) {
   return language === "de"
-    ? "Hallo, ich bin SchnackAI."
-    : "Hello, I'm SchnackAI.";
+    ? "Hallo. Das ist eine kurze Sprachprobe der Systemstimme auf diesem Geraet, damit du sofort hoeren kannst, wie natuerlich oder kuenstlich sie fuer laengere Antworten wirkt. Wenn dir Tempo, Klang oder Betonung nicht gefallen, ist das ein guter Hinweis darauf, lieber eine lokale oder Cloud-Stimme zu verwenden."
+    : "Hello. This is a short sample of the system voice on this device, so you can quickly hear how natural or artificial it feels for longer replies. If you dislike the pacing, tone, or pronunciation here, that is a good sign you will probably prefer a local or cloud voice instead.";
+}
+
+function getNativeVoiceOptionLabel(voice: NativeSpeechVoice) {
+  return `${voice.name} · ${voice.language} · ${voice.quality}`;
 }
 
 function TabIntro({ tab }: { tab: SettingsTab }) {
@@ -251,7 +278,12 @@ function RadioGroup<T extends string>({
   onChange,
 }: {
   label: string;
-  options: { value: T; label: string; description?: string; disabled?: boolean }[];
+  options: {
+    value: T;
+    label: string;
+    description?: string;
+    disabled?: boolean;
+  }[];
   value: T;
   onChange: (v: T) => void;
 }) {
@@ -287,7 +319,10 @@ function RadioGroup<T extends string>({
             >
               {active ? (
                 <LinearGradient
-                  colors={[colors.accentGradientStart, colors.accentGradientEnd]}
+                  colors={[
+                    colors.accentGradientStart,
+                    colors.accentGradientEnd,
+                  ]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={[
@@ -315,10 +350,7 @@ function RadioGroup<T extends string>({
                   ]}
                 >
                   <Text
-                    style={[
-                      styles.radioLabel,
-                      { color: colors.textSecondary },
-                    ]}
+                    style={[styles.radioLabel, { color: colors.textSecondary }]}
                   >
                     {opt.label}
                   </Text>
@@ -370,14 +402,17 @@ function ProviderSection({
   const { colors } = useTheme();
   const { t, language } = useLocalization();
   const [selectedProvider, setSelectedProvider] = useState<Provider>(
-    focusProvider ?? settings.lastProvider
+    focusProvider ?? settings.lastProvider,
   );
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const [validationStateByProvider, setValidationStateByProvider] = useState<
     Partial<
       Record<
         Provider,
-        { status: "idle" | "validating" | "success" | "error"; message?: string }
+        {
+          status: "idle" | "validating" | "success" | "error";
+          message?: string;
+        }
       >
     >
   >({});
@@ -447,8 +482,9 @@ function ProviderSection({
   const handleOpenProviderPortal = React.useCallback(() => {
     void Linking.openURL(PROVIDER_API_KEY_URLS[selectedProvider]);
   }, [selectedProvider]);
-  const validationState =
-    validationStateByProvider[selectedProvider] ?? { status: "idle" as const };
+  const validationState = validationStateByProvider[selectedProvider] ?? {
+    status: "idle" as const,
+  };
   const hasApiKey = selectedProviderApiKey.trim().length > 0;
   const secureApiKey = hasApiKey && !apiKeyVisible;
 
@@ -540,7 +576,13 @@ function ProviderSection({
             </Text>
           </View>
         </View>
-        <Text style={[styles.sectionHint, styles.setupChecklistHint, { color: colors.textMuted }]}>
+        <Text
+          style={[
+            styles.sectionHint,
+            styles.setupChecklistHint,
+            { color: colors.textMuted },
+          ]}
+        >
           {setupChecklistReady
             ? t("setupChecklistReady")
             : t("setupChecklistNeedsWork")}
@@ -556,7 +598,9 @@ function ProviderSection({
                     backgroundColor: item.ready
                       ? colors.accentSoft
                       : colors.surfaceElevated,
-                    borderColor: item.ready ? colors.borderStrong : colors.border,
+                    borderColor: item.ready
+                      ? colors.borderStrong
+                      : colors.border,
                   },
                 ]}
               >
@@ -567,7 +611,9 @@ function ProviderSection({
                 />
               </View>
               <View style={styles.setupChecklistCopy}>
-                <Text style={[styles.setupChecklistLabel, { color: colors.text }]}>
+                <Text
+                  style={[styles.setupChecklistLabel, { color: colors.text }]}
+                >
                   {item.label}
                 </Text>
                 <Text
@@ -635,7 +681,9 @@ function ProviderSection({
           style={[
             styles.providerStatusPill,
             {
-              backgroundColor: hasApiKey ? colors.accentSoft : colors.surfaceElevated,
+              backgroundColor: hasApiKey
+                ? colors.accentSoft
+                : colors.surfaceElevated,
               borderColor: hasApiKey ? colors.borderStrong : colors.border,
             },
           ]}
@@ -682,7 +730,9 @@ function ProviderSection({
                 backgroundColor: colors.surfaceElevated,
                 borderColor: colors.border,
                 opacity:
-                  hasApiKey && validationState.status !== "validating" ? 1 : 0.5,
+                  hasApiKey && validationState.status !== "validating"
+                    ? 1
+                    : 0.5,
               },
             ]}
             onPress={() => {
@@ -697,7 +747,11 @@ function ProviderSection({
                 : t("validateKey")}
             </Text>
             <Feather
-              name={validationState.status === "validating" ? "loader" : "check-circle"}
+              name={
+                validationState.status === "validating"
+                  ? "loader"
+                  : "check-circle"
+              }
               size={14}
               color={colors.accent}
             />
@@ -708,7 +762,10 @@ function ProviderSection({
             value={settings.apiKeys[selectedProvider]}
             onChangeText={(value) => onUpdateApiKey(selectedProvider, value)}
             onFocus={onTextInputFocus}
-            placeholder={getProviderApiKeyPlaceholder(selectedProvider, language)}
+            placeholder={getProviderApiKeyPlaceholder(
+              selectedProvider,
+              language,
+            )}
             placeholderTextColor={colors.textMuted}
             selectionColor={colors.accent}
             autoCapitalize="none"
@@ -747,7 +804,12 @@ function ProviderSection({
             />
           </TouchableOpacity>
         </View>
-        <Text style={[styles.sectionHint, { color: colors.textMuted, marginTop: 8 }]}>
+        <Text
+          style={[
+            styles.sectionHint,
+            { color: colors.textMuted, marginTop: 8 },
+          ]}
+        >
           {t("apiKeyProtectedHint")}
         </Text>
         {validationState.status !== "idle" && validationState.message ? (
@@ -805,7 +867,9 @@ function AssistantResponseSection({
   onTextInputFocus,
 }: {
   settings: Settings;
-  onUpdate: (partial: Partial<Omit<Settings, "apiKeys" | "providerModels">>) => void;
+  onUpdate: (
+    partial: Partial<Omit<Settings, "apiKeys" | "providerModels">>,
+  ) => void;
   onTextInputFocus: TextInputFocusHandler;
 }) {
   const { colors } = useTheme();
@@ -813,10 +877,10 @@ function AssistantResponseSection({
   const responseLengthOptions = getResponseLengthOptions(t);
   const responseToneOptions = getResponseToneOptions(t);
   const selectedLength = responseLengthOptions.find(
-    (option) => option.value === settings.responseLength
+    (option) => option.value === settings.responseLength,
   );
   const selectedTone = responseToneOptions.find(
-    (option) => option.value === settings.responseTone
+    (option) => option.value === settings.responseTone,
   );
 
   return (
@@ -824,7 +888,10 @@ function AssistantResponseSection({
       <View
         style={[
           styles.sectionCard,
-          { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+          {
+            backgroundColor: colors.surfaceElevated,
+            borderColor: colors.border,
+          },
         ]}
       >
         <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
@@ -907,155 +974,239 @@ function AssistantResponseSection({
   );
 }
 
-function TtsPreviewSection({
-  previewText,
-  setPreviewText,
-  previewLoading,
+function PreviewComposer({
+  text,
+  setText,
+  loading,
   onPreview,
-  ttsProvider,
-  voiceOptions,
-  selectedVoice,
-  localVoiceOptions,
-  selectedLocalVoice,
-  selectedListenLanguage,
-  settings,
-  onUpdateProviderTtsVoice,
-  onUpdateLocalTtsVoice,
   onTextInputFocus,
 }: {
-  previewText: string;
-  setPreviewText: (text: string) => void;
-  previewLoading: boolean;
+  text: string;
+  setText: (text: string) => void;
+  loading: boolean;
   onPreview: () => Promise<void>;
-  ttsProvider: Provider | null;
-  voiceOptions: { value: string; label: string }[];
-  selectedVoice: string;
-  localVoiceOptions: { value: string; label: string }[];
-  selectedLocalVoice: string;
-  selectedListenLanguage: TtsListenLanguage;
+  onTextInputFocus: TextInputFocusHandler;
+}) {
+  const { colors } = useTheme();
+  const { t } = useLocalization();
+
+  return (
+    <>
+      <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
+        {t("voicePreviewText")}
+      </Text>
+      <TextInput
+        value={text}
+        onChangeText={setText}
+        onFocus={onTextInputFocus}
+        multiline
+        placeholder={t("voicePreviewPlaceholder")}
+        placeholderTextColor={colors.textMuted}
+        selectionColor={colors.accent}
+        style={[
+          styles.previewInput,
+          {
+            backgroundColor: colors.surfaceElevated,
+            borderColor: colors.border,
+            color: colors.text,
+          },
+        ]}
+      />
+      <Text style={[styles.previewHint, { color: colors.textMuted }]}>
+        {t("voicePreviewHint")}
+      </Text>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => {
+          void onPreview();
+        }}
+        disabled={loading || !text.trim()}
+      >
+        <LinearGradient
+          colors={[colors.accentGradientStart, colors.accentGradientEnd]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[
+            styles.previewButton,
+            !text.trim() || loading ? styles.previewButtonDisabled : null,
+          ]}
+        >
+          <Feather
+            name={loading ? "loader" : "volume-2"}
+            size={16}
+            color="#F4F8FF"
+          />
+          <Text style={styles.previewButtonText}>
+            {loading ? t("generatingPreview") : t("previewVoice")}
+          </Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </>
+  );
+}
+
+function ProviderVoicePreviewSection({
+  providers,
+  settings,
+  previewTexts,
+  activePreviewId,
+  onSetPreviewText,
+  onPreviewProvider,
+  onUpdateProviderTtsVoice,
+  onTextInputFocus,
+}: {
+  providers: Provider[];
   settings: Settings;
+  previewTexts: Record<Provider, string>;
+  activePreviewId: string | null;
+  onSetPreviewText: (provider: Provider, text: string) => void;
+  onPreviewProvider: (provider: Provider) => Promise<void>;
   onUpdateProviderTtsVoice: (provider: Provider, voice: string) => void;
-  onUpdateLocalTtsVoice: (
-    language: keyof LocalTtsVoiceSelections,
-    voice: string
-  ) => void;
   onTextInputFocus: TextInputFocusHandler;
 }) {
   const { colors } = useTheme();
   const { t, language } = useLocalization();
-  const canPickProviderVoice =
-    settings.ttsMode === "provider" && !!ttsProvider && voiceOptions.length > 0;
-  const canPickLocalVoice =
-    settings.ttsMode === "local" && localVoiceOptions.length > 0;
+
+  if (providers.length === 0) {
+    return null;
+  }
 
   return (
     <PickerSection>
-      {canPickProviderVoice ? (
-        <Picker
-          label={t("ttsVoice")}
-          value={selectedVoice}
-          options={voiceOptions}
-          onChange={(value) => onUpdateProviderTtsVoice(ttsProvider!, value)}
-        />
-      ) : canPickLocalVoice ? (
-        <Picker
-          label={t("ttsVoice")}
-          value={selectedLocalVoice}
-          options={localVoiceOptions}
-          onChange={(value) =>
-            onUpdateLocalTtsVoice(selectedListenLanguage, value)
-          }
-        />
-      ) : (
-        <View
-          style={[
-            styles.previewCard,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              marginTop: 0,
-              marginBottom: 8,
-            },
-          ]}
-        >
-          <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
-            {t("voiceSelection")}
-          </Text>
-          <Text style={[styles.previewHint, { color: colors.textMuted, marginTop: 0 }]}>
-            {settings.ttsMode === "native"
-              ? t("nativeVoiceSelectionHint")
-              : settings.ttsMode === "local"
-                ? t("localTtsVoiceSelectionHint", {
-                    languageLabel: getTtsListenLanguageLabel(
-                      selectedListenLanguage,
-                      language
-                    ),
-                  })
-              : t("providerDefaultVoiceHint")}
-          </Text>
-        </View>
-      )}
+      <Text style={[styles.groupLabel, { color: colors.textSecondary }]}>
+        {t("providerVoicePreviews")}
+      </Text>
+      <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+        {t("providerVoicePreviewsHint")}
+      </Text>
+
+      {providers.map((provider) => {
+        const voiceOptions = getProviderTtsVoiceOptions(provider, language).map(
+          (voice) => ({
+            value: voice.id,
+            label: voice.label,
+          }),
+        );
+        const selectedVoice =
+          settings.providerTtsVoices[provider] ||
+          PROVIDER_DEFAULT_TTS_VOICES[provider] ||
+          voiceOptions[0]?.value ||
+          "";
+        const previewId = `provider:${provider}`;
+
+        return (
+          <View
+            key={provider}
+            style={[
+              styles.localPackCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Text
+              style={[styles.previewLabel, { color: colors.textSecondary }]}
+            >
+              {PROVIDER_LABELS[provider]}
+            </Text>
+            {voiceOptions.length > 0 ? (
+              <Picker
+                label={t("ttsVoice")}
+                value={selectedVoice}
+                options={voiceOptions}
+                onChange={(value) => onUpdateProviderTtsVoice(provider, value)}
+              />
+            ) : (
+              <Text
+                style={[
+                  styles.previewHint,
+                  { color: colors.textMuted, marginTop: 0 },
+                ]}
+              >
+                {t("providerDefaultVoiceHint")}
+              </Text>
+            )}
+            <PreviewComposer
+              text={previewTexts[provider]}
+              setText={(text) => onSetPreviewText(provider, text)}
+              loading={activePreviewId === previewId}
+              onPreview={() => onPreviewProvider(provider)}
+              onTextInputFocus={onTextInputFocus}
+            />
+          </View>
+        );
+      })}
+    </PickerSection>
+  );
+}
+
+function NativeVoicePreviewSection({
+  voiceOptions,
+  selectedVoice,
+  previewText,
+  activePreviewId,
+  onSelectVoice,
+  onSetPreviewText,
+  onPreview,
+  onTextInputFocus,
+}: {
+  voiceOptions: { value: string; label: string }[];
+  selectedVoice: string;
+  previewText: string;
+  activePreviewId: string | null;
+  onSelectVoice: (voiceId: string) => void;
+  onSetPreviewText: (text: string) => void;
+  onPreview: () => Promise<void>;
+  onTextInputFocus: TextInputFocusHandler;
+}) {
+  const { colors } = useTheme();
+  const { t } = useLocalization();
+
+  return (
+    <PickerSection>
+      <Text style={[styles.groupLabel, { color: colors.textSecondary }]}>
+        {t("nativeVoicePreviewSection")}
+      </Text>
+      <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+        {t("nativeVoicePreviewSectionHint")}
+      </Text>
 
       <View
         style={[
-          styles.previewCard,
+          styles.localPackCard,
           {
             backgroundColor: colors.surface,
             borderColor: colors.border,
           },
         ]}
       >
-        <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
-          {t("voicePreviewText")}
-        </Text>
-        <TextInput
-          value={previewText}
-          onChangeText={setPreviewText}
-          onFocus={onTextInputFocus}
-          multiline
-          placeholder={t("voicePreviewPlaceholder")}
-          placeholderTextColor={colors.textMuted}
-          selectionColor={colors.accent}
-          style={[
-            styles.previewInput,
-            {
-              backgroundColor: colors.surfaceElevated,
-              borderColor: colors.border,
-              color: colors.text,
-            },
-          ]}
-        />
-        <Text style={[styles.previewHint, { color: colors.textMuted }]}>
-          {t("voicePreviewHint")}
-        </Text>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => {
-            void onPreview();
-          }}
-          disabled={previewLoading || !previewText.trim()}
-        >
-          <LinearGradient
-            colors={[colors.accentGradientStart, colors.accentGradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+        {voiceOptions.length > 0 ? (
+          <>
+            <Picker
+              label={t("ttsVoice")}
+              value={selectedVoice}
+              options={voiceOptions}
+              onChange={onSelectVoice}
+            />
+            <PreviewComposer
+              text={previewText}
+              setText={onSetPreviewText}
+              loading={activePreviewId === "native"}
+              onPreview={onPreview}
+              onTextInputFocus={onTextInputFocus}
+            />
+          </>
+        ) : (
+          <Text
             style={[
-              styles.previewButton,
-              !previewText.trim() || previewLoading
-                ? styles.previewButtonDisabled
-                : null,
+              styles.previewHint,
+              { color: colors.textMuted, marginTop: 0 },
             ]}
           >
-            <Feather
-              name={previewLoading ? "loader" : "volume-2"}
-              size={16}
-              color="#F4F8FF"
-            />
-            <Text style={styles.previewButtonText}>
-              {previewLoading ? t("generatingPreview") : t("previewVoice")}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
+            {t("nativeVoiceUnavailable")}
+          </Text>
+        )}
       </View>
     </PickerSection>
   );
@@ -1090,7 +1241,9 @@ function ListenLanguageSelector({
               style={[
                 styles.languageChip,
                 {
-                  backgroundColor: selected ? colors.accentSoft : colors.surface,
+                  backgroundColor: selected
+                    ? colors.accentSoft
+                    : colors.surface,
                   borderColor: selected ? colors.accent : colors.border,
                 },
               ]}
@@ -1114,7 +1267,13 @@ function ListenLanguageSelector({
 function LocalPackSection({
   settings,
   packStates,
+  onUpdateLocalTtsVoice,
   onInstallLocalTtsLanguagePack,
+  localPreviewTexts,
+  activePreviewId,
+  onSetLocalPreviewText,
+  onPreviewLocalVoice,
+  onTextInputFocus,
 }: {
   settings: Settings;
   packStates: Partial<
@@ -1128,7 +1287,16 @@ function LocalPackSection({
       }
     >
   >;
+  onUpdateLocalTtsVoice: (
+    language: keyof LocalTtsVoiceSelections,
+    voice: string,
+  ) => void;
   onInstallLocalTtsLanguagePack: (language: TtsListenLanguage) => Promise<void>;
+  localPreviewTexts: Record<TtsListenLanguage, string>;
+  activePreviewId: string | null;
+  onSetLocalPreviewText: (language: TtsListenLanguage, text: string) => void;
+  onPreviewLocalVoice: (language: TtsListenLanguage) => Promise<void>;
+  onTextInputFocus: TextInputFocusHandler;
 }) {
   const { colors } = useTheme();
   const { t, language } = useLocalization();
@@ -1144,10 +1312,14 @@ function LocalPackSection({
 
       {settings.ttsListenLanguages.map((entry) => {
         const state = packStates[entry];
-        const supported = state?.supported ?? LOCAL_TTS_SUPPORTED_LANGUAGES.includes(entry);
+        const supported =
+          state?.supported ?? LOCAL_TTS_SUPPORTED_LANGUAGES.includes(entry);
         const installed = state?.installed ?? false;
         const downloading = state?.downloading ?? false;
         const progress = state?.progress ?? 0;
+        const voiceOptions = getLocalTtsVoiceOptions(entry);
+        const selectedVoice =
+          settings.localTtsVoices[entry] || voiceOptions[0]?.value || "";
 
         return (
           <View
@@ -1162,10 +1334,17 @@ function LocalPackSection({
           >
             <View style={styles.localPackHeader}>
               <View style={styles.localPackCopy}>
-                <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
+                <Text
+                  style={[styles.previewLabel, { color: colors.textSecondary }]}
+                >
                   {getTtsListenLanguageLabel(entry, language)}
                 </Text>
-                <Text style={[styles.previewHint, { color: colors.textMuted, marginTop: 4 }]}>
+                <Text
+                  style={[
+                    styles.previewHint,
+                    { color: colors.textMuted, marginTop: 4 },
+                  ]}
+                >
                   {supported
                     ? installed
                       ? t("localTtsPackReady")
@@ -1187,7 +1366,10 @@ function LocalPackSection({
                   disabled={downloading}
                 >
                   <LinearGradient
-                    colors={[colors.accentGradientStart, colors.accentGradientEnd]}
+                    colors={[
+                      colors.accentGradientStart,
+                      colors.accentGradientEnd,
+                    ]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={[
@@ -1207,6 +1389,31 @@ function LocalPackSection({
                 </TouchableOpacity>
               ) : null}
             </View>
+
+            {voiceOptions.length > 0 ? (
+              <View style={styles.localPackVoicePicker}>
+                <Picker
+                  label={t("localVoiceForLanguage", {
+                    languageLabel: getTtsListenLanguageLabel(entry, language),
+                  })}
+                  value={selectedVoice}
+                  options={voiceOptions}
+                  onChange={(value) => onUpdateLocalTtsVoice(entry, value)}
+                />
+              </View>
+            ) : null}
+
+            {installed && voiceOptions.length > 0 ? (
+              <View style={styles.localPackPreview}>
+                <PreviewComposer
+                  text={localPreviewTexts[entry]}
+                  setText={(text) => onSetLocalPreviewText(entry, text)}
+                  loading={activePreviewId === `local:${entry}`}
+                  onPreview={() => onPreviewLocalVoice(entry)}
+                  onTextInputFocus={onTextInputFocus}
+                />
+              </View>
+            ) : null}
           </View>
         );
       })}
@@ -1241,17 +1448,43 @@ export function SettingsModal({
   const insets = useSafeAreaInsets();
   const contentScrollRef = useRef<ScrollView>(null);
   const [activeTab, setActiveTab] = useState<SettingsTab>("instructions");
-  const [previewText, setPreviewText] = useState(getPreviewSampleText(language));
-  const [previewLoading, setPreviewLoading] = useState(false);
+  const [providerPreviewTexts, setProviderPreviewTexts] = useState<
+    Record<Provider, string>
+  >(() =>
+    PROVIDER_ORDER.reduce(
+      (accumulator, provider) => ({
+        ...accumulator,
+        [provider]: PROVIDER_PREVIEW_SAMPLE_TEXT,
+      }),
+      {} as Record<Provider, string>,
+    ),
+  );
+  const [localPreviewTexts, setLocalPreviewTexts] = useState<
+    Record<TtsListenLanguage, string>
+  >(() =>
+    TTS_LISTEN_LANGUAGE_OPTIONS.reduce(
+      (accumulator, option) => ({
+        ...accumulator,
+        [option.value]: getLocalPreviewSampleText(option.value),
+      }),
+      {} as Record<TtsListenLanguage, string>,
+    ),
+  );
+  const [nativePreviewText, setNativePreviewText] = useState(
+    getNativePreviewSampleText(language),
+  );
+  const [nativeVoices, setNativeVoices] = useState<NativeSpeechVoice[]>([]);
+  const [selectedNativeVoice, setSelectedNativeVoice] = useState("");
+  const [activePreviewId, setActivePreviewId] = useState<string | null>(null);
   const [keyboardInset, setKeyboardInset] = useState(0);
 
   const enabledSttProviders = useMemo(
     () => getEnabledSttProviders(settings),
-    [settings]
+    [settings],
   );
   const enabledTtsProviders = useMemo(
     () => getEnabledTtsProviders(settings),
-    [settings]
+    [settings],
   );
 
   const scale = useSharedValue(0.96);
@@ -1263,6 +1496,7 @@ export function SettingsModal({
       scale.value = 0.96;
       translateY.value = 16;
       opacity.value = 0;
+      setActivePreviewId(null);
       return;
     }
 
@@ -1299,12 +1533,18 @@ export function SettingsModal({
     const nextProvider =
       settings.sttProvider && enabledSttProviders.includes(settings.sttProvider)
         ? settings.sttProvider
-        : enabledSttProviders[0] ?? null;
+        : (enabledSttProviders[0] ?? null);
 
     if (nextProvider !== settings.sttProvider) {
       onUpdate({ sttProvider: nextProvider });
     }
-  }, [enabledSttProviders, onUpdate, settings.sttMode, settings.sttProvider, visible]);
+  }, [
+    enabledSttProviders,
+    onUpdate,
+    settings.sttMode,
+    settings.sttProvider,
+    visible,
+  ]);
 
   useEffect(() => {
     if (!visible || settings.ttsMode === "native") {
@@ -1314,81 +1554,166 @@ export function SettingsModal({
     const nextProvider =
       settings.ttsProvider && enabledTtsProviders.includes(settings.ttsProvider)
         ? settings.ttsProvider
-        : enabledTtsProviders[0] ?? null;
+        : (enabledTtsProviders[0] ?? null);
 
     if (nextProvider !== settings.ttsProvider) {
       onUpdate({ ttsProvider: nextProvider });
     }
-  }, [enabledTtsProviders, onUpdate, settings.ttsMode, settings.ttsProvider, visible]);
-
-  useEffect(() => {
-    if (!visible || !settings.ttsProvider) {
-      return;
-    }
-
-    const provider = settings.ttsProvider;
-    const supportedVoices = getProviderTtsVoiceOptions(provider, language);
-    const defaultVoice = PROVIDER_DEFAULT_TTS_VOICES[provider];
-
-    if (!supportedVoices?.length || !defaultVoice) {
-      return;
-    }
-
-    const currentVoice = settings.providerTtsVoices[provider];
-    const isValid = supportedVoices.some((voice) => voice.id === currentVoice);
-
-    if (!isValid) {
-      onUpdateProviderTtsVoice(provider, defaultVoice);
-    }
   }, [
-    language,
-    onUpdateProviderTtsVoice,
-    settings.providerTtsVoices,
+    enabledTtsProviders,
+    onUpdate,
+    settings.ttsMode,
     settings.ttsProvider,
     visible,
   ]);
 
-  const currentLocalVoiceLanguage =
-    settings.ttsListenLanguages.find(
-      (entry) => getLocalTtsVoiceOptions(entry).length > 0
-    ) ?? settings.ttsListenLanguages[0] ?? "en";
-  const localVoiceOptions = getLocalTtsVoiceOptions(currentLocalVoiceLanguage);
-  const selectedLocalVoice =
-    settings.localTtsVoices[currentLocalVoiceLanguage] ||
-    localVoiceOptions[0]?.value ||
-    "";
-
   useEffect(() => {
-    if (!visible || settings.ttsMode !== "local" || localVoiceOptions.length === 0) {
+    if (!visible) {
       return;
     }
 
-    const isValid = localVoiceOptions.some(
-      (option) => option.value === settings.localTtsVoices[currentLocalVoiceLanguage]
-    );
+    const nextProviderTtsVoices = { ...settings.providerTtsVoices };
+    let hasInvalidSelection = false;
 
-    if (!isValid) {
-      onUpdateLocalTtsVoice(currentLocalVoiceLanguage, localVoiceOptions[0].value);
+    for (const provider of enabledTtsProviders) {
+      const supportedVoices = getProviderTtsVoiceOptions(provider, language);
+      const defaultVoice =
+        PROVIDER_DEFAULT_TTS_VOICES[provider] || supportedVoices[0]?.id;
+
+      if (!supportedVoices.length || !defaultVoice) {
+        continue;
+      }
+
+      const currentVoice = nextProviderTtsVoices[provider];
+      const isValid = supportedVoices.some(
+        (voice) => voice.id === currentVoice,
+      );
+
+      if (!isValid) {
+        nextProviderTtsVoices[provider] = defaultVoice;
+        hasInvalidSelection = true;
+      }
+    }
+
+    if (hasInvalidSelection) {
+      onUpdate({ providerTtsVoices: nextProviderTtsVoices });
     }
   }, [
-    currentLocalVoiceLanguage,
-    localVoiceOptions,
-    onUpdateLocalTtsVoice,
-    settings.localTtsVoices,
-    settings.ttsMode,
+    enabledTtsProviders,
+    language,
+    onUpdate,
+    settings.providerTtsVoices,
     visible,
   ]);
 
   useEffect(() => {
-    const localizedSample = getPreviewSampleText(language);
+    if (!visible) {
+      return;
+    }
 
-    setPreviewText((previous) =>
-      previous === getPreviewSampleText("en") ||
-      previous === getPreviewSampleText("de")
+    const nextLocalTtsVoices = { ...settings.localTtsVoices };
+    let hasInvalidSelection = false;
+
+    for (const selectedLanguage of settings.ttsListenLanguages) {
+      const voiceOptions = getLocalTtsVoiceOptions(selectedLanguage);
+
+      if (voiceOptions.length === 0) {
+        continue;
+      }
+
+      const currentVoice = nextLocalTtsVoices[selectedLanguage];
+      const isValid = voiceOptions.some(
+        (option) => option.value === currentVoice,
+      );
+
+      if (!isValid) {
+        nextLocalTtsVoices[selectedLanguage] = voiceOptions[0].value;
+        hasInvalidSelection = true;
+      }
+    }
+
+    if (hasInvalidSelection) {
+      onUpdate({ localTtsVoices: nextLocalTtsVoices });
+    }
+  }, [onUpdate, settings.localTtsVoices, settings.ttsListenLanguages, visible]);
+
+  useEffect(() => {
+    const localizedSample = getNativePreviewSampleText(language);
+
+    setNativePreviewText((previous) =>
+      previous === getNativePreviewSampleText("en") ||
+      previous === getNativePreviewSampleText("de")
         ? localizedSample
-        : previous
+        : previous,
     );
   }, [language]);
+
+  useEffect(() => {
+    if (!visible || activeTab !== "tts") {
+      return;
+    }
+
+    let cancelled = false;
+    const preferredLanguagePrefix = language === "de" ? "de" : "en";
+
+    void Speech.getAvailableVoicesAsync()
+      .then((voices) => {
+        if (cancelled) {
+          return;
+        }
+
+        const sortedVoices = [...voices].sort((left, right) => {
+          const leftLanguageMatches = left.language
+            .toLowerCase()
+            .startsWith(preferredLanguagePrefix);
+          const rightLanguageMatches = right.language
+            .toLowerCase()
+            .startsWith(preferredLanguagePrefix);
+
+          if (leftLanguageMatches !== rightLanguageMatches) {
+            return leftLanguageMatches ? -1 : 1;
+          }
+
+          if (left.quality !== right.quality) {
+            return left.quality === "Enhanced" ? -1 : 1;
+          }
+
+          const languageComparison = left.language.localeCompare(
+            right.language,
+          );
+
+          if (languageComparison !== 0) {
+            return languageComparison;
+          }
+
+          return left.name.localeCompare(right.name);
+        });
+
+        setNativeVoices(sortedVoices);
+        setSelectedNativeVoice((previous) => {
+          if (
+            previous &&
+            sortedVoices.some((voice) => voice.identifier === previous)
+          ) {
+            return previous;
+          }
+
+          return sortedVoices[0]?.identifier ?? "";
+        });
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+
+        setNativeVoices([]);
+        setSelectedNativeVoice("");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, language, visible]);
 
   useEffect(() => {
     if (!visible) {
@@ -1402,16 +1727,16 @@ export function SettingsModal({
 
     const handleKeyboardShow = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
-      (event) => updateInset(event.endCoordinates.height)
+      (event) => updateInset(event.endCoordinates.height),
     );
     const handleKeyboardHide = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
-      () => updateInset(0)
+      () => updateInset(0),
     );
     const handleKeyboardFrameChange =
       Platform.OS === "ios"
         ? Keyboard.addListener("keyboardWillChangeFrame", (event) =>
-            updateInset(event.endCoordinates.height)
+            updateInset(event.endCoordinates.height),
           )
         : null;
 
@@ -1436,39 +1761,91 @@ export function SettingsModal({
             scrollResponderScrollNativeHandleToKeyboard?: (
               nodeHandle: number,
               additionalOffset?: number,
-              preventNegativeScrollOffset?: boolean
+              preventNegativeScrollOffset?: boolean,
             ) => void;
           };
         }
       ).getScrollResponder?.();
 
-      if (!target || !scrollResponder?.scrollResponderScrollNativeHandleToKeyboard) {
+      if (
+        !target ||
+        !scrollResponder?.scrollResponderScrollNativeHandleToKeyboard
+      ) {
         return;
       }
 
-      setTimeout(() => {
-        scrollResponder.scrollResponderScrollNativeHandleToKeyboard?.(
-          target,
-          96,
-          true
-        );
-      }, Platform.OS === "ios" ? 80 : 40);
+      setTimeout(
+        () => {
+          scrollResponder.scrollResponderScrollNativeHandleToKeyboard?.(
+            target,
+            96,
+            true,
+          );
+        },
+        Platform.OS === "ios" ? 80 : 40,
+      );
     },
-    []
+    [],
   );
 
-  const handlePreviewVoice = async () => {
-    const trimmed = previewText.trim();
-    if (!trimmed || previewLoading) {
+  const handleExactPreview = async (
+    previewId: string,
+    request: VoicePreviewRequest,
+  ) => {
+    const trimmed = request.text.trim();
+
+    if (!trimmed || activePreviewId) {
       return;
     }
 
-    setPreviewLoading(true);
+    setActivePreviewId(previewId);
     try {
-      await onPreviewVoice(trimmed);
+      await onPreviewVoice({
+        ...request,
+        text: trimmed,
+      });
     } finally {
-      setPreviewLoading(false);
+      setActivePreviewId(null);
     }
+  };
+
+  const handlePreviewLocalVoice = async (
+    selectedLanguage: TtsListenLanguage,
+  ) => {
+    const selectedVoice =
+      settings.localTtsVoices[selectedLanguage] ||
+      getLocalTtsVoiceOptions(selectedLanguage)[0]?.value ||
+      "";
+
+    await handleExactPreview(`local:${selectedLanguage}`, {
+      text: localPreviewTexts[selectedLanguage],
+      mode: "local",
+      localLanguage: selectedLanguage,
+      voice: selectedVoice,
+    });
+  };
+
+  const handlePreviewProviderVoice = async (provider: Provider) => {
+    const selectedVoice =
+      settings.providerTtsVoices[provider] ||
+      PROVIDER_DEFAULT_TTS_VOICES[provider] ||
+      getProviderTtsVoiceOptions(provider, language)[0]?.id ||
+      "";
+
+    await handleExactPreview(`provider:${provider}`, {
+      text: providerPreviewTexts[provider],
+      mode: "provider",
+      provider,
+      voice: selectedVoice,
+    });
+  };
+
+  const handlePreviewNativeVoice = async () => {
+    await handleExactPreview("native", {
+      text: nativePreviewText,
+      mode: "native",
+      nativeVoice: selectedNativeVoice || undefined,
+    });
   };
 
   const providerPickerDisabled =
@@ -1486,23 +1863,13 @@ export function SettingsModal({
       ? getNativeTtsLanguageNote(language)
       : settings.ttsMode === "local"
         ? t("localTtsLanguageCoverageHint")
-      : settings.ttsProvider
-        ? getProviderTtsLanguageNote(settings.ttsProvider, language)
-        : null;
-  const currentTtsProvider =
-    settings.ttsMode === "provider" ? settings.ttsProvider : null;
-  const ttsVoiceOptions = currentTtsProvider
-    ? getProviderTtsVoiceOptions(currentTtsProvider, language).map((voice) => ({
-        value: voice.id,
-        label: voice.label,
-      }))
-    : [];
-  const selectedTtsVoice =
-    currentTtsProvider && settings.providerTtsVoices[currentTtsProvider]
-      ? settings.providerTtsVoices[currentTtsProvider]
-      : currentTtsProvider
-        ? PROVIDER_DEFAULT_TTS_VOICES[currentTtsProvider] ?? ""
-        : "";
+        : settings.ttsProvider
+          ? getProviderTtsLanguageNote(settings.ttsProvider, language)
+          : null;
+  const nativeVoiceOptions = nativeVoices.map((voice) => ({
+    value: voice.identifier,
+    label: getNativeVoiceOptionLabel(voice),
+  }));
   const toggleListenLanguage = (value: TtsListenLanguage) => {
     const exists = settings.ttsListenLanguages.includes(value);
 
@@ -1691,7 +2058,9 @@ export function SettingsModal({
                     }
                     disabled={providerPickerDisabled}
                   />
-                  <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+                  <Text
+                    style={[styles.sectionHint, { color: colors.textMuted }]}
+                  >
                     {settings.sttMode === "provider"
                       ? enabledSttProviders.length > 0
                         ? t("sttProviderEnabledHint")
@@ -1699,7 +2068,9 @@ export function SettingsModal({
                       : t("nativeSttHint")}
                   </Text>
                   {sttLanguageNote ? (
-                    <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+                    <Text
+                      style={[styles.sectionHint, { color: colors.textMuted }]}
+                    >
                       {t("languageCoverage", { note: sttLanguageNote })}
                     </Text>
                   ) : null}
@@ -1760,52 +2131,84 @@ export function SettingsModal({
                     }
                     disabled={ttsProviderPickerDisabled}
                   />
-                  <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+                  <Text
+                    style={[styles.sectionHint, { color: colors.textMuted }]}
+                  >
                     {settings.ttsMode === "provider"
                       ? enabledTtsProviders.length > 0
                         ? t("ttsProviderEnabledHint")
                         : t("ttsProviderMissingHint")
                       : settings.ttsMode === "local"
                         ? enabledTtsProviders.length > 0
-                          ? t("localTtsCloudFallbackHint")
-                          : t("localTtsNativeFallbackHint")
-                      : t("nativeTtsHint")}
+                          ? t("ttsProviderEnabledHint")
+                          : t("ttsProviderMissingHint")
+                        : t("nativeTtsHint")}
                   </Text>
+                  {settings.ttsMode === "provider" ? (
+                    <Text
+                      style={[styles.sectionHint, { color: colors.textMuted }]}
+                    >
+                      {t("providerTtsOrderHint")}
+                    </Text>
+                  ) : settings.ttsMode === "local" ? (
+                    <Text
+                      style={[styles.sectionHint, { color: colors.textMuted }]}
+                    >
+                      {t("localTtsOrderHint")}
+                    </Text>
+                  ) : null}
                   {ttsLanguageNote ? (
-                    <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
+                    <Text
+                      style={[styles.sectionHint, { color: colors.textMuted }]}
+                    >
                       {t("languageCoverage", { note: ttsLanguageNote })}
                     </Text>
                   ) : null}
                 </PickerSection>
 
-                {settings.ttsMode === "local" ? (
-                  <>
-                    <ListenLanguageSelector
-                      selectedLanguages={settings.ttsListenLanguages}
-                      onToggleLanguage={toggleListenLanguage}
-                    />
-                    <LocalPackSection
-                      settings={settings}
-                      packStates={localTtsPackStates}
-                      onInstallLocalTtsLanguagePack={onInstallLocalTtsLanguagePack}
-                    />
-                  </>
-                ) : null}
-
-                <TtsPreviewSection
-                  previewText={previewText}
-                  setPreviewText={setPreviewText}
-                  previewLoading={previewLoading}
-                  onPreview={handlePreviewVoice}
-                  ttsProvider={currentTtsProvider}
-                  voiceOptions={ttsVoiceOptions}
-                  selectedVoice={selectedTtsVoice}
-                  localVoiceOptions={localVoiceOptions}
-                  selectedLocalVoice={selectedLocalVoice}
-                  selectedListenLanguage={currentLocalVoiceLanguage}
+                <ListenLanguageSelector
+                  selectedLanguages={settings.ttsListenLanguages}
+                  onToggleLanguage={toggleListenLanguage}
+                />
+                <LocalPackSection
                   settings={settings}
-                  onUpdateProviderTtsVoice={onUpdateProviderTtsVoice}
+                  packStates={localTtsPackStates}
                   onUpdateLocalTtsVoice={onUpdateLocalTtsVoice}
+                  onInstallLocalTtsLanguagePack={onInstallLocalTtsLanguagePack}
+                  localPreviewTexts={localPreviewTexts}
+                  activePreviewId={activePreviewId}
+                  onSetLocalPreviewText={(selectedLanguage, text) => {
+                    setLocalPreviewTexts((previous) => ({
+                      ...previous,
+                      [selectedLanguage]: text,
+                    }));
+                  }}
+                  onPreviewLocalVoice={handlePreviewLocalVoice}
+                  onTextInputFocus={handleTextInputFocus}
+                />
+                <ProviderVoicePreviewSection
+                  providers={enabledTtsProviders}
+                  settings={settings}
+                  previewTexts={providerPreviewTexts}
+                  activePreviewId={activePreviewId}
+                  onSetPreviewText={(provider, text) => {
+                    setProviderPreviewTexts((previous) => ({
+                      ...previous,
+                      [provider]: text,
+                    }));
+                  }}
+                  onPreviewProvider={handlePreviewProviderVoice}
+                  onUpdateProviderTtsVoice={onUpdateProviderTtsVoice}
+                  onTextInputFocus={handleTextInputFocus}
+                />
+                <NativeVoicePreviewSection
+                  voiceOptions={nativeVoiceOptions}
+                  selectedVoice={selectedNativeVoice}
+                  previewText={nativePreviewText}
+                  activePreviewId={activePreviewId}
+                  onSelectVoice={setSelectedNativeVoice}
+                  onSetPreviewText={setNativePreviewText}
+                  onPreview={handlePreviewNativeVoice}
                   onTextInputFocus={handleTextInputFocus}
                 />
               </>
@@ -2233,6 +2636,12 @@ const styles = StyleSheet.create({
   },
   localPackCopy: {
     flex: 1,
+  },
+  localPackVoicePicker: {
+    marginTop: 14,
+  },
+  localPackPreview: {
+    marginTop: 14,
   },
   localPackButton: {
     minHeight: 42,

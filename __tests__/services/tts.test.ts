@@ -34,7 +34,9 @@ Object.defineProperty(global, "FileReader", {
   writable: true,
 });
 
-const { synthesizeLocalSpeech } = jest.requireMock("../../src/services/localTts") as {
+const { synthesizeLocalSpeech } = jest.requireMock(
+  "../../src/services/localTts",
+) as {
   synthesizeLocalSpeech: jest.Mock;
 };
 
@@ -87,8 +89,29 @@ describe("synthesizeSpeech", () => {
         voice: "alloy",
         mode: "provider",
         language: "en",
-      })
+      }),
     ).rejects.toThrow("Choose a text-to-speech provider");
+  });
+
+  it("falls back to a matching local voice when provider mode has no provider configured", async () => {
+    synthesizeLocalSpeech.mockResolvedValueOnce("/tmp/local-en.wav");
+
+    const result = await synthesizeSpeech({
+      text: "I think this is the right answer.",
+      voice: "alloy",
+      mode: "provider",
+      language: "en",
+      listenLanguages: ["en"],
+      localVoices,
+    });
+
+    expect(result).toBe("/tmp/local-en.wav");
+    expect(synthesizeLocalSpeech).toHaveBeenCalledWith({
+      text: "I think this is the right answer.",
+      language: "en",
+      voice: "af_heart",
+    });
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("calls Together TTS with a provider-specific language hint", async () => {
@@ -149,12 +172,13 @@ describe("synthesizeSpeech", () => {
     expect(result).toMatch(/^\/tmp\/tts-.*\.wav$/);
     const [url, options] = (fetch as jest.Mock).mock.calls[0];
     expect(url).toBe(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent"
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent",
     );
     expect(options.headers["x-goog-api-key"]).toBe("AIza-test");
     const body = JSON.parse(options.body);
     expect(
-      body.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName
+      body.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig
+        .voiceName,
     ).toBe("Aoede");
   });
 
@@ -227,6 +251,30 @@ describe("synthesizeSpeech", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("falls back to a matching local voice when provider synthesis fails", async () => {
+    (fetch as jest.Mock).mockRejectedValueOnce(new Error("provider failure"));
+    synthesizeLocalSpeech.mockResolvedValueOnce("/tmp/local-de.wav");
+
+    const result = await synthesizeSpeech({
+      text: "Ich glaube, das ist die richtige Antwort.",
+      voice: "alloy",
+      mode: "provider",
+      provider: "openai",
+      apiKey: "sk-test",
+      language: "en",
+      listenLanguages: ["de"],
+      localVoices,
+    });
+
+    expect(result).toBe("/tmp/local-de.wav");
+    expect(synthesizeLocalSpeech).toHaveBeenCalledWith({
+      text: "Ich glaube, das ist die richtige Antwort.",
+      language: "de",
+      voice: "thorsten-medium",
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("calls xAI TTS with provider-specific fields", async () => {
     (fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
@@ -278,12 +326,11 @@ describe("synthesizeSpeech", () => {
         Promise.resolve(
           JSON.stringify({
             error: {
-              message:
-                "String should have at most 4096 characters",
+              message: "String should have at most 4096 characters",
               type: "invalid_request_error",
               code: "string_too_long",
             },
-          })
+          }),
         ),
     });
 
@@ -295,21 +342,23 @@ describe("synthesizeSpeech", () => {
         provider: "openai",
         apiKey: "sk-test",
         language: "en",
-      })
+      }),
     ).rejects.toEqual(
       expect.objectContaining<TtsRequestError>({
         name: "TtsRequestError",
         inputTooLong: true,
         message:
           "OpenAI speech output rejected the reply because it was too long.",
-      })
+      }),
     );
   });
 
   it("times out a hanging provider TTS request with a readable error", async () => {
     jest.useFakeTimers();
     try {
-      (fetch as jest.Mock).mockImplementation(() => new Promise(() => undefined));
+      (fetch as jest.Mock).mockImplementation(
+        () => new Promise(() => undefined),
+      );
       const text = "Hello world";
 
       const pending = synthesizeSpeech({
@@ -321,7 +370,7 @@ describe("synthesizeSpeech", () => {
         language: "en",
       });
       const expectation = expect(pending).rejects.toThrow(
-        "OpenAI speech output took too long."
+        "OpenAI speech output took too long.",
       );
 
       await jest.advanceTimersByTimeAsync(getProviderTtsTimeoutMs(text) + 1);
@@ -333,7 +382,11 @@ describe("synthesizeSpeech", () => {
   });
 
   it("scales provider TTS timeout with reply length up to a cap", () => {
-    expect(getProviderTtsTimeoutMs("short")).toBeGreaterThan(PROVIDER_TTS_TIMEOUT_MS);
-    expect(getProviderTtsTimeoutMs("x".repeat(10000))).toBe(PROVIDER_TTS_MAX_TIMEOUT_MS);
+    expect(getProviderTtsTimeoutMs("short")).toBeGreaterThan(
+      PROVIDER_TTS_TIMEOUT_MS,
+    );
+    expect(getProviderTtsTimeoutMs("x".repeat(10000))).toBe(
+      PROVIDER_TTS_MAX_TIMEOUT_MS,
+    );
   });
 });

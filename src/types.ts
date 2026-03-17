@@ -40,6 +40,24 @@ export type ProviderApiKeys = Record<Provider, string>;
 export type ProviderModelSelections = Record<Provider, string>;
 export type ProviderTtsVoiceSelections = Record<Provider, string>;
 export type LocalTtsVoiceSelections = Record<TtsListenLanguage, string>;
+export type VoicePreviewRequest =
+  | {
+      text: string;
+      mode: "native";
+      nativeVoice?: string;
+    }
+  | {
+      text: string;
+      mode: "provider";
+      provider: Provider;
+      voice: string;
+    }
+  | {
+      text: string;
+      mode: "local";
+      localLanguage: TtsListenLanguage;
+      voice: string;
+    };
 export type VoiceVisualPhase =
   | "idle"
   | "recording"
@@ -68,11 +86,12 @@ export interface Settings {
   apiKeys: ProviderApiKeys;
 }
 
-export const DEFAULT_ASSISTANT_INSTRUCTIONS_BY_LANGUAGE: Record<AppLanguage, string> = {
-  en:
-    "You are a voice assistant. The user is speaking to you and will hear your response read aloud. Respond naturally and conversationally as if talking. Never use markdown, bullet points, numbered lists, headers, or any formatting. Keep responses concise and spoken-friendly.",
-  de:
-    "Du bist ein Sprachassistent. Die Nutzerin oder der Nutzer spricht mit dir und wird deine Antwort vorgelesen bekommen. Antworte natuerlich und gespraechsnah, als waerest du in einem echten Gespraech. Verwende niemals Markdown, Aufzaehlungen, nummerierte Listen, Ueberschriften oder sonstige Formatierung. Halte Antworten knapp und gut vorlesbar.",
+export const DEFAULT_ASSISTANT_INSTRUCTIONS_BY_LANGUAGE: Record<
+  AppLanguage,
+  string
+> = {
+  en: "You are a voice assistant. The user is speaking to you and will hear your response read aloud. Respond naturally and conversationally as if talking. Never use markdown, bullet points, numbered lists, headers, or any formatting. Keep responses concise and spoken-friendly.",
+  de: "Du bist ein Sprachassistent. Die Nutzerin oder der Nutzer spricht mit dir und wird deine Antwort vorgelesen bekommen. Antworte natuerlich und gespraechsnah, als waerest du in einem echten Gespraech. Verwende niemals Markdown, Aufzaehlungen, nummerierte Listen, Ueberschriften oder sonstige Formatierung. Halte Antworten knapp und gut vorlesbar.",
 };
 
 export const DEFAULT_ASSISTANT_INSTRUCTIONS =
@@ -83,11 +102,13 @@ export function getDefaultAssistantInstructions(language: AppLanguage) {
 }
 
 export function isDefaultAssistantInstructions(value: string) {
-  return Object.values(DEFAULT_ASSISTANT_INSTRUCTIONS_BY_LANGUAGE).includes(value);
+  return Object.values(DEFAULT_ASSISTANT_INSTRUCTIONS_BY_LANGUAGE).includes(
+    value,
+  );
 }
 
 export function getDefaultTtsListenLanguages(
-  language: AppLanguage
+  language: AppLanguage,
 ): TtsListenLanguage[] {
   return [language];
 }

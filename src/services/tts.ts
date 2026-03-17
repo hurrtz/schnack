@@ -1,6 +1,9 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { getTtsListenLanguageLabel } from "../constants/localTts";
-import { PROVIDER_DEFAULT_TTS_VOICES, PROVIDER_LABELS } from "../constants/models";
+import {
+  PROVIDER_DEFAULT_TTS_VOICES,
+  PROVIDER_LABELS,
+} from "../constants/models";
 import { translate } from "../i18n";
 import { synthesizeLocalSpeech } from "./localTts";
 import {
@@ -11,7 +14,10 @@ import {
   TtsListenLanguage,
 } from "../types";
 import { getTogetherTtsLanguageCode } from "../utils/speechLanguage";
-import { resolveTtsListenLanguage, supportsLocalTtsLanguage } from "../utils/ttsRouting";
+import {
+  resolveTtsListenLanguage,
+  supportsLocalTtsLanguage,
+} from "../utils/ttsRouting";
 
 let ttsCounter = 0;
 export const PROVIDER_TTS_MAX_INPUT_CHARS = 3500;
@@ -53,7 +59,9 @@ type GeminiTtsConfig = {
   voiceFallback: string;
 };
 
-const TTS_PROVIDER_CONFIGS: Partial<Record<Provider, BinaryTtsConfig | GeminiTtsConfig>> = {
+const TTS_PROVIDER_CONFIGS: Partial<
+  Record<Provider, BinaryTtsConfig | GeminiTtsConfig>
+> = {
   openai: {
     kind: "binary",
     endpoint: "https://api.openai.com/v1/audio/speech",
@@ -84,13 +92,13 @@ const TTS_PROVIDER_CONFIGS: Partial<Record<Provider, BinaryTtsConfig | GeminiTts
 function requireProviderKey(
   provider: Provider,
   apiKey: string | undefined,
-  language: AppLanguage
+  language: AppLanguage,
 ) {
   if (!apiKey?.trim()) {
     throw new Error(
       translate(language, "providerConfiguredInSettings", {
         provider: PROVIDER_LABELS[provider],
-      })
+      }),
     );
   }
 
@@ -230,7 +238,7 @@ function splitLongTtsSegment(text: string, maxChars: number): string[] {
 
 export function splitTextForTts(
   text: string,
-  maxChars = PROVIDER_TTS_MAX_INPUT_CHARS
+  maxChars = PROVIDER_TTS_MAX_INPUT_CHARS,
 ): string[] {
   const normalized = text.trim();
 
@@ -338,7 +346,8 @@ function getGeminiAudioPart(data: any) {
   }
 
   return (
-    parts.find((part) => typeof part?.inlineData?.data === "string")?.inlineData ?? null
+    parts.find((part) => typeof part?.inlineData?.data === "string")
+      ?.inlineData ?? null
   );
 }
 
@@ -371,7 +380,7 @@ function extractProviderErrorMessage(errorText: string) {
 
   if (Array.isArray(parsed?.errors)) {
     const firstMessage = parsed.errors.find(
-      (entry: any) => typeof entry?.message === "string"
+      (entry: any) => typeof entry?.message === "string",
     )?.message;
 
     if (typeof firstMessage === "string") {
@@ -402,7 +411,7 @@ function buildTtsRequestError(params: {
 }) {
   const normalizedMessage = extractProviderErrorMessage(params.errorText);
   const inputTooLong = isInputTooLongError(
-    `${normalizedMessage} ${params.errorText}`
+    `${normalizedMessage} ${params.errorText}`,
   );
 
   return new TtsRequestError({
@@ -428,8 +437,50 @@ function createTtsTimeoutError(params: {
   return new Error(
     translate(params.language, "ttsTimeout", {
       provider: PROVIDER_LABELS[params.provider],
-    })
+    }),
   );
+}
+
+function getResolvedLocalTtsSelection(params: {
+  text: string;
+  language: AppLanguage;
+  listenLanguages?: TtsListenLanguage[];
+  localVoices?: LocalTtsVoiceSelections;
+}) {
+  const resolvedLanguage = resolveTtsListenLanguage({
+    text: params.text,
+    preferredLanguages: params.listenLanguages,
+    appLanguage: params.language,
+  });
+  const localVoice = params.localVoices?.[resolvedLanguage] || "";
+
+  return {
+    resolvedLanguage,
+    localVoice,
+    canUseLocal: supportsLocalTtsLanguage(resolvedLanguage) && !!localVoice,
+  };
+}
+
+async function trySynthesizeResolvedLocalSpeech(params: {
+  text: string;
+  language: AppLanguage;
+  listenLanguages?: TtsListenLanguage[];
+  localVoices?: LocalTtsVoiceSelections;
+}) {
+  const selection = getResolvedLocalTtsSelection(params);
+
+  if (!selection.canUseLocal) {
+    return null;
+  }
+
+  return {
+    resolvedLanguage: selection.resolvedLanguage,
+    audioPath: await synthesizeLocalSpeech({
+      text: params.text,
+      language: selection.resolvedLanguage,
+      voice: selection.localVoice,
+    }),
+  };
 }
 
 export function getProviderTtsTimeoutMs(text: string) {
@@ -437,7 +488,8 @@ export function getProviderTtsTimeoutMs(text: string) {
 
   return Math.min(
     PROVIDER_TTS_MAX_TIMEOUT_MS,
-    PROVIDER_TTS_TIMEOUT_MS + normalizedLength * PROVIDER_TTS_TIMEOUT_MS_PER_CHAR
+    PROVIDER_TTS_TIMEOUT_MS +
+      normalizedLength * PROVIDER_TTS_TIMEOUT_MS_PER_CHAR,
   );
 }
 
@@ -445,7 +497,7 @@ async function fetchWithTimeout(
   input: RequestInfo | URL,
   init: RequestInit,
   timeoutMs: number,
-  onTimeout: () => Error
+  onTimeout: () => Error,
 ) {
   const controller = new AbortController();
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -462,7 +514,8 @@ async function fetchWithTimeout(
   }).catch((error) => {
     if (
       error instanceof Error &&
-      (error.name === "AbortError" || error.message.toLowerCase().includes("aborted"))
+      (error.name === "AbortError" ||
+        error.message.toLowerCase().includes("aborted"))
     ) {
       throw onTimeout();
     }
@@ -501,24 +554,31 @@ export async function synthesizeSpeech(params: {
   } = params;
 
   if (mode === "native") {
-    throw new Error(translate(language, "nativeTtsDoesNotSynthesizeAudioFiles"));
+    throw new Error(
+      translate(language, "nativeTtsDoesNotSynthesizeAudioFiles"),
+    );
   }
 
   if (mode === "local") {
-    const resolvedLanguage = resolveTtsListenLanguage({
+    const localSelection = getResolvedLocalTtsSelection({
       text,
-      preferredLanguages: listenLanguages,
-      appLanguage: language,
+      language,
+      listenLanguages,
+      localVoices,
     });
-    const localVoice = localVoices?.[resolvedLanguage] || "";
 
-    if (supportsLocalTtsLanguage(resolvedLanguage) && localVoice) {
+    if (localSelection.canUseLocal) {
       try {
-        return await synthesizeLocalSpeech({
+        const localResult = await trySynthesizeResolvedLocalSpeech({
           text,
-          language: resolvedLanguage,
-          voice: localVoice,
+          language,
+          listenLanguages,
+          localVoices,
         });
+
+        if (localResult) {
+          return localResult.audioPath;
+        }
       } catch (error) {
         if (!provider || !apiKey?.trim()) {
           throw error;
@@ -538,22 +598,61 @@ export async function synthesizeSpeech(params: {
 
     throw new Error(
       translate(language, "localTtsUnavailableForLanguage", {
-        languageLabel: getTtsListenLanguageLabel(resolvedLanguage, language),
-      })
+        languageLabel: getTtsListenLanguageLabel(
+          localSelection.resolvedLanguage,
+          language,
+        ),
+      }),
     );
   }
 
   if (!provider) {
-    throw new Error(translate(language, "chooseTextToSpeechProviderInSettings"));
+    try {
+      const localResult = await trySynthesizeResolvedLocalSpeech({
+        text,
+        language,
+        listenLanguages,
+        localVoices,
+      });
+
+      if (localResult) {
+        return localResult.audioPath;
+      }
+    } catch {
+      // Provider mode still falls through to the native fallback upstream if local is unavailable.
+    }
+
+    throw new Error(
+      translate(language, "chooseTextToSpeechProviderInSettings"),
+    );
   }
 
-  return synthesizeProviderSpeech({
-    text,
-    voice,
-    provider,
-    apiKey,
-    language,
-  });
+  try {
+    return await synthesizeProviderSpeech({
+      text,
+      voice,
+      provider,
+      apiKey,
+      language,
+    });
+  } catch (providerError) {
+    try {
+      const localResult = await trySynthesizeResolvedLocalSpeech({
+        text,
+        language,
+        listenLanguages,
+        localVoices,
+      });
+
+      if (localResult) {
+        return localResult.audioPath;
+      }
+    } catch {
+      // Provider remains the primary mode here; fall through to native fallback upstream.
+    }
+
+    throw providerError;
+  }
 }
 
 export async function synthesizeSpeechSequence(params: {
@@ -584,7 +683,7 @@ export async function synthesizeSpeechSequence(params: {
         await synthesizeSpeech({
           ...params,
           text: segment,
-        })
+        }),
       );
     }
 
@@ -625,12 +724,15 @@ async function synthesizeProviderSpeech(params: {
     throw new Error(
       translate(language, "ttsNotSupportedYet", {
         provider: PROVIDER_LABELS[provider],
-      })
+      }),
     );
   }
 
   const selectedVoice =
-    voice || config.voiceFallback || PROVIDER_DEFAULT_TTS_VOICES[provider] || "";
+    voice ||
+    config.voiceFallback ||
+    PROVIDER_DEFAULT_TTS_VOICES[provider] ||
+    "";
 
   if (config.kind === "gemini") {
     const response = await fetchWithTimeout(
@@ -664,7 +766,7 @@ async function synthesizeProviderSpeech(params: {
         }),
       },
       timeoutMs,
-      () => createTtsTimeoutError({ provider, language })
+      () => createTtsTimeoutError({ provider, language }),
     );
 
     if (!response.ok) {
@@ -685,7 +787,7 @@ async function synthesizeProviderSpeech(params: {
       throw new Error(
         translate(language, "ttsDidNotReturnAudio", {
           provider: PROVIDER_LABELS[provider],
-        })
+        }),
       );
     }
 
@@ -738,7 +840,7 @@ async function synthesizeProviderSpeech(params: {
       body: JSON.stringify(requestBody),
     },
     timeoutMs,
-    () => createTtsTimeoutError({ provider, language })
+    () => createTtsTimeoutError({ provider, language }),
   );
 
   if (!response.ok) {

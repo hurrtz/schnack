@@ -2,9 +2,7 @@ import React, { createContext, useContext, useMemo } from "react";
 import { AppLanguage } from "./types";
 
 type TranslationParams = Record<string, string | number | undefined>;
-type TranslationValue =
-  | string
-  | ((params: TranslationParams) => string);
+type TranslationValue = string | ((params: TranslationParams) => string);
 
 const translations = {
   en: {
@@ -87,8 +85,7 @@ const translations = {
     assistantInstructionsIntro:
       "Shape the hidden guidance the model receives before every reply.",
     baseInstructions: "Base Instructions",
-    assistantInstructionsPlaceholder:
-      "Define how the assistant should behave.",
+    assistantInstructionsPlaceholder: "Define how the assistant should behave.",
     assistantInstructionsHint:
       "This is always prepended before the selected response length and tone.",
     adaptiveLength: "Adaptive Length",
@@ -126,18 +123,18 @@ const translations = {
       "Use the device speech engine for spoken replies and voice preview.",
     localTts: "Local",
     localTtsDescription:
-      "Use downloaded on-device voice packs first, then fall back to cloud TTS or the system voice.",
+      "Try a matching downloaded local voice first, then the selected provider if available, then the system voice.",
     providerTtsDescription:
-      "Use a configured provider for spoken replies and preview.",
+      "Try the selected provider first, then a matching downloaded local voice, then the system voice.",
     ttsProvider: "TTS Provider",
     ttsProviderEnabledHint:
       "Only enabled providers with spoken-reply support appear here.",
     ttsProviderMissingHint:
       "Enable a provider with TTS support in the Providers tab to choose it here.",
-    localTtsCloudFallbackHint:
-      "Local packs are tried first. If a selected language is missing locally, this provider handles the fallback.",
-    localTtsNativeFallbackHint:
-      "Local packs are tried first. If a selected language is missing locally, the system voice handles the fallback.",
+    localTtsOrderHint:
+      "Playback order: matching local voice first, then the selected provider if configured, then the system voice.",
+    providerTtsOrderHint:
+      "Playback order: selected provider first, then a matching downloaded local voice, then the system voice.",
     nativeTtsHint:
       "Native TTS uses the system voice stack and does not require a provider key.",
     localTtsLanguageCoverageHint:
@@ -146,8 +143,8 @@ const translations = {
     voiceSelection: "Voice Selection",
     nativeVoiceSelectionHint:
       "Native playback uses the device voice chosen by the operating system.",
-    localTtsVoiceSelectionHint: ({ languageLabel }) =>
-      `Local playback currently uses the installed ${languageLabel} voice pack.`,
+    localTtsVoiceSelectionHint:
+      "Each selected language below keeps its own local voice. Preview follows the language detected from the preview text.",
     providerDefaultVoiceHint:
       "This provider currently uses its default voice for preview and spoken replies.",
     listenLanguages: "Listen Languages",
@@ -155,7 +152,16 @@ const translations = {
       "Pick the reply languages you want to sound good. SchnackAI tries them in this order when routing speech output.",
     localVoicePacks: "Local Voice Packs",
     localVoicePacksHint:
-      "Install only the language packs you actually care about to keep storage and download time under control.",
+      "Each language keeps its own local voice. Choose the voice you want for that language, then download only the packs you actually care about.",
+    localVoiceForLanguage: ({ languageLabel }) => `Voice for ${languageLabel}`,
+    providerVoicePreviews: "Provider Voice Previews",
+    providerVoicePreviewsHint:
+      "Each enabled TTS provider can be tested here with its own voice and sample text, without changing the active reply route.",
+    nativeVoicePreviewSection: "Native Voice Preview",
+    nativeVoicePreviewSectionHint:
+      "This speaks directly through the phone's built-in speech synthesizer so you can compare it against local and cloud voices.",
+    nativeVoiceUnavailable:
+      "This device did not report any native system voices for preview.",
     localTtsPackReady: "Installed on this device.",
     localTtsPackMissing:
       "Not installed yet. Cloud TTS or the system voice will be used until you download it.",
@@ -216,8 +222,7 @@ const translations = {
       "Local voice was unavailable. Preview switched to the best fallback voice.",
     localTtsPackInstalled: ({ languageLabel }) =>
       `${languageLabel} local voice pack installed.`,
-    localTtsPackInstallFailed:
-      "Couldn't install the local voice pack.",
+    localTtsPackInstallFailed: "Couldn't install the local voice pack.",
     liveInput: "Live Input",
     parsingInput: "Parsing Input",
     awaitingModel: "Awaiting Model",
@@ -227,7 +232,8 @@ const translations = {
     listeningToYourVoice: "Listening to your voice",
     parsingYourVoiceInput: "Parsing your voice input",
     waitingForProvider: ({ provider }) => `Waiting for ${provider}`,
-    preparingVoiceWithProvider: ({ provider }) => `Preparing voice with ${provider}`,
+    preparingVoiceWithProvider: ({ provider }) =>
+      `Preparing voice with ${provider}`,
     speakingBackToYou: "Speaking back to you",
     readyForNextThought: "Ready for the next thought",
     freshSession: "Fresh session",
@@ -243,7 +249,8 @@ const translations = {
     shareThread: "Share Thread",
     repeatReply: "Repeat Reply",
     renameThread: "Rename Thread",
-    renameThreadHint: "Give this conversation a title you can find quickly later.",
+    renameThreadHint:
+      "Give this conversation a title you can find quickly later.",
     threadTitle: "Thread title",
     noTranscriptYet: "No transcript yet",
     previewTranscriptEmptyDescription:
@@ -340,8 +347,7 @@ const translations = {
       detail
         ? `${provider} rejected the ${action} request: ${detail}`
         : `${provider} rejected the ${action} request.`,
-    providerValidationSuccess: ({ provider }) =>
-      `${provider} is ready to use.`,
+    providerValidationSuccess: ({ provider }) => `${provider} is ready to use.`,
     providerValidationFailed: "Provider validation failed.",
     noBase64EncoderAvailable: "No base64 encoder available.",
     noBase64DecoderAvailable: "No base64 decoder available.",
@@ -351,18 +357,20 @@ const translations = {
       `No local or cloud voice route is ready for ${languageLabel}.`,
     chooseTextToSpeechProviderInSettings:
       "Choose a text-to-speech provider in Settings.",
-    ttsNotSupportedYet: ({ provider }) => `${provider} TTS is not supported yet.`,
+    ttsNotSupportedYet: ({ provider }) =>
+      `${provider} TTS is not supported yet.`,
     ttsError: ({ provider, status, errorText }) =>
       `${provider} TTS error (${status}): ${errorText}`,
     ttsReplyTooLong: ({ provider }) =>
       `${provider} speech output rejected the reply because it was too long.`,
-    ttsTimeout: ({ provider }) =>
-      `${provider} speech output took too long.`,
-    ttsDidNotReturnAudio: ({ provider }) => `${provider} TTS did not return audio.`,
+    ttsTimeout: ({ provider }) => `${provider} speech output took too long.`,
+    ttsDidNotReturnAudio: ({ provider }) =>
+      `${provider} TTS did not return audio.`,
     nativeSttHandledInApp: "Native STT is handled directly in the app.",
     chooseSpeechToTextProviderInSettings:
       "Choose a speech-to-text provider in Settings.",
-    sttNotSupportedYet: ({ provider }) => `${provider} STT is not supported yet.`,
+    sttNotSupportedYet: ({ provider }) =>
+      `${provider} STT is not supported yet.`,
     sttError: ({ provider, status, errorText }) =>
       `${provider} STT error (${status}): ${errorText}`,
     apiError: ({ provider, status, errorText }) =>
@@ -390,8 +398,7 @@ const translations = {
     dismiss: "Schliessen",
     unavailable: "Nicht verfuegbar",
     selection: "Auswahl",
-    chooseCompatibleProviderFirst:
-      "Waehle zuerst einen kompatiblen Anbieter",
+    chooseCompatibleProviderFirst: "Waehle zuerst einen kompatiblen Anbieter",
     settings: "Einstellungen",
     firstRun: "Erster Start",
     instructions: "Anweisungen",
@@ -450,8 +457,7 @@ const translations = {
     eli5: "Einfach erklaert",
     eli5Description:
       "Erklaere alles so einfach wie moeglich. Nutze Analogien, Alltagssprache und vermeide Fachjargon.",
-    openProviderSettings: ({ provider }) =>
-      `${provider}-Einstellungen oeffnen`,
+    openProviderSettings: ({ provider }) => `${provider}-Einstellungen oeffnen`,
     createProviderApiKey: ({ provider }) =>
       `API-Schluessel fuer ${provider} erstellen`,
     useProvider: ({ provider }) => `${provider} verwenden`,
@@ -507,18 +513,18 @@ const translations = {
       "Verwende die Sprachengine des Geraets fuer gesprochene Antworten und die Stimmvorschau.",
     localTts: "Lokal",
     localTtsDescription:
-      "Verwende zuerst heruntergeladene Sprachpakete auf dem Geraet und falle dann auf Cloud-TTS oder die Systemstimme zurueck.",
+      "Nutze zuerst eine passende lokale Stimme, dann den ausgewaehlten Anbieter, falls vorhanden, und danach die Systemstimme.",
     providerTtsDescription:
-      "Verwende einen konfigurierten Anbieter fuer gesprochene Antworten und Vorschau.",
+      "Nutze zuerst den ausgewaehlten Anbieter, dann eine passende lokale Stimme und danach die Systemstimme.",
     ttsProvider: "TTS-Anbieter",
     ttsProviderEnabledHint:
       "Hier erscheinen nur aktivierte Anbieter mit Sprachausgabe-Unterstuetzung.",
     ttsProviderMissingHint:
       "Aktiviere im Tab Anbieter einen Dienst mit TTS-Unterstuetzung, um ihn hier auszuwaehlen.",
-    localTtsCloudFallbackHint:
-      "Lokale Sprachpakete werden zuerst genutzt. Fehlt eine Sprache lokal, uebernimmt dieser Anbieter den Fallback.",
-    localTtsNativeFallbackHint:
-      "Lokale Sprachpakete werden zuerst genutzt. Fehlt eine Sprache lokal, uebernimmt die Systemstimme den Fallback.",
+    localTtsOrderHint:
+      "Reihenfolge: passende lokale Stimme zuerst, dann der ausgewaehlte Anbieter, falls konfiguriert, dann die Systemstimme.",
+    providerTtsOrderHint:
+      "Reihenfolge: ausgewaehlter Anbieter zuerst, dann eine passende heruntergeladene lokale Stimme, dann die Systemstimme.",
     nativeTtsHint:
       "Native TTS nutzt die Systemstimmen des Geraets und benoetigt keinen Anbieter-Schluessel.",
     localTtsLanguageCoverageHint:
@@ -527,8 +533,8 @@ const translations = {
     voiceSelection: "Stimmenauswahl",
     nativeVoiceSelectionHint:
       "Native Wiedergabe nutzt die vom Betriebssystem ausgewaehlte Geraetestimme.",
-    localTtsVoiceSelectionHint: ({ languageLabel }) =>
-      `Lokale Wiedergabe nutzt aktuell das installierte ${languageLabel}-Sprachpaket.`,
+    localTtsVoiceSelectionHint:
+      "Jede ausgewaehlte Sprache unten behaelt ihre eigene lokale Stimme. Die Vorschau folgt der Sprache, die aus dem Vorschautext erkannt wird.",
     providerDefaultVoiceHint:
       "Dieser Anbieter nutzt aktuell seine Standardstimme fuer Vorschau und Sprachausgabe.",
     listenLanguages: "Sprachen zum Hoeren",
@@ -536,7 +542,17 @@ const translations = {
       "Waehle die Antwortsprachen aus, die gut klingen sollen. SchnackAI probiert sie in dieser Reihenfolge fuer die Sprachausgabe.",
     localVoicePacks: "Lokale Sprachpakete",
     localVoicePacksHint:
-      "Installiere nur die Sprachpakete, die dir wirklich wichtig sind, damit Speicher und Downloadzeit klein bleiben.",
+      "Jede Sprache hat ihre eigene lokale Stimme. Waehle zuerst die Stimme pro Sprache und lade dann nur die Pakete herunter, die dir wirklich wichtig sind.",
+    localVoiceForLanguage: ({ languageLabel }) =>
+      `Stimme fuer ${languageLabel}`,
+    providerVoicePreviews: "Anbieter-Stimmvorschau",
+    providerVoicePreviewsHint:
+      "Jeder aktivierte TTS-Anbieter kann hier mit eigener Stimme und eigenem Beispieltext getestet werden, ohne die aktive Antwort-Route umzuschalten.",
+    nativeVoicePreviewSection: "Native Stimmvorschau",
+    nativeVoicePreviewSectionHint:
+      "Das nutzt direkt die eingebaute Sprachsynthese des Telefons, damit du sie mit lokalen und Cloud-Stimmen vergleichen kannst.",
+    nativeVoiceUnavailable:
+      "Dieses Geraet hat keine nativen Systemstimmen fuer die Vorschau gemeldet.",
     localTtsPackReady: "Auf diesem Geraet installiert.",
     localTtsPackMissing:
       "Noch nicht installiert. Bis zum Download werden Cloud-TTS oder die Systemstimme genutzt.",
@@ -547,8 +563,7 @@ const translations = {
     download: "Download",
     downloadingShort: "Laedt...",
     voicePreviewText: "Text fuer Stimmvorschau",
-    voicePreviewPlaceholder:
-      "Gib einen Satz ein, um diese Stimme zu hoeren.",
+    voicePreviewPlaceholder: "Gib einen Satz ein, um diese Stimme zu hoeren.",
     voicePreviewHint:
       "Verwendet das aktuell gewaehlte Sprach-Backend, ohne etwas an das Sprachmodell zu senden.",
     previewVoice: "Stimme testen",
@@ -581,8 +596,7 @@ const translations = {
     couldntCatchThatTryAgain:
       "Das konnte nicht sauber erkannt werden. Versuch es noch einmal.",
     couldntStartVoiceInput: "Spracheingabe konnte nicht gestartet werden.",
-    couldntProcessVoiceInput:
-      "Spracheingabe konnte nicht verarbeitet werden.",
+    couldntProcessVoiceInput: "Spracheingabe konnte nicht verarbeitet werden.",
     addProviderKeyToEnableProvider: ({ provider }) =>
       `Fuege in den Einstellungen deinen API-Schluessel fuer ${provider} hinzu, um diesen Anbieter zu aktivieren.`,
     stopSessionBeforePreview:
@@ -611,7 +625,8 @@ const translations = {
     listeningToYourVoice: "Ich hoere dir zu",
     parsingYourVoiceInput: "Deine Sprache wird verarbeitet",
     waitingForProvider: ({ provider }) => `Warte auf ${provider}`,
-    preparingVoiceWithProvider: ({ provider }) => `Bereite Stimme mit ${provider} vor`,
+    preparingVoiceWithProvider: ({ provider }) =>
+      `Bereite Stimme mit ${provider} vor`,
     speakingBackToYou: "Antwort wird gesprochen",
     readyForNextThought: "Bereit fuer den naechsten Gedanken",
     freshSession: "Neue Sitzung",
@@ -748,8 +763,7 @@ const translations = {
       `Die Sprachausgabe bei ${provider} hat zu lange gedauert.`,
     ttsDidNotReturnAudio: ({ provider }) =>
       `${provider} hat kein Audio zurueckgegeben.`,
-    nativeSttHandledInApp:
-      "Native STT wird direkt in der App verarbeitet.",
+    nativeSttHandledInApp: "Native STT wird direkt in der App verarbeitet.",
     chooseSpeechToTextProviderInSettings:
       "Waehle in den Einstellungen einen Sprache-zu-Text-Anbieter.",
     sttNotSupportedYet: ({ provider }) =>
@@ -786,7 +800,7 @@ export type TranslationKey = keyof typeof translations.en;
 export function translate(
   language: AppLanguage,
   key: TranslationKey,
-  params: TranslationParams = {}
+  params: TranslationParams = {},
 ) {
   const value = translations[language][key] ?? translations.en[key];
   return typeof value === "function" ? value(params) : value;
@@ -802,7 +816,9 @@ interface LocalizationContextValue {
   locale: string;
 }
 
-const LocalizationContext = createContext<LocalizationContextValue | null>(null);
+const LocalizationContext = createContext<LocalizationContextValue | null>(
+  null,
+);
 
 export function LocalizationProvider({
   language,
@@ -817,7 +833,7 @@ export function LocalizationProvider({
       locale: getLocaleForLanguage(language),
       t: (key, params) => translate(language, key, params),
     }),
-    [language]
+    [language],
   );
 
   return (
@@ -831,7 +847,9 @@ export function useLocalization() {
   const context = useContext(LocalizationContext);
 
   if (!context) {
-    throw new Error("useLocalization must be used within a LocalizationProvider");
+    throw new Error(
+      "useLocalization must be used within a LocalizationProvider",
+    );
   }
 
   return context;

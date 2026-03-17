@@ -13,7 +13,10 @@ import * as Clipboard from "expo-clipboard";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { ChatTranscript } from "../components/ChatTranscript";
 import { ConversationMemoryModal } from "../components/ConversationMemoryModal";
 import { ConversationDrawer } from "../components/ConversationDrawer";
@@ -41,21 +44,17 @@ import { useLocalization } from "../i18n";
 import { validateProviderConnection } from "../services/llm";
 import { releaseLocalTtsResources } from "../services/localTts";
 import { runVoicePipeline } from "../services/voicePipeline";
-import {
-  synthesizeSpeech,
-  synthesizeSpeechSequence,
-} from "../services/tts";
+import { synthesizeSpeech, synthesizeSpeechSequence } from "../services/tts";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import {
   Conversation,
   Provider,
   TtsListenLanguage,
+  VoicePreviewRequest,
   VoiceVisualPhase,
 } from "../types";
-import {
-  formatConversationForCopy,
-} from "../utils/conversationExport";
+import { formatConversationForCopy } from "../utils/conversationExport";
 import {
   getEnabledProviders,
   getEnabledSttProviders,
@@ -94,18 +93,20 @@ export function MainScreen() {
   const recorder = useAudioRecorder();
   const nativeStt = useNativeSpeechRecognizer();
   const player = useAudioPlayer();
-  const { packStates: localTtsPackStates, installLanguagePack } = useLocalTtsPacks(settings);
+  const { packStates: localTtsPackStates, installLanguagePack } =
+    useLocalTtsPacks(settings);
 
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const [settingsFocusProvider, setSettingsFocusProvider] = useState<Provider | undefined>();
+  const [settingsFocusProvider, setSettingsFocusProvider] = useState<
+    Provider | undefined
+  >();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [statusDetailsVisible, setStatusDetailsVisible] = useState(false);
   const [transcriptVisible, setTranscriptVisible] = useState(false);
   const [conversationMenuVisible, setConversationMenuVisible] = useState(false);
   const [setupGuideVisible, setSetupGuideVisible] = useState(false);
-  const [memoryConversation, setMemoryConversation] = useState<Conversation | null>(
-    null
-  );
+  const [memoryConversation, setMemoryConversation] =
+    useState<Conversation | null>(null);
   const [memoryVisible, setMemoryVisible] = useState(false);
   const [pipelinePhase, setPipelinePhase] = useState<
     "idle" | "transcribing" | "thinking" | "synthesizing"
@@ -127,7 +128,8 @@ export function MainScreen() {
   const availableProviders = getEnabledProviders(settings);
   const availableSttProviders = getEnabledSttProviders(settings);
   const availableTtsProviders = getEnabledTtsProviders(settings);
-  const sttProvider = settings.sttMode === "provider" ? settings.sttProvider : null;
+  const sttProvider =
+    settings.sttMode === "provider" ? settings.sttProvider : null;
   const ttsProvider = settings.ttsProvider;
   const sttApiKey = sttProvider ? settings.apiKeys[sttProvider].trim() : "";
   const ttsApiKey = ttsProvider ? settings.apiKeys[ttsProvider].trim() : "";
@@ -146,11 +148,17 @@ export function MainScreen() {
   const modelLabel = getProviderModelName(provider, model);
   const isBusy = pipelinePhase !== "idle";
   const isRecording =
-    settings.sttMode === "native" ? nativeStt.isRecording : recorder.isRecording;
+    settings.sttMode === "native"
+      ? nativeStt.isRecording
+      : recorder.isRecording;
   const recordingMetering =
-    settings.sttMode === "native" ? nativeStt.meteringData : recorder.meteringData;
+    settings.sttMode === "native"
+      ? nativeStt.meteringData
+      : recorder.meteringData;
   const recordingLevels =
-    settings.sttMode === "native" ? nativeStt.waveformData : recorder.waveformData;
+    settings.sttMode === "native"
+      ? nativeStt.waveformData
+      : recorder.waveformData;
   const ttsStatusLabel =
     settings.ttsMode === "native"
       ? t("systemVoice")
@@ -158,13 +166,13 @@ export function MainScreen() {
         ? `${t("localTts")} · ${settings.ttsListenLanguages
             .map((entry) => getTtsListenLanguageLabel(entry, language))
             .join(", ")}`
-      : ttsProvider
-        ? `${PROVIDER_LABELS[ttsProvider]} · ${getTtsVoiceLabel(
-            ttsProvider,
-            selectedTtsVoice,
-            language
-          )}`
-        : t("noTtsProvider");
+        : ttsProvider
+          ? `${PROVIDER_LABELS[ttsProvider]} · ${getTtsVoiceLabel(
+              ttsProvider,
+              selectedTtsVoice,
+              language,
+            )}`
+          : t("noTtsProvider");
   const visualPhase: VoiceVisualPhase = isRecording
     ? "recording"
     : pipelinePhase === "transcribing"
@@ -186,12 +194,9 @@ export function MainScreen() {
       ? player.waveformData
       : undefined;
 
-  const showToast = useCallback(
-    (message: string, onRetry?: () => void) => {
-      setToast({ message, onRetry });
-    },
-    []
-  );
+  const showToast = useCallback((message: string, onRetry?: () => void) => {
+    setToast({ message, onRetry });
+  }, []);
 
   const handleInstallLocalTtsLanguage = useCallback(
     async (languageCode: TtsListenLanguage) => {
@@ -200,15 +205,17 @@ export function MainScreen() {
         showToast(
           t("localTtsPackInstalled", {
             languageLabel: getTtsListenLanguageLabel(languageCode, language),
-          })
+          }),
         );
       } catch (error) {
         showToast(
-          error instanceof Error ? error.message : t("localTtsPackInstallFailed")
+          error instanceof Error
+            ? error.message
+            : t("localTtsPackInstallFailed"),
         );
       }
     },
-    [installLanguagePack, language, showToast, t]
+    [installLanguagePack, language, showToast, t],
   );
 
   const copyText = useCallback(
@@ -225,14 +232,14 @@ export function MainScreen() {
         showToast(t("couldntCopyText"));
       }
     },
-    [showToast, t]
+    [showToast, t],
   );
 
   const handleCopyMessage = useCallback(
     async (content: string) => {
       await copyText(content.trim(), t("messageCopied"));
     },
-    [copyText, t]
+    [copyText, t],
   );
 
   const handleCopyThread = useCallback(
@@ -248,10 +255,10 @@ export function MainScreen() {
 
       await copyText(
         formatConversationForCopy(conversation, language),
-        t("threadCopied")
+        t("threadCopied"),
       );
     },
-    [activeConversation, copyText, getConversationById, language, showToast, t]
+    [activeConversation, copyText, getConversationById, language, showToast, t],
   );
 
   const handleShareThread = useCallback(
@@ -276,13 +283,13 @@ export function MainScreen() {
           },
           {
             dialogTitle: title,
-          }
+          },
         );
       } catch {
         showToast(t("couldntShareText"));
       }
     },
-    [activeConversation, getConversationById, language, showToast, t]
+    [activeConversation, getConversationById, language, showToast, t],
   );
 
   const handleShareMessage = useCallback(
@@ -300,7 +307,7 @@ export function MainScreen() {
         showToast(t("couldntShareText"));
       }
     },
-    [showToast, t]
+    [showToast, t],
   );
 
   const handleRenameThread = useCallback(
@@ -308,7 +315,7 @@ export function MainScreen() {
       await renameConversation(conversationId, nextTitle);
       showToast(t("threadRenamed"));
     },
-    [renameConversation, showToast, t]
+    [renameConversation, showToast, t],
   );
 
   const handleTogglePinned = useCallback(
@@ -316,7 +323,7 @@ export function MainScreen() {
       const pinned = toggleConversationPinned(conversationId);
       showToast(pinned ? t("threadPinned") : t("threadUnpinned"));
     },
-    [showToast, t, toggleConversationPinned]
+    [showToast, t, toggleConversationPinned],
   );
 
   const playReplyText = useCallback(
@@ -357,7 +364,7 @@ export function MainScreen() {
         showToast(
           settings.ttsMode === "local"
             ? t("localVoiceFallback")
-            : t("providerVoiceFallback")
+            : t("providerVoiceFallback"),
         );
         return null;
       });
@@ -381,14 +388,13 @@ export function MainScreen() {
       ttsApiKey,
       language,
       ttsProvider,
-    ]
+    ],
   );
 
   const handleRepeatLastReply = useCallback(
     async (textOverride?: string) => {
       const replyText =
-        textOverride?.trim() ||
-        lastCompletedReplyRef.current.trim();
+        textOverride?.trim() || lastCompletedReplyRef.current.trim();
 
       if (!replyText) {
         showToast(t("noReplyToRepeatYet"));
@@ -408,7 +414,7 @@ export function MainScreen() {
         showToast(message);
       }
     },
-    [isBusy, isRecording, playReplyText, showToast, t]
+    [isBusy, isRecording, playReplyText, showToast, t],
   );
 
   const openSettings = useCallback((focusProvider?: Provider) => {
@@ -441,7 +447,7 @@ export function MainScreen() {
     const nextProvider =
       sttProvider && availableSttProviders.includes(sttProvider)
         ? sttProvider
-        : availableSttProviders[0] ?? null;
+        : (availableSttProviders[0] ?? null);
 
     if (nextProvider !== settings.sttProvider) {
       updateSettings({ sttProvider: nextProvider });
@@ -463,7 +469,7 @@ export function MainScreen() {
     const nextProvider =
       ttsProvider && availableTtsProviders.includes(ttsProvider)
         ? ttsProvider
-        : availableTtsProviders[0] ?? null;
+        : (availableTtsProviders[0] ?? null);
 
     if (nextProvider !== settings.ttsProvider) {
       updateSettings({ ttsProvider: nextProvider });
@@ -527,9 +533,7 @@ export function MainScreen() {
 
   const ensureVoiceSessionReady = useCallback(() => {
     if (!providerApiKey) {
-      showToast(
-        t("addProviderKeyToUseProvider", { provider: providerLabel })
-      );
+      showToast(t("addProviderKeyToUseProvider", { provider: providerLabel }));
       return false;
     }
 
@@ -540,14 +544,20 @@ export function MainScreen() {
 
     if (
       settings.sttMode === "provider" &&
-      (!sttProvider || !availableSttProviders.includes(sttProvider) || !sttApiKey)
+      (!sttProvider ||
+        !availableSttProviders.includes(sttProvider) ||
+        !sttApiKey)
     ) {
       showToast(t("chooseSttBeforeVoiceSession"));
       return false;
     }
 
     if (settings.ttsMode === "provider") {
-      if (!ttsProvider || !availableTtsProviders.includes(ttsProvider) || !ttsApiKey) {
+      if (
+        !ttsProvider ||
+        !availableTtsProviders.includes(ttsProvider) ||
+        !ttsApiKey
+      ) {
         showToast(t("chooseTtsBeforeSpokenReplies"));
         return false;
       }
@@ -634,7 +644,7 @@ export function MainScreen() {
             onResponseDone: (fullText) => {
               setStreamingText("");
               setPipelinePhase(
-                settings.ttsMode === "native" ? "idle" : "synthesizing"
+                settings.ttsMode === "native" ? "idle" : "synthesizing",
               );
               lastCompletedReplyRef.current = fullText;
               addMessage({
@@ -659,7 +669,7 @@ export function MainScreen() {
               showToast(
                 settings.ttsMode === "local"
                   ? t("localVoiceFallback")
-                  : t("providerVoiceFallback")
+                  : t("providerVoiceFallback"),
               );
             },
             onError: (error) => {
@@ -715,7 +725,7 @@ export function MainScreen() {
       ttsApiKey,
       ttsProvider,
       updateConversationContextSummary,
-    ]
+    ],
   );
 
   const handlePressIn = useCallback(async () => {
@@ -787,10 +797,22 @@ export function MainScreen() {
         error instanceof Error ? error.message : t("couldntProcessVoiceInput");
       showToast(message);
     }
-  }, [handleVoiceCaptureDone, nativeStt, recorder, settings.sttMode, showToast, t]);
+  }, [
+    handleVoiceCaptureDone,
+    nativeStt,
+    recorder,
+    settings.sttMode,
+    showToast,
+    t,
+  ]);
 
   const handleTogglePress = useCallback(async () => {
-    if (!isRecording && !player.isPlaying && !isBusy && !ensureVoiceSessionReady()) {
+    if (
+      !isRecording &&
+      !player.isPlaying &&
+      !isBusy &&
+      !ensureVoiceSessionReady()
+    ) {
       return;
     }
 
@@ -823,7 +845,9 @@ export function MainScreen() {
         }
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : t("couldntProcessVoiceInput");
+          error instanceof Error
+            ? error.message
+            : t("couldntProcessVoiceInput");
         showToast(message);
       }
       return;
@@ -859,14 +883,14 @@ export function MainScreen() {
         showToast(
           t("addProviderKeyToEnableProvider", {
             provider: PROVIDER_LABELS[nextProvider],
-          })
+          }),
         );
         return;
       }
 
       updateSettings({ lastProvider: nextProvider });
     },
-    [settings.apiKeys, showToast, t, updateSettings]
+    [settings.apiKeys, showToast, t, updateSettings],
   );
 
   const handleDismissSetupGuide = useCallback(() => {
@@ -901,13 +925,19 @@ export function MainScreen() {
       setSetupGuideVisible(false);
       openSettings("openai");
     },
-    [openSettings, updateSettings]
+    [openSettings, updateSettings],
   );
 
   const handlePreviewVoice = useCallback(
-    async (text: string) => {
+    async (request: VoicePreviewRequest) => {
       if (isRecording || isBusy) {
         showToast(t("stopSessionBeforePreview"));
+        return;
+      }
+
+      const trimmed = request.text.trim();
+
+      if (!trimmed) {
         return;
       }
 
@@ -916,38 +946,50 @@ export function MainScreen() {
           await player.stopPlayback();
         }
         player.resetCancellation();
-        if (settings.ttsMode === "native") {
-          player.speakText(text);
+
+        if (request.mode === "native") {
+          player.speakText(trimmed, { voice: request.nativeVoice });
           return;
         }
 
-        if (settings.ttsMode === "provider" && (!ttsProvider || !ttsApiKey)) {
+        if (request.mode === "provider") {
+          const providerApiKey =
+            settings.apiKeys[request.provider]?.trim() ?? "";
+
+          if (!providerApiKey) {
+            showToast(t("chooseTtsToPreviewVoices"));
+            return;
+          }
+
+          const audioUri = await synthesizeSpeech({
+            text: trimmed,
+            voice: request.voice,
+            mode: "provider",
+            provider: request.provider,
+            apiKey: providerApiKey,
+            language,
+          });
+
+          player.enqueueAudio(audioUri);
+          return;
+        }
+
+        if (!request.voice) {
           showToast(t("chooseTtsToPreviewVoices"));
           return;
         }
 
         const audioUri = await synthesizeSpeech({
-          text,
-          voice: selectedTtsVoice,
-          mode: settings.ttsMode,
-          provider: ttsProvider,
-          apiKey: ttsApiKey,
+          text: trimmed,
+          voice: request.voice,
+          mode: "local",
           language,
-          listenLanguages: settings.ttsListenLanguages,
-          localVoices: settings.localTtsVoices,
-        }).catch(() => {
-          player.speakText(text);
-          showToast(
-            settings.ttsMode === "local"
-              ? t("localVoicePreviewFallback")
-              : t("providerVoicePreviewFallback")
-          );
-          return null;
+          listenLanguages: [request.localLanguage],
+          localVoices: {
+            ...settings.localTtsVoices,
+            [request.localLanguage]: request.voice,
+          },
         });
-
-        if (!audioUri) {
-          return;
-        }
 
         player.enqueueAudio(audioUri);
       } catch (error) {
@@ -960,16 +1002,12 @@ export function MainScreen() {
       isBusy,
       isRecording,
       player,
-      settings.ttsMode,
-      settings.ttsListenLanguages,
+      settings.apiKeys,
       settings.localTtsVoices,
-      selectedTtsVoice,
       showToast,
       t,
-      ttsApiKey,
       language,
-      ttsProvider,
-    ]
+    ],
   );
 
   const handleValidateProvider = useCallback(
@@ -983,7 +1021,7 @@ export function MainScreen() {
         language,
       });
     },
-    [language, settings.apiKeys, settings.providerModels]
+    [language, settings.apiKeys, settings.providerModels],
   );
 
   const baseMessages = activeConversation?.messages || [];
@@ -1011,36 +1049,37 @@ export function MainScreen() {
       ]
     : baseMessages;
 
-  const messageCountLabel = messages.length > 0
-    ? t("messageCount", { count: messages.length })
-    : null;
+  const messageCountLabel =
+    messages.length > 0 ? t("messageCount", { count: messages.length }) : null;
   const routeModelLabel = `${providerLabel} · ${modelLabel}`;
   const statusTitle =
     visualPhase === "recording"
       ? t("listening")
       : pipelinePhase === "synthesizing"
         ? t("voiceOutput")
-      : visualPhase === "transcribing"
-        ? t("parsing")
-        : visualPhase === "thinking"
-          ? t("thinking")
-          : visualPhase === "speaking"
-            ? t("speaking")
-            : t("idle");
+        : visualPhase === "transcribing"
+          ? t("parsing")
+          : visualPhase === "thinking"
+            ? t("thinking")
+            : visualPhase === "speaking"
+              ? t("speaking")
+              : t("idle");
   const statusDetail =
     visualPhase === "recording"
       ? t("listeningToYourVoice")
       : pipelinePhase === "synthesizing"
         ? t("preparingVoiceWithProvider", {
-            provider: ttsProvider ? PROVIDER_LABELS[ttsProvider] : providerLabel,
+            provider: ttsProvider
+              ? PROVIDER_LABELS[ttsProvider]
+              : providerLabel,
           })
-      : visualPhase === "transcribing"
-        ? t("parsingYourVoiceInput")
-        : visualPhase === "thinking"
-          ? t("waitingForProvider", { provider: providerLabel })
-          : visualPhase === "speaking"
-            ? t("speakingBackToYou")
-            : messageCountLabel ?? t("freshSession");
+        : visualPhase === "transcribing"
+          ? t("parsingYourVoiceInput")
+          : visualPhase === "thinking"
+            ? t("waitingForProvider", { provider: providerLabel })
+            : visualPhase === "speaking"
+              ? t("speakingBackToYou")
+              : (messageCountLabel ?? t("freshSession"));
   const activeConversationTitle =
     activeConversation?.title.trim() || t("untitledConversation");
 
@@ -1058,7 +1097,7 @@ export function MainScreen() {
       setMemoryConversation(conversation);
       setMemoryVisible(true);
     },
-    [activeConversation, getConversationById, showToast, t]
+    [activeConversation, getConversationById, showToast, t],
   );
 
   const closeMemory = useCallback(() => {
@@ -1082,7 +1121,9 @@ export function MainScreen() {
       return;
     }
 
-    const updatedConversation = await clearConversationMemory(memoryConversation.id);
+    const updatedConversation = await clearConversationMemory(
+      memoryConversation.id,
+    );
 
     setMemoryConversation(updatedConversation);
     showToast(t("memoryCleared"));
@@ -1329,10 +1370,7 @@ export function MainScreen() {
                       },
                     ]}
                   >
-                    <ProviderIcon
-                      provider="groq"
-                      color={colors.text}
-                    />
+                    <ProviderIcon provider="groq" color={colors.text} />
                     <Text
                       style={[
                         styles.providerEmptyBadgeText,
@@ -1348,7 +1386,9 @@ export function MainScreen() {
                     color={colors.accent}
                   />
                 </View>
-                <Text style={[styles.providerEmptyTitle, { color: colors.text }]}>
+                <Text
+                  style={[styles.providerEmptyTitle, { color: colors.text }]}
+                >
                   {t("startWithGroq")}
                 </Text>
                 <Text
@@ -1365,10 +1405,7 @@ export function MainScreen() {
 
           <View style={styles.stageBlock}>
             <View
-              style={[
-                styles.stageHalo,
-                { backgroundColor: colors.glowStrong },
-              ]}
+              style={[styles.stageHalo, { backgroundColor: colors.glowStrong }]}
             />
             <WaveformCircle
               metering={metering}
@@ -1403,7 +1440,9 @@ export function MainScreen() {
                       },
                     ]}
                   />
-                  <Text style={[styles.statusStripTitle, { color: colors.text }]}>
+                  <Text
+                    style={[styles.statusStripTitle, { color: colors.text }]}
+                  >
                     {statusTitle}
                   </Text>
                 </View>
@@ -1542,7 +1581,9 @@ export function MainScreen() {
           >
             <View style={styles.statusDetailsHeader}>
               <View style={styles.statusDetailsHeaderCopy}>
-                <Text style={[styles.statusDetailsTitle, { color: colors.text }]}>
+                <Text
+                  style={[styles.statusDetailsTitle, { color: colors.text }]}
+                >
                   {t("currentSetup")}
                 </Text>
                 <Text
@@ -1590,10 +1631,7 @@ export function MainScreen() {
                   ]}
                 />
                 <Text
-                  style={[
-                    styles.livePillText,
-                    { color: colors.textSecondary },
-                  ]}
+                  style={[styles.livePillText, { color: colors.textSecondary }]}
                 >
                   {statusTitle}
                 </Text>
@@ -1686,7 +1724,10 @@ export function MainScreen() {
         onRequestClose={closeTranscript}
       >
         <SafeAreaView
-          style={[styles.transcriptModal, { backgroundColor: colors.background }]}
+          style={[
+            styles.transcriptModal,
+            { backgroundColor: colors.background },
+          ]}
           edges={["left", "right", "bottom"]}
         >
           <LinearGradient
