@@ -255,6 +255,27 @@ function getNativeVoiceOptionLabel(voice: NativeSpeechVoice) {
   return `${voice.name} · ${voice.language} · ${voice.quality}`;
 }
 
+function normalizeNativeVoices(value: unknown): NativeSpeechVoice[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((entry): entry is NativeSpeechVoice => {
+    if (!entry || typeof entry !== "object") {
+      return false;
+    }
+
+    const candidate = entry as Partial<NativeSpeechVoice>;
+
+    return (
+      typeof candidate.identifier === "string" &&
+      typeof candidate.name === "string" &&
+      typeof candidate.language === "string" &&
+      typeof candidate.quality === "string"
+    );
+  });
+}
+
 function TabIntro({ tab }: { tab: SettingsTab }) {
   const { colors } = useTheme();
   const { t } = useLocalization();
@@ -1662,32 +1683,36 @@ export function SettingsModal({
           return;
         }
 
-        const sortedVoices = [...voices].sort((left, right) => {
-          const leftLanguageMatches = left.language
-            .toLowerCase()
-            .startsWith(preferredLanguagePrefix);
-          const rightLanguageMatches = right.language
-            .toLowerCase()
-            .startsWith(preferredLanguagePrefix);
+        const sortedVoices = normalizeNativeVoices(voices).sort(
+          (left, right) => {
+            const leftLanguage = left.language.toLowerCase();
+            const rightLanguage = right.language.toLowerCase();
+            const leftLanguageMatches = leftLanguage.startsWith(
+              preferredLanguagePrefix,
+            );
+            const rightLanguageMatches = rightLanguage.startsWith(
+              preferredLanguagePrefix,
+            );
 
-          if (leftLanguageMatches !== rightLanguageMatches) {
-            return leftLanguageMatches ? -1 : 1;
-          }
+            if (leftLanguageMatches !== rightLanguageMatches) {
+              return leftLanguageMatches ? -1 : 1;
+            }
 
-          if (left.quality !== right.quality) {
-            return left.quality === "Enhanced" ? -1 : 1;
-          }
+            if (left.quality !== right.quality) {
+              return left.quality === "Enhanced" ? -1 : 1;
+            }
 
-          const languageComparison = left.language.localeCompare(
-            right.language,
-          );
+            const languageComparison = left.language.localeCompare(
+              right.language,
+            );
 
-          if (languageComparison !== 0) {
-            return languageComparison;
-          }
+            if (languageComparison !== 0) {
+              return languageComparison;
+            }
 
-          return left.name.localeCompare(right.name);
-        });
+            return left.name.localeCompare(right.name);
+          },
+        );
 
         setNativeVoices(sortedVoices);
         setSelectedNativeVoice((previous) => {
