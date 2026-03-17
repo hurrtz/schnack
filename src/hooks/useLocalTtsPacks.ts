@@ -41,19 +41,7 @@ export function useLocalTtsPacks(settings: Settings) {
       })
     );
 
-    setPackStates((previous) => {
-      const next = Object.fromEntries(entries) as LocalPackStateMap;
-
-      for (const [language, state] of Object.entries(previous) as Array<
-        [TtsListenLanguage, LocalPackState]
-      >) {
-        if (state.downloading) {
-          next[language] = state;
-        }
-      }
-
-      return next;
-    });
+    setPackStates(Object.fromEntries(entries) as LocalPackStateMap);
   }, [settings.localTtsVoices, settings.ttsListenLanguages]);
 
   useEffect(() => {
@@ -92,6 +80,17 @@ export function useLocalTtsPacks(settings: Settings) {
             }));
           },
         });
+
+        const status = await getLocalTtsInstallStatus({
+          language,
+          voice: settings.localTtsVoices[language],
+        });
+
+        if (!status.installed) {
+          throw new Error(
+            "The local voice pack download finished, but the files could not be verified on this device."
+          );
+        }
       } finally {
         await refreshPackStates();
       }

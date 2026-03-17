@@ -321,8 +321,27 @@ async function ensureFileDownloaded(params: {
     throw new Error(`Download failed for ${params.url}`);
   }
 
+  const persistedInfo = await FileSystem.getInfoAsync(params.path);
+
+  if (!persistedInfo.exists && result.uri !== params.path) {
+    const downloadedInfo = await FileSystem.getInfoAsync(result.uri);
+
+    if (downloadedInfo.exists) {
+      await FileSystem.copyAsync({
+        from: result.uri,
+        to: params.path,
+      });
+    }
+  }
+
+  const finalInfo = await FileSystem.getInfoAsync(params.path);
+
+  if (!finalInfo.exists) {
+    throw new Error(`Downloaded file is missing at ${params.path}`);
+  }
+
   params.onProgress?.(1);
-  return result.uri;
+  return params.path;
 }
 
 function bytesToBase64(bytes: Uint8Array) {
