@@ -394,11 +394,11 @@ const translations = {
     microphonePermissionNotGranted: "Microphone permission not granted",
   },
   de: {
-    retry: "Erneut",
-    dismiss: "Schliessen",
-    unavailable: "Nicht verfuegbar",
+    retry: "Wiederholen",
+    dismiss: "Schließen",
+    unavailable: "Nicht verfügbar",
     selection: "Auswahl",
-    chooseCompatibleProviderFirst: "Waehle zuerst einen kompatiblen Anbieter",
+    chooseCompatibleProviderFirst: "Wähle zuerst einen kompatiblen Anbieter",
     settings: "Einstellungen",
     firstRun: "Erster Start",
     instructions: "Anweisungen",
@@ -418,156 +418,156 @@ const translations = {
     replyGenerationAction: "Antwortgenerierung",
     speechTranscriptionAction: "Sprachtranskription",
     instructionsTabDescription:
-      "Lege die verborgene Anleitung fest, die den Assistenten steuert, bevor ein Anbieter die Anfrage sieht.",
+      "Bestimme die unsichtbare Anweisung, die den Assistenten lenkt, noch bevor ein Anbieter die Anfrage erhält.",
     providersTabDescription:
-      "Verbinde Anbieter, speichere Schluessel lokal auf dem Geraet und bestimme, welches Modell pro Anbieter verwendet wird.",
+      "Verbinde Anbieter, speichere Schlüssel auf dem Gerät und lege fest, welches Modell jeder Anbieter nutzen soll.",
     setupChecklist: "Sprach-Checkliste",
     setupChecklistReady:
-      "Dieses Setup ist fuer Antworten, Spracheingabe und Sprachausgabe bereit.",
+      "Dieses Setup ist bereit für Antworten, Spracheingabe und Sprachausgabe.",
     setupChecklistNeedsWork:
-      "Schliesse zuerst diese drei Routen ab, damit Sprachsitzungen zuverlaessig laufen.",
+      "Schließe zuerst diese drei Routen ab, damit Sprachsitzungen zuverlässig laufen.",
     sttTabDescription:
       "Steuere, wie Sprache aufgenommen wird und welches Backend Audio in Text umwandelt, bevor es das Modell erreicht.",
     ttsTabDescription:
-      "Steuere, wann Antworten vorgelesen werden und welches Backend die Sprachausgabe uebernimmt.",
+      "Steuere, wann Antworten vorgelesen werden und welches Backend die Sprachausgabe übernimmt.",
     brief: "Kurz",
     briefDescription:
-      "Halte die Antwort knapp. Nutze nur so viele Saetze wie noetig, um die Anfrage vollstaendig zu beantworten.",
+      "Halte die Antwort knapp. Nutze nur so viele Sätze wie nötig, um die Frage vollständig zu beantworten.",
     normal: "Normal",
     normalDescription:
-      "Ziele auf eine ausgewogene Antwortlaenge. Decke die wichtigen Punkte ab, ohne die Antwort unnoetig in die Laenge zu ziehen.",
-    thorough: "Ausfuehrlich",
+      "Strebe eine ausgewogene Antwortlänge an. Decke die wichtigsten Punkte ab, ohne die Antwort unnötig in die Länge zu ziehen.",
+    thorough: "Ausführlich",
     thoroughDescription:
-      "Gehe tief rein und sei umfassend. Beruecksichtige Nuancen, Details, Abwaegungen und die relevante Begruendung.",
+      "Geh in die Tiefe und sei umfassend. Berücksichtige Nuancen, Details, Abwägungen und die relevante Begründung.",
     professional: "Professionell",
     professionalDescription:
-      "Sprich wie ein Senior-Berater im Kundengespraech. Praezise Sprache, kein Slang, ruhig und autoritaer.",
+      "Sprich wie ein erfahrener Berater im Kundengespräch. Präzise Wortwahl, kein Slang, souverän und bestimmt.",
     casual: "Locker",
     casualDescription:
-      "Sprich wie ein kluger Freund im Cafe. Locker, natuerlich, gespraechig. Verkuerzungen und kleine Abschweifungen sind okay.",
+      "Sprich wie ein kluger Freund im Café. Entspannt, natürlich, gesprächig. Abkürzungen und kleine Abschweifungen sind völlig okay.",
     nerdy: "Nerdig",
     nerdyDescription:
       "Sprich wie ein begeisterter Experte, der gerne in die Tiefe geht. Nutze Fachbegriffe frei und geh entspannt ins Detail.",
-    concise: "Praegnant",
+    concise: "Prägnant",
     conciseDescription:
-      "Sei so kurz wie moeglich und trotzdem vollstaendig. Keine Einleitung, kein Fuelltext, nur die Antwort.",
+      "Sei so kurz wie möglich und trotzdem vollständig. Keine Einleitung, kein Fülltext, nur die Antwort. Telegramm-Stil.",
     socratic: "Sokratisch",
     socraticDescription:
-      "Fordere das Denken der Nutzerin oder des Nutzers heraus. Stelle Gegenfragen und biete alternative Perspektiven an.",
-    eli5: "Einfach erklaert",
+      "Fordere das Denken heraus. Stelle Gegenfragen, biete alternative Perspektiven an und bestätige nicht einfach, was gesagt wurde.",
+    eli5: "Einfach erklärt",
     eli5Description:
-      "Erklaere alles so einfach wie moeglich. Nutze Analogien, Alltagssprache und vermeide Fachjargon.",
-    openProviderSettings: ({ provider }) => `${provider}-Einstellungen oeffnen`,
+      "Erkläre alles so einfach wie möglich. Nutze Analogien, Alltagssprache und verzichte auf Fachjargon.",
+    openProviderSettings: ({ provider }) => `${provider}-Einstellungen öffnen`,
     createProviderApiKey: ({ provider }) =>
-      `API-Schluessel fuer ${provider} erstellen`,
+      `API-Schlüssel für ${provider} erstellen`,
     useProvider: ({ provider }) => `${provider} verwenden`,
-    createApiKey: "API-Schluessel erstellen",
-    validateKey: "Schluessel pruefen",
-    validatingKey: "Pruefe...",
+    createApiKey: "API-Schlüssel erstellen",
+    validateKey: "Schlüssel prüfen",
+    validatingKey: "Prüfe …",
     configured: "Konfiguriert",
     missing: "Fehlt",
-    showKey: "Schluessel zeigen",
-    hideKey: "Schluessel verbergen",
+    showKey: "Schlüssel anzeigen",
+    hideKey: "Schlüssel verbergen",
     apiKeyProtectedHint:
-      "Gespeicherte Schluessel bleiben standardmaessig verborgen. Zeige sie nur an, wenn du einen Wert pruefen oder aendern musst.",
+      "Gespeicherte Schlüssel bleiben standardmäßig verborgen. Zeige sie nur an, wenn du einen Wert prüfen oder ändern musst.",
     assistantInstructions: "Assistenten-Anweisungen",
     assistantInstructionsIntro:
-      "Lege die verborgene Anleitung fest, die das Modell vor jeder Antwort erhaelt.",
+      "Bestimme die unsichtbare Anweisung, die das Modell vor jeder Antwort erhält.",
     baseInstructions: "Basis-Anweisungen",
     assistantInstructionsPlaceholder:
       "Definiere, wie sich der Assistent verhalten soll.",
     assistantInstructionsHint:
-      "Das wird immer vor der gewaehlten Antwortlaenge und dem Stil vorangestellt.",
-    adaptiveLength: "Antwortlaenge",
+      "Dieser Text wird immer vor der gewählten Antwortlänge und dem Stil vorangestellt.",
+    adaptiveLength: "Antwortlänge",
     responseTone: "Antwortstil",
     inputMode: "Eingabemodus",
-    pushToTalk: "Gedrueckt sprechen",
+    pushToTalk: "Gedrückt sprechen",
     pushToTalkDescription:
-      "Halte die Haupttaste waehrend des Sprechens gedrueckt und lasse los, um zu senden.",
-    toggleToTalk: "Antippen sprechen",
+      "Halte die Haupttaste während des Sprechens gedrückt und lass los, um zu senden.",
+    toggleToTalk: "Tippen zum Sprechen",
     toggleToTalkDescription:
       "Tippe einmal zum Starten der Aufnahme und noch einmal, wenn du fertig bist.",
     speechToText: "Sprache zu Text",
     appNative: "App-intern",
     nativeSttDescription:
-      "Verwende die im Geraet eingebaute Spracherkennung. Kein Anbieter-Schluessel noetig.",
+      "Verwende die eingebaute Spracherkennung des Geräts. Kein Anbieter-Schlüssel nötig.",
     provider: "Anbieter",
     providerSttDescription:
-      "Verwende einen konfigurierten Anbieter, um deine Sprache zu transkribieren, bevor sie an das Modell gesendet wird.",
+      "Verwende einen konfigurierten Anbieter, um deine Sprache zu transkribieren, bevor sie an das Modell geht.",
     sttProvider: "STT-Anbieter",
     sttProviderEnabledHint:
-      "Hier erscheinen nur aktivierte Anbieter mit Transkriptionsunterstuetzung.",
+      "Hier erscheinen nur aktivierte Anbieter mit Transkriptionsunterstützung.",
     sttProviderMissingHint:
-      "Aktiviere im Tab Anbieter einen Dienst mit STT-Unterstuetzung, um ihn hier auszuwaehlen.",
+      "Aktiviere im Tab „Anbieter" einen Dienst mit STT-Unterstützung, um ihn hier auszuwählen.",
     nativeSttHint:
-      "Native STT nutzt direkt die Spracherkennung des Geraets und funktioniert unabhaengig von deinen Anbieter-Schluesseln.",
+      "Native STT nutzt die Spracherkennung des Geräts direkt und funktioniert unabhängig von deinen Anbieter-Schlüsseln.",
     replyPlayback: "Antwort-Wiedergabe",
-    sentencesArrive: "Saetze sofort",
+    sentencesArrive: "Satzweise",
     sentencesArriveDescription:
-      "Beginne mit der Sprachausgabe, sobald vollstaendige Saetze bereitstehen.",
+      "Beginne mit der Sprachausgabe, sobald vollständige Sätze bereitstehen.",
     fullReplyFirst: "Komplette Antwort zuerst",
     fullReplyFirstDescription:
-      "Erzeuge zuerst die komplette Antwort und spiele sie dann in einem Durchgang ab.",
+      "Erzeuge erst die vollständige Antwort und spiele sie dann in einem Durchgang ab.",
     textToSpeech: "Text zu Sprache",
     nativeTtsDescription:
-      "Verwende die Sprachengine des Geraets fuer gesprochene Antworten und die Stimmvorschau.",
+      "Verwende die Sprachausgabe des Geräts für gesprochene Antworten und die Stimmvorschau.",
     localTts: "Lokal",
     localTtsDescription:
-      "Nutze zuerst eine passende lokale Stimme, dann den ausgewaehlten Anbieter, falls vorhanden, und danach die Systemstimme.",
+      "Nutze zuerst eine passende lokale Stimme, dann den ausgewählten Anbieter, falls vorhanden, und zuletzt die Systemstimme.",
     providerTtsDescription:
-      "Nutze zuerst den ausgewaehlten Anbieter, dann eine passende lokale Stimme und danach die Systemstimme.",
+      "Nutze zuerst den ausgewählten Anbieter, dann eine passende lokale Stimme und zuletzt die Systemstimme.",
     ttsProvider: "TTS-Anbieter",
     ttsProviderEnabledHint:
-      "Hier erscheinen nur aktivierte Anbieter mit Sprachausgabe-Unterstuetzung.",
+      "Hier erscheinen nur aktivierte Anbieter mit Sprachausgabe-Unterstützung.",
     ttsProviderMissingHint:
-      "Aktiviere im Tab Anbieter einen Dienst mit TTS-Unterstuetzung, um ihn hier auszuwaehlen.",
+      "Aktiviere im Tab „Anbieter" einen Dienst mit TTS-Unterstützung, um ihn hier auszuwählen.",
     localTtsOrderHint:
-      "Reihenfolge: passende lokale Stimme zuerst, dann der ausgewaehlte Anbieter, falls konfiguriert, dann die Systemstimme.",
+      "Reihenfolge: passende lokale Stimme zuerst, dann der ausgewählte Anbieter (falls konfiguriert), dann die Systemstimme.",
     providerTtsOrderHint:
-      "Reihenfolge: ausgewaehlter Anbieter zuerst, dann eine passende heruntergeladene lokale Stimme, dann die Systemstimme.",
+      "Reihenfolge: ausgewählter Anbieter zuerst, dann eine passende heruntergeladene lokale Stimme, dann die Systemstimme.",
     nativeTtsHint:
-      "Native TTS nutzt die Systemstimmen des Geraets und benoetigt keinen Anbieter-Schluessel.",
+      "Native TTS nutzt die Systemstimmen des Geräts und benötigt keinen Anbieter-Schlüssel.",
     localTtsLanguageCoverageHint:
-      "Lokale Sprachpakete decken aktuell Englisch, Deutsch, vereinfachtes Chinesisch, Spanisch, Portugiesisch, Hindi, Franzoesisch und Italienisch ab. Japanisch faellt weiterhin automatisch zurueck.",
+      "Lokale Sprachpakete decken derzeit Englisch, Deutsch, vereinfachtes Chinesisch, Spanisch, Portugiesisch, Hindi, Französisch und Italienisch ab. Japanisch fällt weiterhin automatisch zurück.",
     ttsVoice: "TTS-Stimme",
     voiceSelection: "Stimmenauswahl",
     nativeVoiceSelectionHint:
-      "Native Wiedergabe nutzt die vom Betriebssystem ausgewaehlte Geraetestimme.",
+      "Native Wiedergabe nutzt die vom Betriebssystem gewählte Gerätestimme.",
     localTtsVoiceSelectionHint:
-      "Jede ausgewaehlte Sprache unten behaelt ihre eigene lokale Stimme. Die Vorschau folgt der Sprache, die aus dem Vorschautext erkannt wird.",
+      "Jede ausgewählte Sprache unten behält ihre eigene lokale Stimme. Die Vorschau folgt der Sprache, die aus dem Vorschautext erkannt wird.",
     providerDefaultVoiceHint:
-      "Dieser Anbieter nutzt aktuell seine Standardstimme fuer Vorschau und Sprachausgabe.",
-    listenLanguages: "Sprachen zum Hoeren",
+      "Dieser Anbieter nutzt aktuell seine Standardstimme für Vorschau und Sprachausgabe.",
+    listenLanguages: "Hörsprachen",
     listenLanguagesHint:
-      "Waehle die Antwortsprachen aus, die gut klingen sollen. SchnackAI probiert sie in dieser Reihenfolge fuer die Sprachausgabe.",
+      "Wähle die Antwortsprachen aus, die gut klingen sollen. SchnackAI probiert sie in dieser Reihenfolge für die Sprachausgabe.",
     localVoicePacks: "Lokale Sprachpakete",
     localVoicePacksHint:
-      "Jede Sprache hat ihre eigene lokale Stimme. Waehle zuerst die Stimme pro Sprache und lade dann nur die Pakete herunter, die dir wirklich wichtig sind.",
+      "Jede Sprache hat ihre eigene lokale Stimme. Wähle zuerst die Stimme pro Sprache und lade dann nur die Pakete herunter, die dir wirklich wichtig sind.",
     localVoiceForLanguage: ({ languageLabel }) =>
-      `Stimme fuer ${languageLabel}`,
+      `Stimme für ${languageLabel}`,
     providerVoicePreviews: "Anbieter-Stimmvorschau",
     providerVoicePreviewsHint:
-      "Jeder aktivierte TTS-Anbieter kann hier mit eigener Stimme und eigenem Beispieltext getestet werden, ohne die aktive Antwort-Route umzuschalten.",
+      "Jeder aktivierte TTS-Anbieter kann hier mit eigener Stimme und eigenem Beispieltext getestet werden, ohne die aktive Antwort-Route zu ändern.",
     nativeVoicePreviewSection: "Native Stimmvorschau",
     nativeVoicePreviewSectionHint:
-      "Das nutzt direkt die eingebaute Sprachsynthese des Telefons, damit du sie mit lokalen und Cloud-Stimmen vergleichen kannst.",
+      "Nutzt direkt die eingebaute Sprachsynthese des Geräts, damit du sie mit lokalen und Cloud-Stimmen vergleichen kannst.",
     nativeVoiceUnavailable:
-      "Dieses Geraet hat keine nativen Systemstimmen fuer die Vorschau gemeldet.",
-    localTtsPackReady: "Auf diesem Geraet installiert.",
+      "Dieses Gerät hat keine nativen Systemstimmen für die Vorschau gemeldet.",
+    localTtsPackReady: "Auf diesem Gerät installiert.",
     localTtsPackMissing:
       "Noch nicht installiert. Bis zum Download werden Cloud-TTS oder die Systemstimme genutzt.",
     localTtsUnsupportedLanguageFallback:
-      "Fuer diese Sprache gibt es lokal noch kein Paket. Cloud-TTS oder die Systemstimme uebernehmen.",
+      "Für diese Sprache gibt es noch kein lokales Paket. Cloud-TTS oder die Systemstimme übernehmen.",
     downloadingLocalTtsPack: ({ progress }) =>
-      `Lokales Paket wird geladen... ${progress}%`,
+      `Lokales Paket wird geladen … ${progress} %`,
     download: "Download",
-    downloadingShort: "Laedt...",
-    voicePreviewText: "Text fuer Stimmvorschau",
-    voicePreviewPlaceholder: "Gib einen Satz ein, um diese Stimme zu hoeren.",
+    downloadingShort: "Lädt …",
+    voicePreviewText: "Text für Stimmvorschau",
+    voicePreviewPlaceholder: "Gib einen Satz ein, um diese Stimme zu hören.",
     voicePreviewHint:
-      "Verwendet das aktuell gewaehlte Sprach-Backend, ohne etwas an das Sprachmodell zu senden.",
+      "Verwendet das aktuell gewählte Sprach-Backend, ohne etwas an das Sprachmodell zu senden.",
     previewVoice: "Stimme testen",
-    generatingPreview: "Vorschau wird erzeugt...",
+    generatingPreview: "Vorschau wird erzeugt …",
     systemVoice: "Systemstimme",
     noTtsProvider: "Kein TTS-Anbieter",
     nothingToCopyYet: "Noch nichts zum Kopieren.",
@@ -576,132 +576,134 @@ const translations = {
     couldntShareText: "Der Text konnte nicht geteilt werden.",
     couldntReplayReply: "Die Antwort konnte nicht erneut abgespielt werden.",
     messageCopied: "Nachricht kopiert.",
-    noConversationToCopyYet: "Noch keine Konversation zum Kopieren.",
-    noConversationToShareYet: "Noch keine Konversation zum Teilen.",
-    noReplyToRepeatYet: "Noch keine Antwort zum erneuten Abspielen.",
+    noConversationToCopyYet: "Noch keine Unterhaltung zum Kopieren.",
+    noConversationToShareYet: "Noch keine Unterhaltung zum Teilen.",
+    noReplyToRepeatYet: "Noch keine Antwort zum Wiederholen.",
     threadCopied: "Verlauf kopiert.",
     threadRenamed: "Verlauf umbenannt.",
     threadPinned: "Verlauf angeheftet.",
-    threadUnpinned: "Anheftung geloest.",
+    threadUnpinned: "Nicht mehr angeheftet.",
     addProviderKeyToUseProvider: ({ provider }) =>
-      `Fuege in den Einstellungen deinen API-Schluessel fuer ${provider} hinzu, um diesen Anbieter zu nutzen.`,
+      `Füge in den Einstellungen deinen API-Schlüssel für ${provider} hinzu, um diesen Anbieter zu nutzen.`,
     speechRecognitionUnavailableOnDevice:
-      "Spracherkennung ist auf diesem Geraet nicht verfuegbar.",
+      "Spracherkennung ist auf diesem Gerät nicht verfügbar.",
     chooseSttBeforeVoiceSession:
-      "Waehle in den Einstellungen einen aktivierten STT-Anbieter, bevor du eine Sprachsitzung startest.",
+      "Wähle in den Einstellungen einen aktivierten STT-Anbieter, bevor du eine Sprachsitzung startest.",
     chooseTtsBeforeSpokenReplies:
-      "Waehle in den Einstellungen einen aktivierten TTS-Anbieter, bevor du gesprochene Antworten nutzt.",
+      "Wähle in den Einstellungen einen aktivierten TTS-Anbieter, bevor du gesprochene Antworten nutzt.",
     stopSessionBeforeReplay:
-      "Beende zuerst die laufende Sprachsitzung, bevor du die letzte Antwort erneut abspielst.",
+      "Beende die laufende Sprachsitzung, bevor du die letzte Antwort erneut abspielst.",
     couldntCatchThatTryAgain:
-      "Das konnte nicht sauber erkannt werden. Versuch es noch einmal.",
+      "Das wurde nicht richtig erkannt – versuch es noch einmal.",
     couldntStartVoiceInput: "Spracheingabe konnte nicht gestartet werden.",
     couldntProcessVoiceInput: "Spracheingabe konnte nicht verarbeitet werden.",
     addProviderKeyToEnableProvider: ({ provider }) =>
-      `Fuege in den Einstellungen deinen API-Schluessel fuer ${provider} hinzu, um diesen Anbieter zu aktivieren.`,
+      `Füge in den Einstellungen deinen API-Schlüssel für ${provider} hinzu, um ihn zu aktivieren.`,
     stopSessionBeforePreview:
-      "Beende zuerst die laufende Sprachsitzung, bevor du eine Stimme testest.",
+      "Beende die laufende Sprachsitzung, bevor du eine Stimme testest.",
     chooseTtsToPreviewVoices:
-      "Waehle in den Einstellungen einen aktivierten TTS-Anbieter, um Stimmen zu testen.",
+      "Wähle in den Einstellungen einen aktivierten TTS-Anbieter, um Stimmen zu testen.",
     couldntPreviewVoice: "Die Stimmvorschau konnte nicht abgespielt werden.",
     providerVoiceFallback:
       "Die Anbieter-Stimme ist ausgefallen. Diese Antwort wird mit der Systemstimme abgespielt.",
     providerVoicePreviewFallback:
       "Die Anbieter-Stimme ist ausgefallen. Die Vorschau nutzt jetzt die Systemstimme.",
     localVoiceFallback:
-      "Die lokale Stimme war nicht verfuegbar. Diese Antwort nutzt jetzt die beste verfuegbare Ersatzstimme.",
+      "Die lokale Stimme war nicht verfügbar. Diese Antwort nutzt die beste verfügbare Ersatzstimme.",
     localVoicePreviewFallback:
-      "Die lokale Stimme war nicht verfuegbar. Die Vorschau nutzt jetzt die beste verfuegbare Ersatzstimme.",
+      "Die lokale Stimme war nicht verfügbar. Die Vorschau nutzt die beste verfügbare Ersatzstimme.",
     localTtsPackInstalled: ({ languageLabel }) =>
-      `Lokales Sprachpaket fuer ${languageLabel} installiert.`,
+      `Lokales Sprachpaket für ${languageLabel} installiert.`,
     localTtsPackInstallFailed:
       "Das lokale Sprachpaket konnte nicht installiert werden.",
     liveInput: "Live-Eingabe",
     parsingInput: "Eingabe wird verarbeitet",
-    awaitingModel: "Modell wartet",
+    awaitingModel: "Warte auf Modell",
     voiceOutput: "Sprachausgabe",
     controlRoom: "Steuerzentrale",
     currentSetup: "Aktuelles Setup",
-    listeningToYourVoice: "Ich hoere dir zu",
+    listeningToYourVoice: "Ich höre dir zu",
     parsingYourVoiceInput: "Deine Sprache wird verarbeitet",
     waitingForProvider: ({ provider }) => `Warte auf ${provider}`,
     preparingVoiceWithProvider: ({ provider }) =>
       `Bereite Stimme mit ${provider} vor`,
     speakingBackToYou: "Antwort wird gesprochen",
-    readyForNextThought: "Bereit fuer den naechsten Gedanken",
+    readyForNextThought: "Bereit für den nächsten Gedanken",
     freshSession: "Neue Sitzung",
     messageCount: ({ count }) =>
       Number(count) === 1 ? "1 Nachricht" : `${count} Nachrichten`,
     speechInputRoute: ({ route }) => `Sprache rein: ${route}`,
     replyModelRoute: ({ route }) => `Antwortmodell: ${route}`,
     voiceOutputRoute: ({ route }) => `Stimme raus: ${route}`,
-    conversation: "Konversation",
+    conversation: "Unterhaltung",
     show: "Anzeigen",
-    open: "Oeffnen",
+    open: "Öffnen",
     copyThread: "Verlauf kopieren",
     shareThread: "Verlauf teilen",
-    repeatReply: "Antwort erneut",
+    repeatReply: "Antwort wiederholen",
     renameThread: "Verlauf umbenennen",
     renameThreadHint:
-      "Gib dieser Konversation einen Titel, den du spaeter schnell wiederfindest.",
+      "Gib dieser Unterhaltung einen Titel, den du später schnell wiederfindest.",
     threadTitle: "Verlaufstitel",
     noTranscriptYet: "Noch kein Transkript",
     previewTranscriptEmptyDescription:
-      "Starte oben mit der Sprachbuehne. Deine Nachrichten und die Modellantwort erscheinen hier sofort.",
+      "Starte oben mit der Sprachsteuerung. Deine Nachrichten und die Modellantwort erscheinen hier sofort.",
     transcript: "Transkript",
-    noConversationYet: "Noch keine Konversation",
+    noConversationYet: "Noch keine Unterhaltung",
     expandedTranscriptEmptyDescription:
-      "Sprich ueber die Steuerung oben. Schliesse diesen Bildschirm, wenn du zur Hauptansicht zurueckkehren willst.",
+      "Sprich über die Steuerung oben. Schließe diesen Bildschirm, wenn du zur Hauptansicht zurückkehren willst.",
     transcriptSelectionHint:
       "Du kannst Text direkt markieren oder einzelne Nachrichten unten teilen und kopieren.",
     startWithGroq: "Mit Groq starten",
     groqStarterDescription:
-      "Groq bietet einen kostenlosen Tarif und ist damit der schnellste Weg, die App freizuschalten. Fuege in den Einstellungen den API-Schluessel hinzu, dann erscheint der Anbieter-Umschalter sofort hier.",
+      "Groq bietet einen kostenlosen Tarif und ist damit der schnellste Weg, die App freizuschalten. Füge in den Einstellungen den API-Schlüssel hinzu – der Anbieter-Umschalter erscheint dann sofort hier.",
     live: "Live",
     idle: "Bereit",
-    yourConversationAppearsHere: "Deine Konversation erscheint hier",
+    yourConversationAppearsHere: "Deine Unterhaltung erscheint hier",
     defaultTranscriptEmptyDescription:
-      "Halte die Sprachsteuerung gedrueckt und sprich ganz natuerlich. SchnackAI behaelt den Verlauf und antwortet dir per Stimme.",
-    delete: "Loeschen",
+      "Halte die Sprachsteuerung gedrückt und sprich ganz natürlich. SchnackAI behält den Verlauf und antwortet dir per Stimme.",
+    delete: "Löschen",
     memory: "Speicher",
-    conversations: "Konversationen",
+    conversations: "Unterhaltungen",
     drawerSubtitle:
-      "Wechsle zwischen aktiven Verlaeufen oder starte einen neuen Raum.",
+      "Wechsle zwischen aktiven Verläufen oder starte einen neuen Raum.",
     newSession: "Neue Sitzung",
-    noSavedConversationsYet: "Noch keine gespeicherten Konversationen",
+    noSavedConversationsYet: "Noch keine gespeicherten Unterhaltungen",
     drawerEmptyDescription:
       "Sprich in der Hauptansicht los und SchnackAI erstellt automatisch eine Sitzung.",
-    setupGuideTitle: "Waehle ein Start-Setup",
+    setupGuideTitle: "Wähle ein Start-Setup",
     setupGuideSubtitle:
-      "Suche dir zuerst einen Stack aus. Spaeter kannst du jede Route in den Einstellungen aendern.",
+      "Such dir zuerst einen Stack aus. Später kannst du jede Route in den Einstellungen ändern.",
     fastestStartPreset: "Schnellster Start",
     fastestStartDescription:
-      "Groq uebernimmt Antworten, waehrend das Geraet Hoeren und Sprechen erledigt. So startest du mit dem wenigsten Aufwand.",
+      "Groq übernimmt die Antworten, das Gerät kümmert sich ums Hören und Sprechen. Minimaler Aufwand.",
     fullVoicePreset: "Kompletter Anbieter-Stack",
     fullVoiceDescription:
-      "OpenAI uebernimmt Antworten, Transkription und Sprachausgabe. Gut, wenn du einen einzigen Anbieter-Stack willst.",
+      "OpenAI übernimmt Antworten, Transkription und Sprachausgabe. Ideal, wenn du alles über einen Anbieter laufen lassen willst.",
     setupGuideNote:
-      "Danach oeffnen wir die Einstellungen, damit du den Anbieter-Schluessel einfuegen und pruefen kannst.",
+      "Danach öffnen wir die Einstellungen, damit du den Anbieter-Schlüssel einfügen und prüfen kannst.",
     useThisSetup: "Dieses Setup nutzen",
     notNow: "Jetzt nicht",
     searchConversationsPlaceholder:
       "Suche nach Titeln, Modellen und Nachrichtentext",
-    noMatchingConversations: "Keine passenden Konversationen",
+    noMatchingConversations: "Keine passenden Unterhaltungen",
     noMatchingConversationsDescription:
-      "Versuche es mit einem anderen Titel, Anbieter, Modell oder Satz aus dem Transkript.",
-    memoryModalTitle: "Konversationsspeicher",
+      "Versuch es mit einem anderen Titel, Anbieter, Modell oder Satz aus dem Transkript.",
+    memoryModalTitle: "Gesprächsspeicher",
     memoryModalDescription:
-      "Das ist die kompakte Zusammenfassung, die SchnackAI weitertraegt, sobald ein Verlauf lang genug wird und aeltere Zuege verdichtet werden.",
+      "Das ist die kompakte Zusammenfassung, die SchnackAI weiterträgt, sobald ein Verlauf lang genug wird und ältere Beiträge zusammengefasst werden.",
     memorySummary: "Gespeicherte Zusammenfassung",
     memorySummaryEmpty:
-      "Noch kein kompakter Speicher. Sobald dieser Verlauf laenger wird, erscheinen hier verdichtete aeltere Zuege.",
+      "Noch kein kompakter Speicher. Sobald dieser Verlauf länger wird, werden ältere Beiträge hier zusammengefasst.",
     summarizedTurnsCount: ({ count }) =>
-      Number(count) === 1 ? "1 verdichteter Zug" : `${count} verdichtete Zuege`,
+      Number(count) === 1
+        ? "1 zusammengefasster Beitrag"
+        : `${count} zusammengefasste Beiträge`,
     copyMemory: "Speicher kopieren",
     forgetMemory: "Speicher vergessen",
     memoryCopied: "Speicher kopiert.",
-    memoryCleared: "Konversationsspeicher geloescht.",
-    noConversationToManageYet: "Noch kein Konversationsspeicher verfuegbar.",
+    memoryCleared: "Gesprächsspeicher gelöscht.",
+    noConversationToManageYet: "Noch kein Gesprächsspeicher verfügbar.",
     yesterday: "Gestern",
     noProviderYet: "Noch kein Anbieter",
     noModelYet: "Noch kein Modell",
@@ -711,12 +713,12 @@ const translations = {
     share: "Teilen",
     rename: "Umbenennen",
     pin: "Anheften",
-    unpin: "Loesen",
+    unpin: "Lösen",
     save: "Speichern",
     cancel: "Abbrechen",
-    listening: "Hoert",
+    listening: "Hört zu",
     parsing: "Verarbeitet",
-    thinking: "Denkt",
+    thinking: "Denkt nach",
     speaking: "Spricht",
     hold: "Halten",
     tap: "Tippen",
@@ -729,32 +731,32 @@ const translations = {
     providerConfiguredInSettings: ({ provider }) =>
       `${provider} ist in den Einstellungen nicht konfiguriert.`,
     providerNetworkError: ({ provider, action }) =>
-      `${provider} konnte fuer ${action} nicht erreicht werden. Pruefe die Verbindung und versuche es erneut.`,
+      `${provider} war für ${action} nicht erreichbar. Prüfe die Verbindung und versuch es erneut.`,
     providerAuthError: ({ provider, action }) =>
-      `${provider} hat die Zugangsdaten fuer ${action} abgelehnt. Pruefe API-Schluessel und Berechtigungen.`,
+      `${provider} hat die Zugangsdaten für ${action} abgelehnt. Prüfe API-Schlüssel und Berechtigungen.`,
     providerRateLimitError: ({ provider, action }) =>
-      `${provider} begrenzt ${action} gerade. Versuche es gleich noch einmal.`,
+      `${provider} drosselt ${action} gerade. Versuch es gleich noch einmal.`,
     providerTemporaryError: ({ provider, action }) =>
-      `${provider} hatte waehrend ${action} ein temporaeres Problem. Versuche es in kuerze erneut.`,
+      `${provider} hatte während ${action} ein vorübergehendes Problem. Versuch es in Kürze erneut.`,
     providerContextTooLong: ({ provider }) =>
-      `${provider} hat die Antwort abgelehnt, weil die Konversation zu lang geworden ist. Starte einen neuen Verlauf oder kuerze die Anfrage.`,
+      `${provider} hat die Antwort abgelehnt, weil die Unterhaltung zu lang geworden ist. Starte einen neuen Verlauf oder kürze die Anfrage.`,
     providerRequestRejected: ({ provider, action, detail }) =>
       detail
-        ? `${provider} hat die Anfrage fuer ${action} abgelehnt: ${detail}`
-        : `${provider} hat die Anfrage fuer ${action} abgelehnt.`,
+        ? `${provider} hat die Anfrage für ${action} abgelehnt: ${detail}`
+        : `${provider} hat die Anfrage für ${action} abgelehnt.`,
     providerValidationSuccess: ({ provider }) =>
       `${provider} ist einsatzbereit.`,
-    providerValidationFailed: "Anbieter-Pruefung fehlgeschlagen.",
-    noBase64EncoderAvailable: "Kein Base64-Encoder verfuegbar.",
-    noBase64DecoderAvailable: "Kein Base64-Decoder verfuegbar.",
+    providerValidationFailed: "Anbieter-Prüfung fehlgeschlagen.",
+    noBase64EncoderAvailable: "Kein Base64-Encoder verfügbar.",
+    noBase64DecoderAvailable: "Kein Base64-Decoder verfügbar.",
     nativeTtsDoesNotSynthesizeAudioFiles:
       "Native TTS erzeugt keine Audiodateien.",
     localTtsUnavailableForLanguage: ({ languageLabel }) =>
-      `Fuer ${languageLabel} ist aktuell weder lokal noch in der Cloud eine Sprachroute bereit.`,
+      `Für ${languageLabel} ist aktuell weder lokal noch in der Cloud eine Sprachroute bereit.`,
     chooseTextToSpeechProviderInSettings:
-      "Waehle in den Einstellungen einen Text-zu-Sprache-Anbieter.",
+      "Wähle in den Einstellungen einen Text-zu-Sprache-Anbieter.",
     ttsNotSupportedYet: ({ provider }) =>
-      `TTS wird fuer ${provider} noch nicht unterstuetzt.`,
+      `TTS wird für ${provider} noch nicht unterstützt.`,
     ttsError: ({ provider, status, errorText }) =>
       `TTS-Fehler bei ${provider} (${status}): ${errorText}`,
     ttsReplyTooLong: ({ provider }) =>
@@ -762,12 +764,12 @@ const translations = {
     ttsTimeout: ({ provider }) =>
       `Die Sprachausgabe bei ${provider} hat zu lange gedauert.`,
     ttsDidNotReturnAudio: ({ provider }) =>
-      `${provider} hat kein Audio zurueckgegeben.`,
+      `${provider} hat kein Audio zurückgegeben.`,
     nativeSttHandledInApp: "Native STT wird direkt in der App verarbeitet.",
     chooseSpeechToTextProviderInSettings:
-      "Waehle in den Einstellungen einen Sprache-zu-Text-Anbieter.",
+      "Wähle in den Einstellungen einen Sprache-zu-Text-Anbieter.",
     sttNotSupportedYet: ({ provider }) =>
-      `STT wird fuer ${provider} noch nicht unterstuetzt.`,
+      `STT wird für ${provider} noch nicht unterstützt.`,
     sttError: ({ provider, status, errorText }) =>
       `STT-Fehler bei ${provider} (${status}): ${errorText}`,
     apiError: ({ provider, status, errorText }) =>
@@ -777,21 +779,21 @@ const translations = {
     user: "Nutzer",
     you: "Du",
     assistant: "Assistent",
-    untitledConversation: "Unbenannte Konversation",
-    conversationExportHeader: ({ title }) => `Konversation: ${title}`,
+    untitledConversation: "Unbenannte Unterhaltung",
+    conversationExportHeader: ({ title }) => `Unterhaltung: ${title}`,
     speechRecognitionPermissionNotGranted:
-      "Berechtigung fuer Spracherkennung wurde nicht erteilt.",
+      "Berechtigung für Spracherkennung wurde nicht erteilt.",
     speechRecognitionUnavailableForDeviceLanguage:
-      "Spracherkennung ist fuer die aktuelle Geraetesprache nicht verfuegbar.",
+      "Spracherkennung ist für die aktuelle Gerätesprache nicht verfügbar.",
     nativeSpeechRecognitionNeedsNetwork:
-      "Die native Spracherkennung benoetigt gerade eine Netzwerkverbindung.",
+      "Die native Spracherkennung benötigt gerade eine Netzwerkverbindung.",
     noSpeechDetected: "Es wurde keine Sprache erkannt.",
     nativeSpeechRecognitionFailed:
       "Die native Spracherkennung ist fehlgeschlagen.",
     couldntStartNativeSpeechRecognition:
       "Die native Spracherkennung konnte nicht gestartet werden.",
     microphonePermissionNotGranted:
-      "Berechtigung fuer das Mikrofon wurde nicht erteilt",
+      "Berechtigung für das Mikrofon wurde nicht erteilt",
   },
 } satisfies Record<AppLanguage, Record<string, TranslationValue>>;
 
