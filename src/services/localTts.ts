@@ -331,13 +331,23 @@ async function getInstalledKokoroMultilingualModelRootPath() {
     return null;
   }
 
-  return findNestedDirectory(basePath, (candidate) =>
-    directoryContainsFiles(candidate, [
-      "model.onnx",
+  return findNestedDirectory(basePath, async (candidate) => {
+    const hasRequiredFiles = await directoryContainsFiles(candidate, [
       "voices.bin",
       "tokens.txt",
-    ]),
-  );
+    ]);
+
+    if (!hasRequiredFiles) {
+      return false;
+    }
+
+    const [modelPath, hasDataDir] = await Promise.all([
+      findModelFile(candidate),
+      pathExists(`${candidate}/espeak-ng-data`),
+    ]);
+
+    return !!modelPath && hasDataDir;
+  });
 }
 
 async function ensureKokoroMultilingualModelRootPath(language: "en" | "zh") {
@@ -351,6 +361,7 @@ async function ensureKokoroMultilingualModelRootPath(language: "en" | "zh") {
 
   const defaultLexiconPath = `${rootPath}/lexicon.txt`;
   const backupLexiconPath = `${rootPath}/lexicon-default.txt`;
+  const englishLexiconPath = `${rootPath}/lexicon-us-en.txt`;
   const chineseLexiconPath = `${rootPath}/lexicon-zh.txt`;
 
   if (
@@ -372,6 +383,15 @@ async function ensureKokoroMultilingualModelRootPath(language: "en" | "zh") {
     }
 
     await copyFile(chineseLexiconPath, defaultLexiconPath);
+    return rootPath;
+  }
+
+  if (await pathExists(englishLexiconPath)) {
+    if (await pathExists(defaultLexiconPath)) {
+      await unlinkPath(defaultLexiconPath);
+    }
+
+    await copyFile(englishLexiconPath, defaultLexiconPath);
     return rootPath;
   }
 
@@ -485,7 +505,6 @@ async function getKokoroMultilingualSession(language: "en" | "zh") {
         dataDirPath: modelFiles.dataDirPath,
         voicesPath: modelFiles.voicesPath,
         lexiconPaths: modelFiles.lexiconPaths,
-        lang: language === "zh" ? "zh" : "us-en",
         numThreads: 2,
         debug: false,
         provider: "cpu",

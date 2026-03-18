@@ -145,15 +145,15 @@ const PROVIDER_PREVIEW_SAMPLE_TEXT =
 
 const LOCAL_PREVIEW_SAMPLE_TEXT_BY_LANGUAGE: Record<TtsListenLanguage, string> =
   {
-    en: "Hello",
-    de: "Hallo",
-    zh: "你好",
-    es: "Hola",
-    pt: "Ola",
-    hi: "नमस्ते",
-    fr: "Bonjour",
-    it: "Ciao",
-    ja: "こんにちは",
+    en: "Hello. This is a longer local voice preview for SchnackAI, spoken slowly enough that you can hear how clear the pronunciation is and whether the rhythm feels natural for a full conversation. If this voice sounds pleasant over these two sentences, it will usually also feel comfortable when the app reads longer replies aloud.",
+    de: "Hallo. Dies ist eine längere lokale Stimmprobe für SchnackAI, damit du hören kannst, wie klar die Aussprache ist und ob die Stimme auch über mehrere Sätze hinweg angenehm klingt. Wenn sich diese Stimme hier ruhig und natürlich anhört, passt sie in der Regel auch gut für längere Antworten im Alltag.",
+    zh: "你好。这是一段较长的本地语音预览，用来帮助你判断这条声音是否清晰、自然，并且适合在日常对话里连续收听更长的回答。如果这两句话听起来稳定又舒服，那么它通常也适合让应用朗读完整回复。",
+    es: "Hola. Esta es una muestra local de voz más larga para que puedas escuchar con calma si la pronunciación es clara y si el ritmo suena natural durante varias frases seguidas. Si esta voz te parece agradable en estas dos oraciones, normalmente también funcionará bien para respuestas más largas dentro de la aplicación.",
+    pt: "Olá. Esta é uma amostra local de voz mais longa para que você possa perceber com calma se a pronúncia está clara e se o ritmo parece natural ao longo de várias frases. Se esta voz soar agradável nestas duas frases, normalmente também será uma boa escolha para respostas mais longas no aplicativo.",
+    hi: "नमस्ते। यह स्थानीय आवाज़ का थोड़ा लंबा पूर्वावलोकन है, ताकि आप सुन सकें कि उच्चारण कितना साफ़ है और क्या यह आवाज़ कई वाक्यों तक स्वाभाविक और आरामदायक लगती है। अगर यह आवाज़ इन दो वाक्यों में संतुलित और सुखद लगे, तो आम तौर पर यह ऐप के लंबे उत्तर सुनने के लिए भी अच्छी रहेगी।",
+    fr: "Bonjour. Voici un aperçu local plus long de la voix afin que vous puissiez entendre si la prononciation reste claire et si le rythme paraît naturel sur plusieurs phrases d'affilée. Si cette voix vous semble agréable sur ces deux phrases, elle conviendra en général aussi pour des réponses plus longues dans l'application.",
+    it: "Ciao. Questa e una prova locale della voce un po' piu lunga, cosi puoi capire se la pronuncia e chiara e se il ritmo rimane naturale anche per piu frasi consecutive. Se questa voce ti sembra piacevole in queste due frasi, di solito sara una buona scelta anche per risposte piu lunghe nell'app.",
+    ja: "こんにちは。これは少し長めのローカル音声プレビューで、発音の明瞭さや、複数の文を続けて聞いたときに自然に感じられるかどうかを確かめるためのものです。ここで落ち着いて聞こえる声であれば、アプリが長めの返答を読み上げる場合にもたいてい快適に使えます。",
   };
 
 function getTabLabel(
