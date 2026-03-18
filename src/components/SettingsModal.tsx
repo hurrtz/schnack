@@ -143,15 +143,15 @@ const PROVIDER_PREVIEW_SAMPLE_TEXT =
 
 const LOCAL_PREVIEW_SAMPLE_TEXT_BY_LANGUAGE: Record<TtsListenLanguage, string> =
   {
-    en: "Hello. This is a longer voice preview for SchnackAI, spoken at a calm and steady pace so you can judge clarity, tone, and whether this voice feels pleasant enough for full replies. If you listen for a few seconds, you should get a realistic sense of how this local voice will sound during everyday conversations.",
-    de: "Hallo. Dies ist eine etwas laengere Sprachvorschau fuer SchnackAI, ruhig und gleichmaessig gesprochen, damit du Klarheit, Klang und Tempo besser einschaetzen kannst. Wenn du ein paar Sekunden zuhoerst, bekommst du ein gutes Gefuehl dafuer, ob sich diese Stimme fuer alltaegliche Gespraeche angenehm anhoert.",
-    zh: "你好，这是 SchnackAI 的一段较长语音示例，我会用比较自然和平稳的节奏说话，方便你判断这条声音是否清晰、稳定，而且适合较长时间收听。你只要听上几秒钟，就能大致感觉到它在日常对话里听起来是不是舒服。",
-    es: "Hola. Esta es una muestra de voz un poco mas larga para SchnackAI, dicha con un ritmo tranquilo y estable para que puedas juzgar con mas claridad el tono, la nitidez y lo agradable que resulta escucharla durante respuestas completas. Si escuchas unos segundos, deberias hacerte una buena idea de como sonaria esta voz en conversaciones cotidianas.",
-    pt: "Ola. Esta e uma amostra de voz um pouco mais longa para o SchnackAI, falada com um ritmo calmo e estavel para que voce possa avaliar melhor a clareza, o timbre e o conforto desta voz em respostas completas. Se voce ouvir por alguns segundos, ja tera uma boa nocao de como ela soaria em conversas do dia a dia.",
-    hi: "नमस्ते। यह SchnackAI के लिए एक थोड़ी लंबी आवाज़ की झलक है, जिसे शांत और स्थिर गति से बोला जा रहा है, ताकि आप स्पष्टता, लहजे और सुनने के आराम का ठीक से अंदाज़ा लगा सकें। अगर आप कुछ सेकंड ध्यान से सुनें, तो आपको अच्छी तरह महसूस हो जाएगा कि यह आवाज़ रोज़मर्रा की बातचीत में कैसी लगेगी।",
-    fr: "Bonjour. Ceci est un extrait vocal un peu plus long pour SchnackAI, prononce avec un rythme calme et regulier afin que vous puissiez mieux juger la clarte, le timbre et le confort d'ecoute sur des reponses completes. En ecoutant quelques secondes, vous devriez vite sentir si cette voix convient a des conversations du quotidien.",
-    it: "Ciao. Questo e un esempio vocale un po' piu lungo per SchnackAI, pronunciato con un ritmo calmo e regolare cosi puoi valutare meglio chiarezza, timbro e piacevolezza di ascolto su risposte complete. Se ascolti per qualche secondo, dovresti capire abbastanza bene come suonera questa voce nelle conversazioni di tutti i giorni.",
-    ja: "こんにちは。これは SchnackAI の少し長めの音声サンプルで、聞き取りやすさや声の雰囲気、そして長めの返答でも心地よく聞けるかどうかを判断しやすいよう、落ち着いた自然な速さで話します。数秒聞いてみれば、この声が日常の会話でどのように感じられるかをかなり具体的に想像できるはずです。",
+    en: "Hello",
+    de: "Hallo",
+    zh: "你好",
+    es: "Hola",
+    pt: "Ola",
+    hi: "नमस्ते",
+    fr: "Bonjour",
+    it: "Ciao",
+    ja: "こんにちは",
   };
 
 function getTabLabel(

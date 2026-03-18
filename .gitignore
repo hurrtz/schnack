@@ -45,3 +45,6 @@ src/config.ts
 
 # internal tooling
 .superpowers/
+
+# local native build artifacts
+.xcode-derived/
