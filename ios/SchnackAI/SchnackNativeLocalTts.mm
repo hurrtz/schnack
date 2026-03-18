@@ -149,6 +149,9 @@ RCT_REMAP_METHOD(initialize,
 
   @try {
     try {
+      NSLog(@"[SchnackNativeLocalTts] initialize begin instance=%@ modelType=%@",
+            instanceId,
+            modelType);
       sherpa_onnx::cxx::OfflineTtsConfig nativeConfig;
       nativeConfig.model.num_threads = numThreads != nil ? numThreads.intValue : 2;
       nativeConfig.model.debug = debug != nil ? debug.boolValue : false;
@@ -236,25 +239,41 @@ RCT_REMAP_METHOD(initialize,
                  modelPath,
                  tokensPath,
                  dataDirPath);
+      NSLog(@"[SchnackNativeLocalTts] create offline tts instance=%@ modelType=%@",
+            instanceId,
+            modelType);
 
       auto state = std::make_shared<SchnackLocalTtsState>();
       state->modelType = modelTypeValue;
       state->tts = sherpa_onnx::cxx::OfflineTts::Create(nativeConfig);
+      NSLog(@"[SchnackNativeLocalTts] create offline tts finished instance=%@ hasValue=%@",
+            instanceId,
+            state->tts.has_value() ? @"yes" : @"no");
 
       std::lock_guard<std::mutex> lock(g_local_tts_mutex);
       g_local_tts_instances[std::string(instanceId.UTF8String)] = state;
 
+      NSLog(@"[SchnackNativeLocalTts] initialize success instance=%@",
+            instanceId);
       resolve(@YES);
     } catch (const std::exception &exception) {
+      NSLog(@"[SchnackNativeLocalTts] initialize std::exception instance=%@ reason=%s",
+            instanceId,
+            exception.what());
       reject(@"local_tts_init_error",
              [NSString stringWithUTF8String:exception.what()],
              nil);
     } catch (...) {
+      NSLog(@"[SchnackNativeLocalTts] initialize unknown exception instance=%@",
+            instanceId);
       reject(@"local_tts_init_error",
              @"Unknown local TTS initialization error.",
              nil);
     }
   } @catch (NSException *exception) {
+    NSLog(@"[SchnackNativeLocalTts] initialize NSException instance=%@ reason=%@",
+          instanceId,
+          exception.reason);
     reject(@"local_tts_init_error", exception.reason, nil);
   }
 }
@@ -288,9 +307,18 @@ RCT_REMAP_METHOD(generateToFile,
 
   @try {
     try {
+      NSLog(@"[SchnackNativeLocalTts] generate begin instance=%@ textLength=%lu speakerId=%.0f speed=%.2f",
+            instanceId,
+            (unsigned long)text.length,
+            speakerId,
+            speed);
       auto audio = state->tts.value().Generate(std::string(text.UTF8String),
                                                static_cast<int32_t>(speakerId),
                                                static_cast<float>(speed));
+      NSLog(@"[SchnackNativeLocalTts] generate finished instance=%@ sampleRate=%d samples=%lu",
+            instanceId,
+            audio.sample_rate,
+            (unsigned long)audio.samples.size());
 
       if (audio.samples.empty() || audio.sample_rate <= 0) {
         reject(@"local_tts_generate_error",
@@ -307,9 +335,15 @@ RCT_REMAP_METHOD(generateToFile,
         targetPath = [NSTemporaryDirectory() stringByAppendingPathComponent:tmpName];
       }
 
+      NSLog(@"[SchnackNativeLocalTts] save wav begin instance=%@ output=%@",
+            instanceId,
+            targetPath);
       BOOL saved = SaveWavFile(audio.samples,
                                audio.sample_rate,
                                std::string(targetPath.UTF8String));
+      NSLog(@"[SchnackNativeLocalTts] save wav finished instance=%@ saved=%@",
+            instanceId,
+            saved ? @"yes" : @"no");
       if (!saved) {
         reject(@"local_tts_generate_error",
                @"The generated local TTS audio could not be saved.",
@@ -317,17 +351,28 @@ RCT_REMAP_METHOD(generateToFile,
         return;
       }
 
+      NSLog(@"[SchnackNativeLocalTts] generate success instance=%@ output=%@",
+            instanceId,
+            targetPath);
       resolve(targetPath);
     } catch (const std::exception &exception) {
+      NSLog(@"[SchnackNativeLocalTts] generate std::exception instance=%@ reason=%s",
+            instanceId,
+            exception.what());
       reject(@"local_tts_generate_error",
              [NSString stringWithUTF8String:exception.what()],
              nil);
     } catch (...) {
+      NSLog(@"[SchnackNativeLocalTts] generate unknown exception instance=%@",
+            instanceId);
       reject(@"local_tts_generate_error",
              @"Unknown local TTS generation error.",
              nil);
     }
   } @catch (NSException *exception) {
+    NSLog(@"[SchnackNativeLocalTts] generate NSException instance=%@ reason=%@",
+          instanceId,
+          exception.reason);
     reject(@"local_tts_generate_error", exception.reason, nil);
   }
 }
