@@ -37,7 +37,15 @@ yarn-error.*
 *.tsbuildinfo
 
 # generated native folders
-/ios
+/ios/*
+!/ios/Podfile.lock
+!/ios/SchnackAI/
+/ios/SchnackAI/*
+!/ios/SchnackAI/SchnackNativeAudioQueue.m
+!/ios/SchnackAI/SchnackNativeLocalTts.mm
+!/ios/SchnackAI.xcodeproj/
+/ios/SchnackAI.xcodeproj/*
+!/ios/SchnackAI.xcodeproj/project.pbxproj
 /android
 
 # secrets

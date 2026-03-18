@@ -128,7 +128,10 @@ export function useLocalTtsPacks(settings: Settings) {
                 error: null,
               }),
               downloading: false,
-              error: installError.message,
+              error:
+                installError instanceof Error
+                  ? installError.message
+                  : "The local voice pack installation failed.",
             },
           }));
         }

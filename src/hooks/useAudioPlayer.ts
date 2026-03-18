@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { Platform } from "react-native";
 import * as Speech from "expo-speech";
 import {
   setAudioModeAsync,
@@ -10,6 +11,15 @@ import {
   type SpeechDiagnosticsContext,
   recordSpeechDiagnostic,
 } from "../services/speech/diagnostics";
+import {
+  enqueueNativeAudioQueueItem,
+  isNativeAudioQueueAvailable,
+  prepareNativeAudioQueue,
+  startNativeAudioQueue,
+  stopNativeAudioQueue,
+  subscribeToNativeAudioQueue,
+  type NativeAudioQueueEvent,
+} from "../services/nativeAudioQueue";
 import {
   EMPTY_VISUAL_LEVELS,
   averageLevels,
@@ -34,6 +44,8 @@ function nextPlaybackJobId(prefix: "audio" | "native") {
 }
 
 export function useAudioPlayer() {
+  const usingNativeAudioQueue =
+    Platform.OS === "ios" && isNativeAudioQueueAvailable();
   const player = useExpoAudioPlayer(null, {
     updateInterval: PLAYER_STATUS_INTERVAL_MS,
     keepAudioSessionActive: true,
@@ -55,6 +67,11 @@ export function useAudioPlayer() {
   const cancelledRef = useRef(false);
   const loadedSourceRef = useRef(false);
   const hasSeenAudioPlayingRef = useRef(false);
+  const nativeAudioQueueContextsRef = useRef<
+    Map<string, { uri: string; diagnostics?: SpeechDiagnosticsContext }>
+  >(new Map());
+  const nativeAudioQueuePendingCountRef = useRef(0);
+  const nativeAudioQueuePlayingRef = useRef(false);
   const nativeQueueRef = useRef<
     Array<{
       id: string;
@@ -69,6 +86,7 @@ export function useAudioPlayer() {
   const audioSessionPromiseRef = useRef<Promise<void> | null>(null);
   const drainResolversRef = useRef<Array<() => void>>([]);
   const [nativeSpeaking, setNativeSpeaking] = useState(false);
+  const [nativeAudioQueuePlaying, setNativeAudioQueuePlaying] = useState(false);
 
   const resetVisualState = useCallback(() => {
     setMeteringData(-160);
@@ -80,6 +98,13 @@ export function useAudioPlayer() {
       clearInterval(nativeIntervalRef.current);
       nativeIntervalRef.current = null;
     }
+  }, []);
+
+  const clearNativeAudioQueueState = useCallback(() => {
+    nativeAudioQueueContextsRef.current.clear();
+    nativeAudioQueuePendingCountRef.current = 0;
+    nativeAudioQueuePlayingRef.current = false;
+    setNativeAudioQueuePlaying(false);
   }, []);
 
   const removeLoadedAudio = useCallback(() => {
@@ -103,15 +128,20 @@ export function useAudioPlayer() {
   }, [stopNativeMetering]);
 
   const hasPendingPlaybackNow = useCallback(() => {
+    const hasAudioQueuePending = usingNativeAudioQueue
+      ? nativeAudioQueuePendingCountRef.current > 0 ||
+        nativeAudioQueuePlayingRef.current
+      : startingRef.current ||
+        playingRef.current ||
+        currentAudioRef.current !== null ||
+        queueRef.current.length > 0;
+
     return (
-      startingRef.current ||
-      playingRef.current ||
-      currentAudioRef.current !== null ||
-      queueRef.current.length > 0 ||
+      hasAudioQueuePending ||
       nativeSpeakingRef.current ||
       nativeQueueRef.current.length > 0
     );
-  }, []);
+  }, [usingNativeAudioQueue]);
 
   const resolveDrainWaiters = useCallback(() => {
     if (drainResolversRef.current.length === 0) {
@@ -145,10 +175,12 @@ export function useAudioPlayer() {
   const finalizeDrainedState = useCallback(() => {
     removeLoadedAudio();
     stopNativeMetering();
+    clearNativeAudioQueueState();
     resetVisualState();
     resetPlaybackSession();
     updatePendingPlaybackState();
   }, [
+    clearNativeAudioQueueState,
     removeLoadedAudio,
     resetPlaybackSession,
     resetVisualState,
@@ -177,7 +209,21 @@ export function useAudioPlayer() {
     await audioSessionPromiseRef.current;
   }, []);
 
+  const ensureAudioQueuePlaybackSession = useCallback(async () => {
+    if (!usingNativeAudioQueue) {
+      await ensurePlaybackSession();
+      return;
+    }
+
+    await ensurePlaybackSession();
+    await prepareNativeAudioQueue();
+  }, [ensurePlaybackSession, usingNativeAudioQueue]);
+
   const playNextAudio = useCallback(async () => {
+    if (usingNativeAudioQueue) {
+      return;
+    }
+
     if (
       playingRef.current ||
       startingRef.current ||
@@ -232,6 +278,7 @@ export function useAudioPlayer() {
     ensurePlaybackSession,
     finalizeDrainedState,
     player,
+    usingNativeAudioQueue,
     updatePendingPlaybackState,
   ]);
 
@@ -381,6 +428,147 @@ export function useAudioPlayer() {
     updatePendingPlaybackState,
   ]);
 
+  useEffect(() => {
+    if (!usingNativeAudioQueue) {
+      return;
+    }
+
+    const handleNativeAudioQueueEvent = (event: NativeAudioQueueEvent) => {
+      const itemId = event.itemId ?? "";
+      const context = itemId
+        ? nativeAudioQueueContextsRef.current.get(itemId)
+        : undefined;
+
+      switch (event.type) {
+        case "started": {
+          if (context) {
+            currentAudioRef.current = {
+              id: itemId,
+              uri: context.uri,
+              diagnostics: context.diagnostics,
+            };
+          }
+          hasSeenAudioPlayingRef.current = true;
+          playingRef.current = true;
+          nativeAudioQueuePlayingRef.current = true;
+          setNativeAudioQueuePlaying(true);
+          recordSpeechDiagnostic({
+            requestId: context?.diagnostics?.requestId ?? event.requestId ?? undefined,
+            source:
+              context?.diagnostics?.source ??
+              (event.source as SpeechDiagnosticsContext["source"] | null) ??
+              "unknown",
+            stage: "playback-started",
+            message: context?.uri ?? event.uri,
+          });
+          updatePendingPlaybackState();
+          break;
+        }
+        case "finished": {
+          if (context) {
+            recordSpeechDiagnostic({
+              requestId: context.diagnostics?.requestId ?? event.requestId ?? undefined,
+              source:
+                context.diagnostics?.source ??
+                (event.source as SpeechDiagnosticsContext["source"] | null) ??
+                "unknown",
+              stage: "playback-finished",
+              message: context.uri,
+            });
+          }
+
+          if (itemId) {
+            nativeAudioQueueContextsRef.current.delete(itemId);
+          }
+          nativeAudioQueuePendingCountRef.current = Math.max(
+            0,
+            nativeAudioQueuePendingCountRef.current - 1,
+          );
+          if (nativeAudioQueuePendingCountRef.current === 0) {
+            currentAudioRef.current = null;
+            hasSeenAudioPlayingRef.current = false;
+            playingRef.current = false;
+            nativeAudioQueuePlayingRef.current = false;
+            setNativeAudioQueuePlaying(false);
+          }
+          updatePendingPlaybackState();
+          if (
+            !cancelledRef.current &&
+            nativeAudioQueuePendingCountRef.current === 0 &&
+            nativeQueueRef.current.length > 0
+          ) {
+            void playNextNative();
+          }
+          break;
+        }
+        case "failed": {
+          if (context) {
+            recordSpeechDiagnostic({
+              requestId: context.diagnostics?.requestId ?? event.requestId ?? undefined,
+              source:
+                context.diagnostics?.source ??
+                (event.source as SpeechDiagnosticsContext["source"] | null) ??
+                "unknown",
+              stage: "playback-stopped",
+              message: event.message ?? context.uri,
+            });
+          }
+
+          if (itemId) {
+            nativeAudioQueueContextsRef.current.delete(itemId);
+          }
+          nativeAudioQueuePendingCountRef.current = Math.max(
+            0,
+            nativeAudioQueuePendingCountRef.current - 1,
+          );
+          if (nativeAudioQueuePendingCountRef.current === 0) {
+            currentAudioRef.current = null;
+            hasSeenAudioPlayingRef.current = false;
+            playingRef.current = false;
+            nativeAudioQueuePlayingRef.current = false;
+            setNativeAudioQueuePlaying(false);
+          }
+          updatePendingPlaybackState();
+          if (
+            !cancelledRef.current &&
+            nativeAudioQueuePendingCountRef.current === 0 &&
+            nativeQueueRef.current.length > 0
+          ) {
+            void playNextNative();
+          }
+          break;
+        }
+        case "stopped": {
+          break;
+        }
+        case "drained": {
+          currentAudioRef.current = null;
+          hasSeenAudioPlayingRef.current = false;
+          playingRef.current = false;
+          nativeAudioQueuePlayingRef.current = false;
+          setNativeAudioQueuePlaying(false);
+          nativeAudioQueuePendingCountRef.current = 0;
+          nativeAudioQueueContextsRef.current.clear();
+          updatePendingPlaybackState();
+
+          if (!cancelledRef.current && nativeQueueRef.current.length > 0) {
+            void playNextNative();
+          } else {
+            finalizeDrainedState();
+          }
+          break;
+        }
+      }
+    };
+
+    return subscribeToNativeAudioQueue(handleNativeAudioQueueEvent);
+  }, [
+    finalizeDrainedState,
+    playNextNative,
+    updatePendingPlaybackState,
+    usingNativeAudioQueue,
+  ]);
+
   useAudioSampleListener(player, (sample) => {
     const levels = buildSampleLevels(sample.channels);
 
@@ -389,6 +577,30 @@ export function useAudioPlayer() {
   });
 
   useEffect(() => {
+    if (usingNativeAudioQueue) {
+      if (
+        !nativeSpeakingRef.current &&
+        !cancelledRef.current &&
+        nativeQueueRef.current.length > 0 &&
+        nativeAudioQueuePendingCountRef.current === 0 &&
+        !nativeAudioQueuePlayingRef.current
+      ) {
+        void playNextNative();
+        return;
+      }
+
+      if (
+        !startingRef.current &&
+        !nativeSpeakingRef.current &&
+        nativeAudioQueuePendingCountRef.current === 0 &&
+        !nativeAudioQueuePlayingRef.current &&
+        nativeQueueRef.current.length === 0
+      ) {
+        finalizeDrainedState();
+      }
+      return;
+    }
+
     if (status.playing) {
       playingRef.current = true;
       if (currentAudioRef.current && !hasSeenAudioPlayingRef.current) {
@@ -470,20 +682,25 @@ export function useAudioPlayer() {
     playNextAudio,
     playNextNative,
     status.playing,
+    usingNativeAudioQueue,
     updatePendingPlaybackState,
   ]);
 
   useEffect(() => {
+    const clipPlaybackActive = usingNativeAudioQueue
+      ? nativeAudioQueuePlaying
+      : status.playing;
+
     if (nativeSpeaking) {
       return;
     }
 
-    if (!status.playing) {
+    if (!clipPlaybackActive) {
       resetVisualState();
       return;
     }
 
-    if (player.isAudioSamplingSupported) {
+    if (!usingNativeAudioQueue && player.isAudioSamplingSupported) {
       return;
     }
 
@@ -501,16 +718,82 @@ export function useAudioPlayer() {
     };
   }, [
     nativeSpeaking,
+    nativeAudioQueuePlaying,
     player.currentTime,
     player.id,
     player.isAudioSamplingSupported,
     resetVisualState,
     status.playing,
+    usingNativeAudioQueue,
   ]);
 
   const enqueueAudio = useCallback(
     (audioUri: string, diagnostics?: SpeechDiagnosticsContext) => {
       if (cancelledRef.current) {
+        return;
+      }
+
+      if (usingNativeAudioQueue) {
+        const itemId = nextPlaybackJobId("audio");
+        nativeAudioQueueContextsRef.current.set(itemId, {
+          uri: audioUri,
+          diagnostics,
+        });
+        nativeAudioQueuePendingCountRef.current += 1;
+        recordSpeechDiagnostic({
+          requestId: diagnostics?.requestId,
+          source: diagnostics?.source ?? "unknown",
+          stage: "playback-enqueued",
+          message: audioUri,
+        });
+        updatePendingPlaybackState();
+
+        void (async () => {
+          try {
+            await ensureAudioQueuePlaybackSession();
+
+            if (cancelledRef.current) {
+              nativeAudioQueueContextsRef.current.delete(itemId);
+              nativeAudioQueuePendingCountRef.current = Math.max(
+                0,
+                nativeAudioQueuePendingCountRef.current - 1,
+              );
+              updatePendingPlaybackState();
+              return;
+            }
+
+            await enqueueNativeAudioQueueItem({
+              uri: audioUri,
+              itemId,
+              requestId: diagnostics?.requestId,
+              source: diagnostics?.source ?? "unknown",
+            });
+            await startNativeAudioQueue();
+          } catch (error) {
+            nativeAudioQueueContextsRef.current.delete(itemId);
+            nativeAudioQueuePendingCountRef.current = Math.max(
+              0,
+              nativeAudioQueuePendingCountRef.current - 1,
+            );
+            recordSpeechDiagnostic({
+              requestId: diagnostics?.requestId,
+              source: diagnostics?.source ?? "unknown",
+              stage: "playback-stopped",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Native audio queue playback could not be started.",
+            });
+            updatePendingPlaybackState();
+            if (
+              nativeAudioQueuePendingCountRef.current === 0 &&
+              !nativeSpeakingRef.current &&
+              nativeQueueRef.current.length === 0
+            ) {
+              finalizeDrainedState();
+            }
+          }
+        })();
         return;
       }
 
@@ -535,7 +818,13 @@ export function useAudioPlayer() {
         void playNextAudio();
       }
     },
-    [playNextAudio, updatePendingPlaybackState],
+    [
+      ensureAudioQueuePlaybackSession,
+      finalizeDrainedState,
+      playNextAudio,
+      updatePendingPlaybackState,
+      usingNativeAudioQueue,
+    ],
   );
 
   const speakText = useCallback(
@@ -590,8 +879,12 @@ export function useAudioPlayer() {
     nativeQueueRef.current = [];
     currentAudioRef.current = null;
     hasSeenAudioPlayingRef.current = false;
+    clearNativeAudioQueueState();
     player.pause();
     removeLoadedAudio();
+    if (usingNativeAudioQueue) {
+      await stopNativeAudioQueue();
+    }
     await Speech.stop();
     stopNativeMetering();
     nativeSpeakingRef.current = false;
@@ -612,7 +905,9 @@ export function useAudioPlayer() {
     resetPlaybackSession,
     resetVisualState,
     stopNativeMetering,
+    usingNativeAudioQueue,
     updatePendingPlaybackState,
+    clearNativeAudioQueueState,
   ]);
 
   const resetCancellation = useCallback(() => {
@@ -621,12 +916,16 @@ export function useAudioPlayer() {
     nativeQueueRef.current = [];
     currentAudioRef.current = null;
     hasSeenAudioPlayingRef.current = false;
+    clearNativeAudioQueueState();
     nativeSpeakingRef.current = false;
     setNativeSpeaking(false);
     startingRef.current = false;
     playingRef.current = false;
     player.pause();
     removeLoadedAudio();
+    if (usingNativeAudioQueue) {
+      void stopNativeAudioQueue();
+    }
     stopNativeMetering();
     resetVisualState();
     resetPlaybackSession();
@@ -637,15 +936,20 @@ export function useAudioPlayer() {
     resetPlaybackSession,
     resetVisualState,
     stopNativeMetering,
+    usingNativeAudioQueue,
     updatePendingPlaybackState,
+    clearNativeAudioQueueState,
   ]);
 
   useEffect(() => {
     return () => {
       stopNativeMetering();
+      if (usingNativeAudioQueue) {
+        void stopNativeAudioQueue();
+      }
       resolveDrainWaiters();
     };
-  }, [resolveDrainWaiters, stopNativeMetering]);
+  }, [resolveDrainWaiters, stopNativeMetering, usingNativeAudioQueue]);
 
   return {
     isPlaying: hasPendingPlayback,

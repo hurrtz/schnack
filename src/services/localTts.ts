@@ -1,4 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
+import { Platform } from "react-native";
 import {
   copyFile,
   exists as pathExists,
@@ -14,6 +15,10 @@ import {
 } from "react-native-sherpa-onnx/download";
 import { LOCAL_TTS_SUPPORTED_LANGUAGES } from "../constants/localTts";
 import type { TtsListenLanguage } from "../types";
+import {
+  createNativeLocalTtsEngine,
+  isNativeLocalTtsAvailable,
+} from "./nativeLocalTts";
 
 const KOKORO_MULTILINGUAL_MODEL_ID = "kokoro-multi-lang-v1_0";
 const LOCAL_TTS_IDLE_RELEASE_MS = 45000;
@@ -232,6 +237,77 @@ async function findNestedDirectory(
   return null;
 }
 
+async function findModelFile(candidate: string) {
+  if (!(await pathExists(candidate))) {
+    return null;
+  }
+
+  const entries = await readDir(candidate);
+  const match = entries.find(
+    (entry) =>
+      !entry.isDirectory() &&
+      entry.name.endsWith(".onnx") &&
+      !entry.name.endsWith(".onnx.json"),
+  );
+
+  return match?.path ?? null;
+}
+
+async function resolveSherpaVitsModelFiles(modelRootPath: string) {
+  const resolvedRoot = await findNestedDirectory(
+    modelRootPath,
+    (candidate) =>
+      directoryContainsFiles(candidate, ["tokens.txt", "espeak-ng-data"]),
+  );
+
+  if (!resolvedRoot) {
+    throw new Error("The local voice pack files could not be resolved.");
+  }
+
+  const modelPath = await findModelFile(resolvedRoot);
+  if (!modelPath) {
+    throw new Error("The local voice model file is missing.");
+  }
+
+  const tokensPath = `${resolvedRoot}/tokens.txt`;
+  const dataDirPath = `${resolvedRoot}/espeak-ng-data`;
+  const lexiconPath = (await pathExists(`${resolvedRoot}/lexicon.txt`))
+    ? `${resolvedRoot}/lexicon.txt`
+    : undefined;
+
+  return {
+    modelPath,
+    tokensPath,
+    dataDirPath,
+    lexiconPath,
+  };
+}
+
+async function resolveKokoroModelFiles(rootPath: string) {
+  const modelPath = await findModelFile(rootPath);
+
+  if (!modelPath) {
+    throw new Error("The Kokoro local model file is missing.");
+  }
+
+  const tokensPath = `${rootPath}/tokens.txt`;
+  const dataDirPath = `${rootPath}/espeak-ng-data`;
+  const voicesPath = `${rootPath}/voices.bin`;
+  const lexiconPaths = [
+    `${rootPath}/lexicon-us-en.txt`,
+    `${rootPath}/lexicon-zh.txt`,
+    `${rootPath}/lexicon.txt`,
+  ];
+
+  return {
+    modelPath,
+    tokensPath,
+    dataDirPath,
+    voicesPath,
+    lexiconPaths,
+  };
+}
+
 async function getInstalledKokoroMultilingualModelRootPath() {
   const basePath = await getLocalModelPathByCategory(
     ModelCategory.Tts,
@@ -387,6 +463,27 @@ async function getKokoroMultilingualSession(language: "en" | "zh") {
   }
 
   const promise = (async () => {
+    if (Platform.OS === "ios" && isNativeLocalTtsAvailable()) {
+      const modelFiles = await resolveKokoroModelFiles(rootPath);
+      const engine = await createNativeLocalTtsEngine({
+        modelType: "kokoro",
+        modelPath: modelFiles.modelPath,
+        tokensPath: modelFiles.tokensPath,
+        dataDirPath: modelFiles.dataDirPath,
+        voicesPath: modelFiles.voicesPath,
+        lexiconPaths: modelFiles.lexiconPaths,
+        lang: language === "zh" ? "zh" : "us-en",
+        numThreads: 2,
+        debug: false,
+        provider: "cpu",
+      });
+
+      return {
+        engine,
+        rootPath: cacheKey,
+      };
+    }
+
     const [{ createTTS }, { fileModelPath }] = await Promise.all([
       import("react-native-sherpa-onnx/tts"),
       import("react-native-sherpa-onnx"),
@@ -435,6 +532,25 @@ async function getSherpaVitsSession(modelId: string) {
   }
 
   const promise = (async () => {
+    if (Platform.OS === "ios" && isNativeLocalTtsAvailable()) {
+      const modelFiles = await resolveSherpaVitsModelFiles(rootPath);
+      const engine = await createNativeLocalTtsEngine({
+        modelType: "vits",
+        modelPath: modelFiles.modelPath,
+        tokensPath: modelFiles.tokensPath,
+        dataDirPath: modelFiles.dataDirPath,
+        lexiconPath: modelFiles.lexiconPath,
+        numThreads: 2,
+        debug: false,
+        provider: "cpu",
+      });
+
+      return {
+        engine,
+        rootPath,
+      };
+    }
+
     const [{ createTTS }, { fileModelPath }] = await Promise.all([
       import("react-native-sherpa-onnx/tts"),
       import("react-native-sherpa-onnx"),
@@ -557,6 +673,32 @@ function buildSherpaVitsStrategy(
   };
 }
 
+async function synthesizeEngineSpeechToFile(params: {
+  engine: any;
+  text: string;
+  sid: number;
+  speed: number;
+}) {
+  if (typeof params.engine?.synthesizeToFile === "function") {
+    return params.engine.synthesizeToFile({
+      text: params.text,
+      sid: params.sid,
+      speed: params.speed,
+    });
+  }
+
+  const audio = await params.engine.generateSpeech(params.text, {
+    sid: params.sid,
+    speed: params.speed,
+  });
+
+  if (!audio?.samples || !audio?.sampleRate) {
+    throw new Error("The local voice model did not return audio.");
+  }
+
+  return writeWaveformFile(Float32Array.from(audio.samples), audio.sampleRate);
+}
+
 const LOCAL_TTS_STRATEGIES: Partial<
   Record<TtsListenLanguage, LocalTtsStrategy>
 > = {
@@ -623,22 +765,12 @@ const LOCAL_TTS_STRATEGIES: Partial<
       }
 
       const sessionState = await getKokoroMultilingualSession("en");
-      const audio = await sessionState.engine.generateSpeech(
-        normalizeText(params.text),
-        {
-          sid: voiceConfig.sid,
-          speed: 1,
-        },
-      );
-
-      if (!audio?.samples || !audio?.sampleRate) {
-        throw new Error("The local English voice model did not return audio.");
-      }
-
-      return writeWaveformFile(
-        Float32Array.from(audio.samples),
-        audio.sampleRate,
-      );
+      return synthesizeEngineSpeechToFile({
+        engine: sessionState.engine,
+        text: normalizeText(params.text),
+        sid: voiceConfig.sid,
+        speed: 1,
+      });
     },
   },
   de: buildSherpaVitsStrategy("de"),
@@ -741,21 +873,12 @@ async function synthesizeKokoroChineseSpeech(params: {
   }
 
   const sessionState = await getKokoroMultilingualSession("zh");
-  const audio = await sessionState.engine.generateSpeech(
-    normalizeText(params.text),
-    {
-      sid: voiceConfig.sid,
-      speed: 1,
-    },
-  );
-
-  if (!audio?.samples || !audio?.sampleRate) {
-    throw new Error(
-      "The local Simplified Chinese voice model did not return audio.",
-    );
-  }
-
-  return writeWaveformFile(Float32Array.from(audio.samples), audio.sampleRate);
+  return synthesizeEngineSpeechToFile({
+    engine: sessionState.engine,
+    text: normalizeText(params.text),
+    sid: voiceConfig.sid,
+    speed: 1,
+  });
 }
 
 async function synthesizeSherpaVitsSpeech(params: {
@@ -784,21 +907,18 @@ async function synthesizeSherpaVitsSpeech(params: {
   }
 
   const sessionState = await getSherpaVitsSession(modelId);
-  const audio = await sessionState.engine.generateSpeech(
-    normalizeText(params.text),
-    {
-      sid: 0,
-      speed: 1,
-    },
-  );
-
-  if (!audio?.samples || !audio?.sampleRate) {
+  return synthesizeEngineSpeechToFile({
+    engine: sessionState.engine,
+    text: normalizeText(params.text),
+    sid: 0,
+    speed: 1,
+  }).catch((error) => {
     throw new Error(
-      `The local ${languageLabel} voice model did not return audio.`,
+      error instanceof Error && error.message
+        ? error.message
+        : `The local ${languageLabel} voice model did not return audio.`,
     );
-  }
-
-  return writeWaveformFile(Float32Array.from(audio.samples), audio.sampleRate);
+  });
 }
 
 export async function verifyLocalTtsPack(params: {

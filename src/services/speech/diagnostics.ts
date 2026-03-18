@@ -82,10 +82,10 @@ export function recordSpeechDiagnostic(
   event: Omit<SpeechDiagnosticEvent, "id" | "createdAt">,
 ) {
   const entry: SpeechDiagnosticEvent = {
+    ...event,
     id: nextSpeechDiagnosticId(),
     createdAt: new Date().toISOString(),
     source: event.source ?? "unknown",
-    ...event,
   };
 
   speechDiagnosticEvents = [entry, ...speechDiagnosticEvents].slice(
