@@ -62,7 +62,8 @@ describe("useLocalTtsPacks", () => {
         installed: false,
         downloading: false,
         progress: 0,
-        error: null,
+        error:
+          "The local voice pack download finished, but the files could not be verified on this device.",
       });
     });
   });

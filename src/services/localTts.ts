@@ -18,25 +18,12 @@ import type { TtsListenLanguage } from "../types";
 const KOKORO_MULTILINGUAL_MODEL_ID = "kokoro-multi-lang-v1_0";
 const LOCAL_TTS_IDLE_RELEASE_MS = 45000;
 
-const PIPER_GERMAN_VOICES = {
-  "thorsten-medium": {
-    repoId: "csukuangfj/vits-piper-de_DE-thorsten-medium",
-    modelFile: "de_DE-thorsten-medium.onnx",
-    configFile: "de_DE-thorsten-medium.onnx.json",
-  },
-  "kerstin-low": {
-    repoId: "csukuangfj/vits-piper-de_DE-kerstin-low",
-    modelFile: "de_DE-kerstin-low.onnx",
-    configFile: "de_DE-kerstin-low.onnx.json",
-  },
+const GERMAN_PIPER_MODEL_IDS = {
+  "thorsten-medium": "vits-piper-de_DE-thorsten-medium",
+  "kerstin-low": "vits-piper-de_DE-kerstin-low",
+  "vits-piper-de_DE-thorsten-medium": "vits-piper-de_DE-thorsten-medium",
+  "vits-piper-de_DE-kerstin-low": "vits-piper-de_DE-kerstin-low",
 } as const;
-
-const PIPER_DATA_MARKERS = [
-  "espeak-ng-data/phondata",
-  "espeak-ng-data/phontab",
-  "espeak-ng-data/de_dict",
-  "espeak-ng-data/lang/gmw/de",
-] as const;
 
 const KOKORO_CHINESE_VOICES = {
   zf_xiaobei: { sid: 24 },
@@ -57,6 +44,7 @@ const KOKORO_ENGLISH_VOICES = {
 } as const;
 
 const SHERPA_VITS_LANGUAGE_MODEL_IDS = {
+  de: ["vits-piper-de_DE-thorsten-medium", "vits-piper-de_DE-kerstin-low"],
   es: ["vits-piper-es_ES-davefx-medium", "vits-piper-es_MX-claude-high"],
   pt: ["vits-piper-pt_BR-faber-medium", "vits-piper-pt_PT-tugao-medium"],
   hi: ["vits-piper-hi_IN-priyamvada-medium", "vits-piper-hi_IN-pratham-medium"],
@@ -85,17 +73,10 @@ type SherpaSessionState = {
   rootPath: string;
 };
 
-type HuggingFaceModelResponse = {
-  siblings?: Array<{
-    rfilename?: string;
-  }>;
-};
-
 const sherpaSessionCache = new Map<
   string,
   Promise<SherpaSessionState> | SherpaSessionState
 >();
-const huggingFaceRepoFilesCache = new Map<string, Promise<string[]>>();
 const localTtsVerificationCache = new Map<
   string,
   { verified: boolean; error: string | null }
@@ -106,14 +87,14 @@ const LOCAL_TTS_VERIFY_SAMPLE_TEXT: Record<
   Exclude<TtsListenLanguage, "ja">,
   string
 > = {
-  en: "Hello. This is a quick voice check.",
-  de: "Hallo. Dies ist ein kurzer Sprachtest.",
-  zh: "你好。这是一个简短的语音测试。",
-  es: "Hola. Esta es una prueba corta de voz.",
-  pt: "Ola. Este e um teste curto de voz.",
-  hi: "नमस्ते। यह एक छोटा आवाज परीक्षण है।",
-  fr: "Bonjour. Ceci est un court test vocal.",
-  it: "Ciao. Questo e un breve test vocale.",
+  en: "Hello",
+  de: "Hallo",
+  zh: "你好",
+  es: "Hola",
+  pt: "Ola",
+  hi: "नमस्ते",
+  fr: "Bonjour",
+  it: "Ciao",
 };
 
 function cancelLocalTtsIdleRelease() {
@@ -128,28 +109,6 @@ function scheduleLocalTtsIdleRelease() {
   localTtsIdleReleaseTimeout = setTimeout(() => {
     void releaseLocalTtsResources();
   }, LOCAL_TTS_IDLE_RELEASE_MS);
-}
-
-function getLocalTtsRootPath() {
-  return `${FileSystem.documentDirectory}local-tts`;
-}
-
-function getPiperVoiceConfig(voice: string) {
-  return PIPER_GERMAN_VOICES[voice as keyof typeof PIPER_GERMAN_VOICES] ?? null;
-}
-
-function getPiperVoiceRootPath(voice: string) {
-  return `${getLocalTtsRootPath()}/piper/de/${voice}`;
-}
-
-function getPiperModelPath(voice: string) {
-  const config = getPiperVoiceConfig(voice);
-  return config ? `${getPiperVoiceRootPath(voice)}/${config.modelFile}` : "";
-}
-
-function getPiperConfigPath(voice: string) {
-  const config = getPiperVoiceConfig(voice);
-  return config ? `${getPiperVoiceRootPath(voice)}/${config.configFile}` : "";
 }
 
 function getKokoroChineseVoiceConfig(voice: string) {
@@ -171,6 +130,14 @@ function isSherpaVitsLanguage(
 }
 
 function getSherpaVitsModelId(language: SherpaVitsLanguage, voice: string) {
+  if (language === "de") {
+    return (
+      GERMAN_PIPER_MODEL_IDS[
+        voice as keyof typeof GERMAN_PIPER_MODEL_IDS
+      ] ?? null
+    );
+  }
+
   return SHERPA_VITS_LANGUAGE_MODEL_IDS[language].some(
     (modelId) => modelId === voice,
   )
@@ -330,73 +297,6 @@ async function ensureKokoroMultilingualModelRootPath(language: "en" | "zh") {
   return rootPath;
 }
 
-async function ensureDirectory(path: string) {
-  const info = await FileSystem.getInfoAsync(path);
-
-  if (!info.exists) {
-    await FileSystem.makeDirectoryAsync(path, { intermediates: true });
-  }
-}
-
-async function ensureFileDownloaded(params: {
-  url: string;
-  path: string;
-  onProgress?: (progress: number) => void;
-}) {
-  const info = await FileSystem.getInfoAsync(params.path);
-
-  if (info.exists) {
-    params.onProgress?.(1);
-    return params.path;
-  }
-
-  const parent = params.path.split("/").slice(0, -1).join("/");
-  await ensureDirectory(parent);
-
-  const download = FileSystem.createDownloadResumable(
-    params.url,
-    params.path,
-    {},
-    (progress) => {
-      if (!params.onProgress || progress.totalBytesExpectedToWrite <= 0) {
-        return;
-      }
-
-      params.onProgress(
-        progress.totalBytesWritten / progress.totalBytesExpectedToWrite,
-      );
-    },
-  );
-
-  const result = await download.downloadAsync();
-
-  if (!result?.uri) {
-    throw new Error(`Download failed for ${params.url}`);
-  }
-
-  const persistedInfo = await FileSystem.getInfoAsync(params.path);
-
-  if (!persistedInfo.exists && result.uri !== params.path) {
-    const downloadedInfo = await FileSystem.getInfoAsync(result.uri);
-
-    if (downloadedInfo.exists) {
-      await FileSystem.copyAsync({
-        from: result.uri,
-        to: params.path,
-      });
-    }
-  }
-
-  const finalInfo = await FileSystem.getInfoAsync(params.path);
-
-  if (!finalInfo.exists) {
-    throw new Error(`Downloaded file is missing at ${params.path}`);
-  }
-
-  params.onProgress?.(1);
-  return params.path;
-}
-
 function bytesToBase64(bytes: Uint8Array) {
   const BufferCtor = (globalThis as any).Buffer;
 
@@ -474,85 +374,6 @@ async function writeWaveformFile(floatArray: Float32Array, sampleRate: number) {
     encoding: "base64",
   });
   return path;
-}
-
-function buildHuggingFaceResolveUrl(repoId: string, relativePath: string) {
-  const encodedPath = relativePath
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-
-  return `https://huggingface.co/${repoId}/resolve/main/${encodedPath}`;
-}
-
-async function listHuggingFaceRepoFiles(repoId: string) {
-  const cached = huggingFaceRepoFilesCache.get(repoId);
-
-  if (cached) {
-    return cached;
-  }
-
-  const request = (async () => {
-    const response = await fetch(`https://huggingface.co/api/models/${repoId}`);
-
-    if (!response.ok) {
-      throw new Error(`Couldn't list local voice pack files for ${repoId}.`);
-    }
-
-    const data = (await response.json()) as HuggingFaceModelResponse;
-    return (data.siblings ?? [])
-      .map((entry) => entry.rfilename)
-      .filter(
-        (value): value is string =>
-          typeof value === "string" && value.length > 0,
-      );
-  })().catch((error) => {
-    huggingFaceRepoFilesCache.delete(repoId);
-    throw error;
-  });
-
-  huggingFaceRepoFilesCache.set(repoId, request);
-  return request;
-}
-
-async function getPiperSession(voice: string) {
-  cancelLocalTtsIdleRelease();
-  const rootPath = getPiperVoiceRootPath(voice);
-  const cached = sherpaSessionCache.get(rootPath);
-
-  if (cached) {
-    return cached instanceof Promise ? cached : cached;
-  }
-
-  const promise = (async () => {
-    const [{ createTTS }, { fileModelPath }] = await Promise.all([
-      import("react-native-sherpa-onnx/tts"),
-      import("react-native-sherpa-onnx"),
-    ]);
-
-    const engine = await createTTS({
-      modelPath: fileModelPath(rootPath),
-      modelType: "vits",
-      numThreads: 2,
-      debug: false,
-    });
-
-    return {
-      engine,
-      rootPath,
-    };
-  })()
-    .then((state) => {
-      sherpaSessionCache.set(rootPath, state);
-      return state;
-    })
-    .catch((error) => {
-      sherpaSessionCache.delete(rootPath);
-      throw error;
-    });
-
-  sherpaSessionCache.set(rootPath, promise);
-  return promise;
 }
 
 async function getKokoroMultilingualSession(language: "en" | "zh") {
@@ -642,46 +463,6 @@ async function getSherpaVitsSession(modelId: string) {
 
   sherpaSessionCache.set(rootPath, promise);
   return promise;
-}
-
-async function installPiperVoicePack(params: {
-  voice: string;
-  onProgress?: (progress: number) => void;
-}) {
-  const config = getPiperVoiceConfig(params.voice);
-
-  if (!config) {
-    throw new Error(
-      "A local German voice pack is not configured for this voice.",
-    );
-  }
-
-  const repoFiles = await listHuggingFaceRepoFiles(config.repoId);
-  const filesToDownload = repoFiles.filter(
-    (file) =>
-      file === config.modelFile ||
-      file === config.configFile ||
-      file.startsWith("espeak-ng-data/"),
-  );
-
-  if (filesToDownload.length === 0) {
-    throw new Error("The local German voice pack files could not be resolved.");
-  }
-
-  for (const [index, file] of filesToDownload.entries()) {
-    const progressOffset = index / filesToDownload.length;
-    const progressWeight = 1 / filesToDownload.length;
-
-    await ensureFileDownloaded({
-      url: buildHuggingFaceResolveUrl(config.repoId, file),
-      path: `${getPiperVoiceRootPath(params.voice)}/${file}`,
-      onProgress: (progress) => {
-        params.onProgress?.(progressOffset + progress * progressWeight);
-      },
-    });
-  }
-
-  params.onProgress?.(1);
 }
 
 async function installKokoroChineseVoicePack(params: {
@@ -860,50 +641,7 @@ const LOCAL_TTS_STRATEGIES: Partial<
       );
     },
   },
-  de: {
-    getInstallStatus: async (voice) => {
-      const config = getPiperVoiceConfig(voice);
-
-      if (!config) {
-        return {
-          supported: true,
-          installed: false,
-          modelInstalled: false,
-          configInstalled: false,
-          dataInstalled: false,
-        };
-      }
-
-      const [modelInfo, configInfo, ...dataInfos] = await Promise.all([
-        FileSystem.getInfoAsync(getPiperModelPath(voice)),
-        FileSystem.getInfoAsync(getPiperConfigPath(voice)),
-        ...PIPER_DATA_MARKERS.map((file) =>
-          FileSystem.getInfoAsync(`${getPiperVoiceRootPath(voice)}/${file}`),
-        ),
-      ]);
-      const dataInstalled = dataInfos.every((info) => info.exists);
-
-      return {
-        supported: true,
-        installed: modelInfo.exists && configInfo.exists && dataInstalled,
-        modelInstalled: modelInfo.exists,
-        configInstalled: configInfo.exists,
-        dataInstalled,
-      };
-    },
-    install: async (params) => {
-      await installPiperVoicePack({
-        voice: params.voice,
-        onProgress: params.onProgress,
-      });
-    },
-    synthesize: async (params) => {
-      return synthesizePiperSpeech({
-        text: params.text,
-        voice: params.voice,
-      });
-    },
-  },
+  de: buildSherpaVitsStrategy("de"),
   zh: {
     getInstallStatus: async (voice) => {
       const voiceConfig = getKokoroChineseVoiceConfig(voice);
@@ -977,32 +715,6 @@ async function getRawLocalTtsInstallStatus(params: {
   return strategy.getInstallStatus(
     params.voice,
   ) as Promise<RawLocalTtsInstallStatus>;
-}
-
-async function synthesizePiperSpeech(params: { text: string; voice: string }) {
-  const status = await getRawLocalTtsInstallStatus({
-    language: "de",
-    voice: params.voice,
-  });
-
-  if (!status.installed) {
-    throw new Error("The German local voice pack is not installed yet.");
-  }
-
-  const sessionState = await getPiperSession(params.voice);
-  const audio = await sessionState.engine.generateSpeech(
-    normalizeText(params.text),
-    {
-      sid: 0,
-      speed: 1,
-    },
-  );
-
-  if (!audio?.samples || !audio?.sampleRate) {
-    throw new Error("The local German voice model did not return audio.");
-  }
-
-  return writeWaveformFile(Float32Array.from(audio.samples), audio.sampleRate);
 }
 
 async function synthesizeKokoroChineseSpeech(params: {
@@ -1174,6 +886,10 @@ export async function getLocalTtsInstallStatus(params: {
   language: TtsListenLanguage;
   voice: string;
 }): Promise<LocalTtsInstallStatus> {
+  const cacheKey = getLocalTtsVerificationCacheKey(
+    params.language,
+    params.voice,
+  );
   const rawStatus = await getRawLocalTtsInstallStatus(params);
 
   if (!rawStatus.supported) {
@@ -1197,14 +913,16 @@ export async function getLocalTtsInstallStatus(params: {
     };
   }
 
-  const verification = await verifyLocalTtsPack(params);
+  const cachedVerification = localTtsVerificationCache.get(cacheKey);
+  const verified = cachedVerification?.verified ?? false;
+  const verificationError = cachedVerification?.error ?? null;
 
   return {
     ...rawStatus,
     downloaded: true,
-    verified: verification.verified,
-    installed: verification.verified,
-    verificationError: verification.error,
+    verified,
+    installed: cachedVerification ? verified : true,
+    verificationError,
   };
 }
 

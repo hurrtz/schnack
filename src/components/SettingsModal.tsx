@@ -1494,7 +1494,7 @@ function LocalPackSection({
                           : t("localTtsPackMissing")
                     : t("localTtsUnsupportedLanguageFallback")}
                 </Text>
-                {supported && downloaded && !verified && error ? (
+                {supported && !downloading && error ? (
                   <Text
                     style={[
                       styles.previewHint,
