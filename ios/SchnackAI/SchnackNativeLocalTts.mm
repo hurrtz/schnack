@@ -148,112 +148,114 @@ RCT_REMAP_METHOD(initialize,
   }
 
   @try {
-    sherpa_onnx::cxx::OfflineTtsConfig nativeConfig;
-    nativeConfig.model.num_threads = numThreads != nil ? numThreads.intValue : 2;
-    nativeConfig.model.debug = debug != nil ? debug.boolValue : false;
-    nativeConfig.model.provider = provider.length > 0 ? std::string(provider.UTF8String) : "cpu";
+    try {
+      sherpa_onnx::cxx::OfflineTtsConfig nativeConfig;
+      nativeConfig.model.num_threads = numThreads != nil ? numThreads.intValue : 2;
+      nativeConfig.model.debug = debug != nil ? debug.boolValue : false;
+      nativeConfig.model.provider = provider.length > 0 ? std::string(provider.UTF8String) : "cpu";
 
-    std::string modelTypeValue(modelType.UTF8String);
-    if (modelTypeValue == "vits") {
-      nativeConfig.model.vits.model = std::string(modelPath.UTF8String);
-      nativeConfig.model.vits.tokens = std::string(tokensPath.UTF8String);
-      nativeConfig.model.vits.data_dir = std::string(dataDirPath.UTF8String);
+      std::string modelTypeValue(modelType.UTF8String);
+      if (modelTypeValue == "vits") {
+        nativeConfig.model.vits.model = std::string(modelPath.UTF8String);
+        nativeConfig.model.vits.tokens = std::string(tokensPath.UTF8String);
+        nativeConfig.model.vits.data_dir = std::string(dataDirPath.UTF8String);
 
-      NSString *lexiconPath = config[@"lexiconPath"];
-      if (FileExists(lexiconPath)) {
-        nativeConfig.model.vits.lexicon = std::string(lexiconPath.UTF8String);
-      }
+        NSString *lexiconPath = config[@"lexiconPath"];
+        if (FileExists(lexiconPath)) {
+          nativeConfig.model.vits.lexicon = std::string(lexiconPath.UTF8String);
+        }
 
-      NSNumber *noiseScale = config[@"noiseScale"];
-      NSNumber *noiseScaleW = config[@"noiseScaleW"];
-      NSNumber *lengthScale = config[@"lengthScale"];
-      if (noiseScale != nil) {
-        nativeConfig.model.vits.noise_scale = noiseScale.floatValue;
-      }
-      if (noiseScaleW != nil) {
-        nativeConfig.model.vits.noise_scale_w = noiseScaleW.floatValue;
-      }
-      if (lengthScale != nil) {
-        nativeConfig.model.vits.length_scale = lengthScale.floatValue;
-      }
-    } else if (modelTypeValue == "kokoro") {
-      NSString *voicesPath = config[@"voicesPath"];
-      if (!FileExists(voicesPath)) {
+        NSNumber *noiseScale = config[@"noiseScale"];
+        NSNumber *noiseScaleW = config[@"noiseScaleW"];
+        NSNumber *lengthScale = config[@"lengthScale"];
+        if (noiseScale != nil) {
+          nativeConfig.model.vits.noise_scale = noiseScale.floatValue;
+        }
+        if (noiseScaleW != nil) {
+          nativeConfig.model.vits.noise_scale_w = noiseScaleW.floatValue;
+        }
+        if (lengthScale != nil) {
+          nativeConfig.model.vits.length_scale = lengthScale.floatValue;
+        }
+      } else if (modelTypeValue == "kokoro") {
+        NSString *voicesPath = config[@"voicesPath"];
+        if (!FileExists(voicesPath)) {
+          reject(@"local_tts_init_error",
+                 @"The Kokoro voices file is missing.",
+                 nil);
+          return;
+        }
+
+        nativeConfig.model.kokoro.model = std::string(modelPath.UTF8String);
+        nativeConfig.model.kokoro.tokens = std::string(tokensPath.UTF8String);
+        nativeConfig.model.kokoro.data_dir = std::string(dataDirPath.UTF8String);
+        nativeConfig.model.kokoro.voices = std::string(voicesPath.UTF8String);
+
+        NSArray<NSString *> *lexiconPaths = config[@"lexiconPaths"];
+        NSString *joinedLexiconPaths = JoinLexiconPaths(lexiconPaths ?: @[]);
+        if (joinedLexiconPaths.length > 0) {
+          nativeConfig.model.kokoro.lexicon = std::string(joinedLexiconPaths.UTF8String);
+        }
+
+        NSString *lang = config[@"lang"];
+        if (lang.length > 0) {
+          nativeConfig.model.kokoro.lang = std::string(lang.UTF8String);
+        }
+
+        NSNumber *lengthScale = config[@"lengthScale"];
+        if (lengthScale != nil) {
+          nativeConfig.model.kokoro.length_scale = lengthScale.floatValue;
+        }
+      } else {
         reject(@"local_tts_init_error",
-               @"The Kokoro voices file is missing.",
+               [NSString stringWithFormat:@"Unsupported model type: %@", modelType],
                nil);
         return;
       }
 
-      nativeConfig.model.kokoro.model = std::string(modelPath.UTF8String);
-      nativeConfig.model.kokoro.tokens = std::string(tokensPath.UTF8String);
-      nativeConfig.model.kokoro.data_dir = std::string(dataDirPath.UTF8String);
-      nativeConfig.model.kokoro.voices = std::string(voicesPath.UTF8String);
-
-      NSArray<NSString *> *lexiconPaths = config[@"lexiconPaths"];
-      NSString *joinedLexiconPaths = JoinLexiconPaths(lexiconPaths ?: @[]);
-      if (joinedLexiconPaths.length > 0) {
-        nativeConfig.model.kokoro.lexicon = std::string(joinedLexiconPaths.UTF8String);
+      NSString *ruleFsts = config[@"ruleFsts"];
+      if (ruleFsts.length > 0) {
+        nativeConfig.rule_fsts = std::string(ruleFsts.UTF8String);
+      }
+      NSString *ruleFars = config[@"ruleFars"];
+      if (ruleFars.length > 0) {
+        nativeConfig.rule_fars = std::string(ruleFars.UTF8String);
+      }
+      NSNumber *maxNumSentences = config[@"maxNumSentences"];
+      if (maxNumSentences != nil && maxNumSentences.intValue >= 1) {
+        nativeConfig.max_num_sentences = maxNumSentences.intValue;
+      }
+      NSNumber *silenceScale = config[@"silenceScale"];
+      if (silenceScale != nil) {
+        nativeConfig.silence_scale = silenceScale.floatValue;
       }
 
-      NSString *lang = config[@"lang"];
-      if (lang.length > 0) {
-        nativeConfig.model.kokoro.lang = std::string(lang.UTF8String);
-      }
+      RCTLogInfo(@"[SchnackNativeLocalTts] initialize instance=%@ modelType=%@ model=%@ tokens=%@ dataDir=%@",
+                 instanceId,
+                 modelType,
+                 modelPath,
+                 tokensPath,
+                 dataDirPath);
 
-      NSNumber *lengthScale = config[@"lengthScale"];
-      if (lengthScale != nil) {
-        nativeConfig.model.kokoro.length_scale = lengthScale.floatValue;
-      }
-    } else {
+      auto state = std::make_shared<SchnackLocalTtsState>();
+      state->modelType = modelTypeValue;
+      state->tts = sherpa_onnx::cxx::OfflineTts::Create(nativeConfig);
+
+      std::lock_guard<std::mutex> lock(g_local_tts_mutex);
+      g_local_tts_instances[std::string(instanceId.UTF8String)] = state;
+
+      resolve(@YES);
+    } catch (const std::exception &exception) {
       reject(@"local_tts_init_error",
-             [NSString stringWithFormat:@"Unsupported model type: %@", modelType],
+             [NSString stringWithUTF8String:exception.what()],
              nil);
-      return;
+    } catch (...) {
+      reject(@"local_tts_init_error",
+             @"Unknown local TTS initialization error.",
+             nil);
     }
-
-    NSString *ruleFsts = config[@"ruleFsts"];
-    if (ruleFsts.length > 0) {
-      nativeConfig.rule_fsts = std::string(ruleFsts.UTF8String);
-    }
-    NSString *ruleFars = config[@"ruleFars"];
-    if (ruleFars.length > 0) {
-      nativeConfig.rule_fars = std::string(ruleFars.UTF8String);
-    }
-    NSNumber *maxNumSentences = config[@"maxNumSentences"];
-    if (maxNumSentences != nil && maxNumSentences.intValue >= 1) {
-      nativeConfig.max_num_sentences = maxNumSentences.intValue;
-    }
-    NSNumber *silenceScale = config[@"silenceScale"];
-    if (silenceScale != nil) {
-      nativeConfig.silence_scale = silenceScale.floatValue;
-    }
-
-    RCTLogInfo(@"[SchnackNativeLocalTts] initialize instance=%@ modelType=%@ model=%@ tokens=%@ dataDir=%@",
-               instanceId,
-               modelType,
-               modelPath,
-               tokensPath,
-               dataDirPath);
-
-    auto state = std::make_shared<SchnackLocalTtsState>();
-    state->modelType = modelTypeValue;
-    state->tts = sherpa_onnx::cxx::OfflineTts::Create(nativeConfig);
-
-    std::lock_guard<std::mutex> lock(g_local_tts_mutex);
-    g_local_tts_instances[std::string(instanceId.UTF8String)] = state;
-
-    resolve(@YES);
   } @catch (NSException *exception) {
     reject(@"local_tts_init_error", exception.reason, nil);
-  } catch (const std::exception &exception) {
-    reject(@"local_tts_init_error",
-           [NSString stringWithUTF8String:exception.what()],
-           nil);
-  } catch (...) {
-    reject(@"local_tts_init_error",
-           @"Unknown local TTS initialization error.",
-           nil);
   }
 }
 
@@ -285,46 +287,48 @@ RCT_REMAP_METHOD(generateToFile,
   }
 
   @try {
-    auto audio = state->tts.value().Generate(std::string(text.UTF8String),
-                                             static_cast<int32_t>(speakerId),
-                                             static_cast<float>(speed));
+    try {
+      auto audio = state->tts.value().Generate(std::string(text.UTF8String),
+                                               static_cast<int32_t>(speakerId),
+                                               static_cast<float>(speed));
 
-    if (audio.samples.empty() || audio.sample_rate <= 0) {
+      if (audio.samples.empty() || audio.sample_rate <= 0) {
+        reject(@"local_tts_generate_error",
+               @"The local TTS engine produced no audio.",
+               nil);
+        return;
+      }
+
+      NSString *targetPath = outputPath;
+      if (targetPath.length == 0) {
+        NSString *tmpName = [NSString stringWithFormat:@"local-tts-%@-%@.wav",
+                                                       instanceId,
+                                                       NSUUID.UUID.UUIDString];
+        targetPath = [NSTemporaryDirectory() stringByAppendingPathComponent:tmpName];
+      }
+
+      BOOL saved = SaveWavFile(audio.samples,
+                               audio.sample_rate,
+                               std::string(targetPath.UTF8String));
+      if (!saved) {
+        reject(@"local_tts_generate_error",
+               @"The generated local TTS audio could not be saved.",
+               nil);
+        return;
+      }
+
+      resolve(targetPath);
+    } catch (const std::exception &exception) {
       reject(@"local_tts_generate_error",
-             @"The local TTS engine produced no audio.",
+             [NSString stringWithUTF8String:exception.what()],
              nil);
-      return;
-    }
-
-    NSString *targetPath = outputPath;
-    if (targetPath.length == 0) {
-      NSString *tmpName = [NSString stringWithFormat:@"local-tts-%@-%@.wav",
-                                                     instanceId,
-                                                     NSUUID.UUID.UUIDString];
-      targetPath = [NSTemporaryDirectory() stringByAppendingPathComponent:tmpName];
-    }
-
-    BOOL saved = SaveWavFile(audio.samples,
-                             audio.sample_rate,
-                             std::string(targetPath.UTF8String));
-    if (!saved) {
+    } catch (...) {
       reject(@"local_tts_generate_error",
-             @"The generated local TTS audio could not be saved.",
+             @"Unknown local TTS generation error.",
              nil);
-      return;
     }
-
-    resolve(targetPath);
   } @catch (NSException *exception) {
     reject(@"local_tts_generate_error", exception.reason, nil);
-  } catch (const std::exception &exception) {
-    reject(@"local_tts_generate_error",
-           [NSString stringWithUTF8String:exception.what()],
-           nil);
-  } catch (...) {
-    reject(@"local_tts_generate_error",
-           @"Unknown local TTS generation error.",
-           nil);
   }
 }
 

@@ -393,6 +393,7 @@ RCT_REMAP_METHOD(stop,
 
 - (void)invalidate
 {
+  [super invalidate];
   [[NSNotificationCenter defaultCenter] removeObserver:self];
   [self detachPlayerObserversIfNeeded];
   [_player pause];
