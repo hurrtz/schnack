@@ -1601,7 +1601,7 @@ function LocalPackSection({
                 ) : null}
               </View>
 
-              {supported && !installed ? (
+              {supported && !downloaded ? (
                 <TouchableOpacity
                   activeOpacity={0.9}
                   onPress={() => {
@@ -1629,9 +1629,7 @@ function LocalPackSection({
                     <Text style={styles.localPackButtonText}>
                       {downloading
                         ? t("downloadingShort")
-                        : downloaded
-                          ? t("retry")
-                          : t("download")}
+                        : t("download")}
                     </Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -1651,7 +1649,7 @@ function LocalPackSection({
               </View>
             ) : null}
 
-            {installed && voiceOptions.length > 0 ? (
+            {downloaded && voiceOptions.length > 0 ? (
               <View style={styles.localPackPreview}>
                 <PreviewComposer
                   text={localPreviewTexts[entry]}

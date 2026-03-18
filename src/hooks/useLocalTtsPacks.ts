@@ -60,6 +60,15 @@ export function useLocalTtsPacks(settings: Settings) {
   const installLanguagePack = useCallback(
     async (language: TtsListenLanguage) => {
       let installError: Error | null = null;
+      let installedStatus:
+        | {
+            supported: boolean;
+            downloaded: boolean;
+            verified: boolean;
+            installed: boolean;
+            verificationError: string | null;
+          }
+        | null = null;
 
       setPackStates((previous) => ({
         ...previous,
@@ -102,10 +111,11 @@ export function useLocalTtsPacks(settings: Settings) {
           language,
           voice: settings.localTtsVoices[language],
         });
+        installedStatus = status;
 
-        if (!status.installed) {
+        if (!status.downloaded) {
           throw new Error(
-            "The local voice pack download finished, but the files could not be verified on this device.",
+            "The local voice pack download finished, but the files could not be found on this device.",
           );
         }
       } catch (error) {
@@ -136,6 +146,8 @@ export function useLocalTtsPacks(settings: Settings) {
           }));
         }
       }
+
+      return installedStatus;
     },
     [refreshPackStates, settings.localTtsVoices],
   );

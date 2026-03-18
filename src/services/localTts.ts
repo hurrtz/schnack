@@ -1051,7 +1051,7 @@ export async function getLocalTtsInstallStatus(params: {
       ...rawStatus,
       downloaded: rawStatus.installed,
       verified: false,
-      installed: false,
+      installed: rawStatus.installed,
       verificationError: unavailableReason,
     };
   }
@@ -1075,7 +1075,7 @@ export async function getLocalTtsInstallStatus(params: {
     ...rawStatus,
     downloaded: true,
     verified,
-    installed: cachedVerification ? verified : true,
+    installed: rawStatus.installed,
     verificationError,
   };
 }

@@ -41,6 +41,21 @@ static NSString *SchnackNativeLocalTtsUnavailableReason() {
 #endif
 }
 
+static NSString *ResolveLocalFilesystemPath(NSString *path) {
+  if (path == nil || path.length == 0) {
+    return nil;
+  }
+
+  if ([path hasPrefix:@"file://"]) {
+    NSURL *fileURL = [NSURL URLWithString:path];
+    if (fileURL.isFileURL && fileURL.path.length > 0) {
+      return fileURL.path;
+    }
+  }
+
+  return path;
+}
+
 static bool SaveWavFile(const std::vector<float> &samples,
                         int32_t sampleRate,
                         const std::string &filePath) {
@@ -90,14 +105,36 @@ static bool SaveWavFile(const std::vector<float> &samples,
 }
 
 static bool FileExists(NSString *path) {
-  return path != nil && [[NSFileManager defaultManager] fileExistsAtPath:path];
+  NSString *resolvedPath = ResolveLocalFilesystemPath(path);
+  return resolvedPath != nil &&
+         [[NSFileManager defaultManager] fileExistsAtPath:resolvedPath];
+}
+
+static bool EnsureParentDirectoryExists(NSString *path, NSError **error) {
+  NSString *resolvedPath = ResolveLocalFilesystemPath(path);
+  if (resolvedPath.length == 0) {
+    return false;
+  }
+
+  NSString *directoryPath = [resolvedPath stringByDeletingLastPathComponent];
+  if (directoryPath.length == 0) {
+    return false;
+  }
+
+  return [[NSFileManager defaultManager] createDirectoryAtPath:directoryPath
+                                   withIntermediateDirectories:YES
+                                                    attributes:nil
+                                                         error:error];
 }
 
 static NSString *JoinLexiconPaths(NSArray<NSString *> *paths) {
   NSMutableArray<NSString *> *existing = [NSMutableArray array];
   for (NSString *path in paths) {
     if ([path isKindOfClass:[NSString class]] && FileExists(path)) {
-      [existing addObject:path];
+      NSString *resolvedPath = ResolveLocalFilesystemPath(path);
+      if (resolvedPath.length > 0) {
+        [existing addObject:resolvedPath];
+      }
     }
   }
 
@@ -188,14 +225,18 @@ RCT_REMAP_METHOD(initialize,
       nativeConfig.model.provider = provider.length > 0 ? std::string(provider.UTF8String) : "cpu";
 
       std::string modelTypeValue(modelType.UTF8String);
+      NSString *resolvedModelPath = ResolveLocalFilesystemPath(modelPath);
+      NSString *resolvedTokensPath = ResolveLocalFilesystemPath(tokensPath);
+      NSString *resolvedDataDirPath = ResolveLocalFilesystemPath(dataDirPath);
       if (modelTypeValue == "vits") {
-        nativeConfig.model.vits.model = std::string(modelPath.UTF8String);
-        nativeConfig.model.vits.tokens = std::string(tokensPath.UTF8String);
-        nativeConfig.model.vits.data_dir = std::string(dataDirPath.UTF8String);
+        nativeConfig.model.vits.model = std::string(resolvedModelPath.UTF8String);
+        nativeConfig.model.vits.tokens = std::string(resolvedTokensPath.UTF8String);
+        nativeConfig.model.vits.data_dir = std::string(resolvedDataDirPath.UTF8String);
 
         NSString *lexiconPath = config[@"lexiconPath"];
         if (FileExists(lexiconPath)) {
-          nativeConfig.model.vits.lexicon = std::string(lexiconPath.UTF8String);
+          NSString *resolvedLexiconPath = ResolveLocalFilesystemPath(lexiconPath);
+          nativeConfig.model.vits.lexicon = std::string(resolvedLexiconPath.UTF8String);
         }
 
         NSNumber *noiseScale = config[@"noiseScale"];
@@ -219,10 +260,11 @@ RCT_REMAP_METHOD(initialize,
           return;
         }
 
-        nativeConfig.model.kokoro.model = std::string(modelPath.UTF8String);
-        nativeConfig.model.kokoro.tokens = std::string(tokensPath.UTF8String);
-        nativeConfig.model.kokoro.data_dir = std::string(dataDirPath.UTF8String);
-        nativeConfig.model.kokoro.voices = std::string(voicesPath.UTF8String);
+        NSString *resolvedVoicesPath = ResolveLocalFilesystemPath(voicesPath);
+        nativeConfig.model.kokoro.model = std::string(resolvedModelPath.UTF8String);
+        nativeConfig.model.kokoro.tokens = std::string(resolvedTokensPath.UTF8String);
+        nativeConfig.model.kokoro.data_dir = std::string(resolvedDataDirPath.UTF8String);
+        nativeConfig.model.kokoro.voices = std::string(resolvedVoicesPath.UTF8String);
 
         NSArray<NSString *> *lexiconPaths = config[@"lexiconPaths"];
         NSString *joinedLexiconPaths = JoinLexiconPaths(lexiconPaths ?: @[]);
@@ -371,12 +413,22 @@ RCT_REMAP_METHOD(generateToFile,
         targetPath = [NSTemporaryDirectory() stringByAppendingPathComponent:tmpName];
       }
 
-      NSLog(@"[SchnackNativeLocalTts] save wav begin instance=%@ output=%@",
+      NSString *resolvedTargetPath = ResolveLocalFilesystemPath(targetPath);
+      NSError *directoryError = nil;
+      if (!EnsureParentDirectoryExists(resolvedTargetPath, &directoryError)) {
+        reject(@"local_tts_generate_error",
+               directoryError.localizedDescription ?: @"The generated local TTS audio directory could not be prepared.",
+               nil);
+        return;
+      }
+
+      NSLog(@"[SchnackNativeLocalTts] save wav begin instance=%@ output=%@ resolved=%@",
             instanceId,
-            targetPath);
+            targetPath,
+            resolvedTargetPath);
       BOOL saved = SaveWavFile(audio.samples,
                                audio.sample_rate,
-                               std::string(targetPath.UTF8String));
+                               std::string(resolvedTargetPath.UTF8String));
       NSLog(@"[SchnackNativeLocalTts] save wav finished instance=%@ saved=%@",
             instanceId,
             saved ? @"yes" : @"no");

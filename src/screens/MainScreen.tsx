@@ -246,12 +246,15 @@ export function MainScreen() {
   const handleInstallLocalTtsLanguage = useCallback(
     async (languageCode: TtsListenLanguage) => {
       try {
-        await installLanguagePack(languageCode);
-        showToast(
-          t("localTtsPackInstalled", {
-            languageLabel: getTtsListenLanguageLabel(languageCode, language),
-          }),
-        );
+        const status = await installLanguagePack(languageCode);
+        const languageLabel = getTtsListenLanguageLabel(languageCode, language);
+
+        if (status?.downloaded && !status.verified) {
+          showToast(status.verificationError || t("localTtsPackBroken"));
+          return;
+        }
+
+        showToast(t("localTtsPackInstalled", { languageLabel }));
       } catch (error) {
         showToast(
           error instanceof Error
@@ -800,16 +803,14 @@ export function MainScreen() {
           voice: request.voice,
         });
 
-        if (!localStatus.installed) {
+        if (!localStatus.downloaded) {
           showToast(
-            localStatus.downloaded
-              ? localStatus.verificationError || t("localTtsPackBroken")
-              : t("downloadSelectedLocalVoiceFirst", {
-                  languageLabel: getTtsListenLanguageLabel(
-                    request.localLanguage,
-                    language,
-                  ),
-                }),
+            t("downloadSelectedLocalVoiceFirst", {
+              languageLabel: getTtsListenLanguageLabel(
+                request.localLanguage,
+                language,
+              ),
+            }),
           );
           return;
         }

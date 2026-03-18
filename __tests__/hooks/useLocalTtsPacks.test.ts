@@ -24,14 +24,29 @@ describe("useLocalTtsPacks", () => {
     jest.clearAllMocks();
   });
 
-  it("clears the downloading state when install verification fails", async () => {
-    getLocalTtsInstallStatus.mockResolvedValue({
-      supported: true,
-      downloaded: false,
-      verified: false,
-      installed: false,
-      verificationError: null,
-    });
+  it("keeps a downloaded pack available when verification fails", async () => {
+    getLocalTtsInstallStatus
+      .mockResolvedValueOnce({
+        supported: true,
+        downloaded: false,
+        verified: false,
+        installed: false,
+        verificationError: null,
+      })
+      .mockResolvedValueOnce({
+        supported: true,
+        downloaded: true,
+        verified: false,
+        installed: true,
+        verificationError: "The local voice pack failed verification.",
+      })
+      .mockResolvedValueOnce({
+        supported: true,
+        downloaded: true,
+        verified: false,
+        installed: true,
+        verificationError: "The local voice pack failed verification.",
+      });
     installLocalTtsPack.mockImplementation(
       async ({ onProgress }: { onProgress?: (progress: number) => void }) => {
         onProgress?.(1);
@@ -53,17 +68,16 @@ describe("useLocalTtsPacks", () => {
       }
     });
 
-    expect(installError?.message).toContain("could not be verified");
+    expect(installError).toBeNull();
     await waitFor(() => {
       expect(result.current.packStates.en).toEqual({
         supported: true,
-        downloaded: false,
+        downloaded: true,
         verified: false,
-        installed: false,
+        installed: true,
         downloading: false,
         progress: 0,
-        error:
-          "The local voice pack download finished, but the files could not be verified on this device.",
+        error: "The local voice pack failed verification.",
       });
     });
   });
@@ -120,12 +134,12 @@ describe("useLocalTtsPacks", () => {
     });
   });
 
-  it("surfaces a downloaded but broken pack as not installed", async () => {
+  it("surfaces a downloaded but broken pack as downloaded but unverified", async () => {
     getLocalTtsInstallStatus.mockResolvedValue({
       supported: true,
       downloaded: true,
       verified: false,
-      installed: false,
+      installed: true,
       verificationError: "The local voice pack failed verification.",
     });
 
@@ -136,7 +150,7 @@ describe("useLocalTtsPacks", () => {
         supported: true,
         downloaded: true,
         verified: false,
-        installed: false,
+        installed: true,
         downloading: false,
         progress: 0,
         error: "The local voice pack failed verification.",
