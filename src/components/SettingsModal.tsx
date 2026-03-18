@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import * as Speech from "expo-speech";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -114,6 +115,7 @@ type SettingsTab = "instructions" | "providers" | "stt" | "tts" | "ui";
 type TextInputFocusHandler = NonNullable<
   React.ComponentProps<typeof TextInput>["onFocus"]
 >;
+type ApiKeyClipboardStatus = "idle" | "pasted" | "copied" | "empty";
 
 const TABS: SettingsTab[] = ["instructions", "providers", "stt", "tts", "ui"];
 
@@ -536,6 +538,8 @@ function ProviderSection({
     focusProvider ?? settings.lastProvider,
   );
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const [clipboardStatus, setClipboardStatus] =
+    useState<ApiKeyClipboardStatus>("idle");
   const [validationStateByProvider, setValidationStateByProvider] = useState<
     Partial<
       Record<
@@ -554,6 +558,7 @@ function ProviderSection({
 
   useEffect(() => {
     setApiKeyVisible(false);
+    setClipboardStatus("idle");
   }, [selectedProvider]);
 
   const selectedProviderApiKey = settings.apiKeys[selectedProvider];
@@ -650,6 +655,40 @@ function ProviderSection({
         },
       }));
     }
+  };
+
+  useEffect(() => {
+    if (clipboardStatus === "idle") {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setClipboardStatus("idle");
+    }, 1800);
+
+    return () => clearTimeout(timeout);
+  }, [clipboardStatus]);
+
+  const handlePasteApiKey = async () => {
+    const clipboardValue = (await Clipboard.getStringAsync()).trim();
+
+    if (!clipboardValue) {
+      setClipboardStatus("empty");
+      return;
+    }
+
+    onUpdateApiKey(selectedProvider, clipboardValue);
+    setClipboardStatus("pasted");
+  };
+
+  const handleCopyApiKey = async () => {
+    if (!selectedProviderApiKey.trim()) {
+      setClipboardStatus("empty");
+      return;
+    }
+
+    await Clipboard.setStringAsync(selectedProviderApiKey);
+    setClipboardStatus("copied");
   };
 
   return (
@@ -905,6 +944,10 @@ function ProviderSection({
             textContentType="password"
             importantForAutofill="no"
             spellCheck={false}
+            contextMenuHidden={false}
+            selectTextOnFocus={apiKeyVisible}
+            keyboardType="ascii-capable"
+            returnKeyType="done"
             secureTextEntry={secureApiKey}
             style={[
               styles.apiKeyInput,
@@ -935,6 +978,48 @@ function ProviderSection({
             />
           </TouchableOpacity>
         </View>
+        <View style={styles.apiKeyActionRow}>
+          <TouchableOpacity
+            style={[
+              styles.apiKeyLinkButton,
+              styles.apiKeyActionButton,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+              },
+            ]}
+            onPress={() => {
+              void handlePasteApiKey();
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
+              {clipboardStatus === "pasted" ? t("pasted") : t("paste")}
+            </Text>
+            <Feather name="clipboard" size={14} color={colors.accent} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.apiKeyLinkButton,
+              styles.apiKeyActionButton,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+                opacity: hasApiKey ? 1 : 0.5,
+              },
+            ]}
+            onPress={() => {
+              void handleCopyApiKey();
+            }}
+            activeOpacity={0.85}
+            disabled={!hasApiKey}
+          >
+            <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
+              {clipboardStatus === "copied" ? t("copied") : t("copy")}
+            </Text>
+            <Feather name="copy" size={14} color={colors.accent} />
+          </TouchableOpacity>
+        </View>
         <Text
           style={[
             styles.sectionHint,
@@ -943,6 +1028,16 @@ function ProviderSection({
         >
           {t("apiKeyProtectedHint")}
         </Text>
+        {clipboardStatus === "empty" ? (
+          <Text
+            style={[
+              styles.sectionHint,
+              { color: colors.textMuted, marginTop: 6 },
+            ]}
+          >
+            {t("clipboardEmpty")}
+          </Text>
+        ) : null}
         {validationState.status !== "idle" && validationState.message ? (
           <View
             style={[
