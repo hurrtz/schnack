@@ -18,6 +18,7 @@ import type { TtsListenLanguage } from "../types";
 import {
   createNativeLocalTtsEngine,
   isNativeLocalTtsAvailable,
+  getNativeLocalTtsUnavailableReason,
 } from "./nativeLocalTts";
 
 const KOKORO_MULTILINGUAL_MODEL_ID = "kokoro-multi-lang-v1_0";
@@ -114,6 +115,18 @@ function scheduleLocalTtsIdleRelease() {
   localTtsIdleReleaseTimeout = setTimeout(() => {
     void releaseLocalTtsResources();
   }, LOCAL_TTS_IDLE_RELEASE_MS);
+}
+
+function getLocalTtsRuntimeUnavailableReason() {
+  if (Platform.OS !== "ios") {
+    return null;
+  }
+
+  if (!isNativeLocalTtsAvailable()) {
+    return null;
+  }
+
+  return getNativeLocalTtsUnavailableReason();
 }
 
 function getKokoroChineseVoiceConfig(voice: string) {
@@ -943,6 +956,16 @@ export async function verifyLocalTtsPack(params: {
     language: params.language,
     voice: params.voice,
   });
+  const unavailableReason = getLocalTtsRuntimeUnavailableReason();
+
+  if (unavailableReason) {
+    const unsupportedOnDevice = {
+      verified: false,
+      error: unavailableReason,
+    };
+    setLocalTtsVerification(params.language, params.voice, unsupportedOnDevice);
+    return unsupportedOnDevice;
+  }
 
   if (!rawStatus.installed) {
     const missing = {
@@ -1011,6 +1034,7 @@ export async function getLocalTtsInstallStatus(params: {
     params.voice,
   );
   const rawStatus = await getRawLocalTtsInstallStatus(params);
+  const unavailableReason = getLocalTtsRuntimeUnavailableReason();
 
   if (!rawStatus.supported) {
     return {
@@ -1019,6 +1043,16 @@ export async function getLocalTtsInstallStatus(params: {
       verified: false,
       installed: false,
       verificationError: null,
+    };
+  }
+
+  if (unavailableReason) {
+    return {
+      ...rawStatus,
+      downloaded: rawStatus.installed,
+      verified: false,
+      installed: false,
+      verificationError: unavailableReason,
     };
   }
 
@@ -1051,6 +1085,11 @@ export async function installLocalTtsPack(params: {
   voice: string;
   onProgress?: (progress: number) => void;
 }) {
+  const unavailableReason = getLocalTtsRuntimeUnavailableReason();
+  if (unavailableReason) {
+    throw new Error(unavailableReason);
+  }
+
   const strategy = LOCAL_TTS_STRATEGIES[params.language];
 
   if (!strategy) {
@@ -1091,6 +1130,11 @@ export async function synthesizeLocalSpeech(params: {
   voice: string;
 }) {
   try {
+    const unavailableReason = getLocalTtsRuntimeUnavailableReason();
+    if (unavailableReason) {
+      throw new Error(unavailableReason);
+    }
+
     const strategy = LOCAL_TTS_STRATEGIES[params.language];
 
     if (!strategy) {

@@ -1,4 +1,5 @@
 #import <Foundation/Foundation.h>
+#import <TargetConditionals.h>
 #import <React/RCTBridgeModule.h>
 #import <React/RCTLog.h>
 
@@ -31,6 +32,14 @@ struct SchnackLocalTtsState {
 
 static std::unordered_map<std::string, std::shared_ptr<SchnackLocalTtsState>> g_local_tts_instances;
 static std::mutex g_local_tts_mutex;
+
+static NSString *SchnackNativeLocalTtsUnavailableReason() {
+#if TARGET_OS_SIMULATOR
+  return @"Local offline TTS currently requires a physical iPhone. The iOS simulator backend crashes inside sherpa during initialization.";
+#else
+  return nil;
+#endif
+}
 
 static bool SaveWavFile(const std::vector<float> &samples,
                         int32_t sampleRate,
@@ -109,6 +118,21 @@ RCT_EXPORT_MODULE();
   return NO;
 }
 
+- (NSDictionary *)constantsToExport
+{
+  NSString *reason = SchnackNativeLocalTtsUnavailableReason();
+  return @{
+    @"isSimulator": @(
+#if TARGET_OS_SIMULATOR
+      YES
+#else
+      NO
+#endif
+    ),
+    @"unavailableReason": reason ?: [NSNull null],
+  };
+}
+
 - (dispatch_queue_t)methodQueue
 {
   return dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0);
@@ -122,6 +146,12 @@ RCT_REMAP_METHOD(initialize,
 {
   if (instanceId.length == 0) {
     reject(@"local_tts_init_error", @"instanceId is required.", nil);
+    return;
+  }
+
+  NSString *unavailableReason = SchnackNativeLocalTtsUnavailableReason();
+  if (unavailableReason != nil) {
+    reject(@"local_tts_init_error", unavailableReason, nil);
     return;
   }
 
@@ -289,6 +319,12 @@ RCT_REMAP_METHOD(generateToFile,
 {
   if (instanceId.length == 0 || text.length == 0) {
     reject(@"local_tts_generate_error", @"instanceId and text are required.", nil);
+    return;
+  }
+
+  NSString *unavailableReason = SchnackNativeLocalTtsUnavailableReason();
+  if (unavailableReason != nil) {
+    reject(@"local_tts_generate_error", unavailableReason, nil);
     return;
   }
 

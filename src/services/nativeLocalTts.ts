@@ -38,6 +38,8 @@ type NativeLocalTtsConfig =
     };
 
 type NativeLocalTtsModule = {
+  isSimulator?: boolean;
+  unavailableReason?: string | null;
   initialize(instanceId: string, config: NativeLocalTtsConfig): Promise<boolean>;
   generateToFile(
     instanceId: string,
@@ -59,7 +61,28 @@ export function isNativeLocalTtsAvailable() {
   return Platform.OS === "ios" && !!nativeModule;
 }
 
+export function getNativeLocalTtsUnavailableReason() {
+  if (Platform.OS !== "ios") {
+    return null;
+  }
+
+  if (!nativeModule) {
+    return "The native local TTS bridge is not available.";
+  }
+
+  return nativeModule.unavailableReason ?? null;
+}
+
+export function isNativeLocalTtsSupportedOnCurrentDevice() {
+  return isNativeLocalTtsAvailable() && !getNativeLocalTtsUnavailableReason();
+}
+
 export async function createNativeLocalTtsEngine(config: NativeLocalTtsConfig) {
+  const unavailableReason = getNativeLocalTtsUnavailableReason();
+  if (unavailableReason) {
+    throw new Error(unavailableReason);
+  }
+
   if (!nativeModule || Platform.OS !== "ios") {
     throw new Error("The native local TTS bridge is not available.");
   }
