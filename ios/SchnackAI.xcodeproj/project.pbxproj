@@ -388,6 +388,17 @@
 					"$(inherited)",
 					"FB_SONARKIT_ENABLED=1",
 				);
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios/archive",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios/model_detect",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios/online_stt",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios/stt",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios/tts",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios/Frameworks/sherpa_onnx.xcframework/ios-arm64/Headers",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios/Frameworks/sherpa_onnx.xcframework/ios-arm64_x86_64-simulator/Headers",
+				);
 				INFOPLIST_FILE = SchnackAI/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Schnack AI";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
@@ -431,6 +442,17 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y295UCE38G;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios/archive",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios/model_detect",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios/online_stt",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios/stt",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios/tts",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios/Frameworks/sherpa_onnx.xcframework/ios-arm64/Headers",
+					"$(SRCROOT)/../node_modules/react-native-sherpa-onnx/ios/Frameworks/sherpa_onnx.xcframework/ios-arm64_x86_64-simulator/Headers",
+				);
 				INFOPLIST_FILE = SchnackAI/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Schnack AI";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
