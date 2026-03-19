@@ -276,11 +276,11 @@ function getResponseModeLabel(
 ) {
   switch (mode) {
     case "quick":
-      return "Quick";
+      return t("quickAndShallow");
     case "normal":
       return t("normal");
     case "deep":
-      return "Deep";
+      return t("deepThinking");
   }
 }
 

@@ -18,14 +18,15 @@ interface ResponseModeToggleProps {
 
 function getResponseModeLabel(
   mode: ResponseMode,
+  t: ReturnType<typeof useLocalization>["t"],
 ) {
   switch (mode) {
     case "quick":
-      return "Quick";
+      return t("quickAndShallow");
     case "normal":
-      return "Normal";
+      return t("normal");
     case "deep":
-      return "Deep";
+      return t("deepThinking");
   }
 }
 
@@ -62,7 +63,7 @@ export function ResponseModeToggle({
                   { color: active ? colors.text : colors.textSecondary },
                 ]}
               >
-                {getResponseModeLabel(mode)}
+                {getResponseModeLabel(mode, t)}
               </Text>
             </View>
 
@@ -101,7 +102,7 @@ export function ResponseModeToggle({
             onPress={() => onSelect(mode)}
             accessibilityRole="button"
             accessibilityLabel={t("useResponseMode", {
-              mode: getResponseModeLabel(mode),
+              mode: getResponseModeLabel(mode, t),
             })}
             accessibilityState={{ disabled: !ready, selected: active }}
           >

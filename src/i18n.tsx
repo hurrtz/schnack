@@ -37,8 +37,8 @@ const translations = {
     responseModes: "Response Modes",
     responseModesDescription:
       "Map each home-screen response category to its own provider and model.",
-    quickAndShallow: "Quick + Shallow",
-    deepThinking: "Deep Thinking",
+    quickAndShallow: "Quick",
+    deepThinking: "Deep",
     quickModeHint: "Fastest route",
     normalModeHint: "Balanced default",
     deepModeHint: "Most capable route",
@@ -502,8 +502,8 @@ const translations = {
     responseModes: "Antwortmodi",
     responseModesDescription:
       "Ordne jeder Antwort-Kategorie auf dem Home-Bildschirm ihren eigenen Anbieter und ihr eigenes Modell zu.",
-    quickAndShallow: "Schnell + knapp",
-    deepThinking: "Tiefes Denken",
+    quickAndShallow: "Zackig",
+    deepThinking: "Tiefgründig",
     quickModeHint: "Schnellste Route",
     normalModeHint: "Ausgewogener Standard",
     deepModeHint: "Stärkste Route",
