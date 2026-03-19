@@ -28,7 +28,7 @@ export function ProviderToggle({
   const providers = visibleProviders;
   const isSingleProvider = providers.length === 1;
   const columnCount = isSingleProvider
-    ? 2
+    ? 1
     : providers.length <= 3
       ? providers.length
       : 4;
@@ -140,6 +140,7 @@ const styles = StyleSheet.create({
   },
   optionWrap: {
     padding: 4,
+    alignSelf: "stretch",
   },
   optionWrapSingle: {
     alignSelf: "center",
@@ -148,8 +149,10 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     overflow: "hidden",
+    height: "100%",
   },
   optionInner: {
+    flex: 1,
     minHeight: 72,
     borderRadius: 17,
     alignItems: "center",

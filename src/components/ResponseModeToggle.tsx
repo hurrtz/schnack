@@ -142,6 +142,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     overflow: "hidden",
+    alignSelf: "stretch",
   },
   optionActiveShell: {
     borderColor: "rgba(255,255,255,0.18)",
@@ -150,9 +151,11 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   optionInner: {
+    flex: 1,
     minHeight: 96,
     borderRadius: 17,
     alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 12,
     paddingVertical: 14,
     gap: 10,
