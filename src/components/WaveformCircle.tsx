@@ -216,6 +216,7 @@ export function WaveformCircle({
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
   const pulse = useSharedValue(0);
   const orbit = useSharedValue(0);
+  const spin = useSharedValue(0);
   const energy = useSharedValue(intensity);
   const shouldAnimate = appState === "active" && isActive;
 
@@ -242,6 +243,23 @@ export function WaveformCircle({
       true
     );
   }, [orbit, shouldAnimate]);
+
+  useEffect(() => {
+    if (!shouldAnimate) {
+      cancelAnimation(spin);
+      spin.value = 0;
+      return;
+    }
+
+    spin.value = withRepeat(
+      withTiming(1, {
+        duration: isRecording ? 3000 : 5200,
+        easing: Easing.linear,
+      }),
+      -1,
+      false,
+    );
+  }, [isRecording, shouldAnimate, spin]);
 
   useEffect(() => {
     energy.value = withTiming(shouldAnimate ? intensity : 0, {
@@ -320,23 +338,35 @@ export function WaveformCircle({
     : colors.glowStrong;
 
   const outerRingStyle = useAnimatedStyle(() => ({
-    opacity: usesPreciseWaveform ? 0.34 : 0.38 + pulse.value * 0.15,
+    opacity: usesPreciseWaveform
+      ? 0.34
+      : isRecording
+        ? 0.4 + pulse.value * 0.18 + energy.value * 0.08
+        : 0.38 + pulse.value * 0.15,
     transform: [
       {
         scale: usesPreciseWaveform
           ? 1
-          : 0.98 + pulse.value * 0.03 + energy.value * 0.03,
+          : isRecording
+            ? 0.975 + pulse.value * 0.04 + energy.value * 0.055
+            : 0.98 + pulse.value * 0.03 + energy.value * 0.03,
       } as const,
     ],
   }));
 
   const innerRingStyle = useAnimatedStyle(() => ({
-    opacity: usesPreciseWaveform ? 0.46 : 0.52 + pulse.value * 0.12,
+    opacity: usesPreciseWaveform
+      ? 0.46
+      : isRecording
+        ? 0.56 + pulse.value * 0.12 + energy.value * 0.1
+        : 0.52 + pulse.value * 0.12,
     transform: [
       {
         scale: usesPreciseWaveform
           ? 1
-          : 0.995 + pulse.value * 0.025 + energy.value * 0.02,
+          : isRecording
+            ? 0.99 + pulse.value * 0.03 + energy.value * 0.045
+            : 0.995 + pulse.value * 0.025 + energy.value * 0.02,
       } as const,
     ],
   }));
@@ -346,7 +376,41 @@ export function WaveformCircle({
       {
         scale: usesPreciseWaveform
           ? 1
-          : 0.992 + pulse.value * 0.028 + energy.value * 0.025,
+          : isRecording
+            ? 0.992 + pulse.value * 0.032 + energy.value * 0.075
+            : 0.992 + pulse.value * 0.028 + energy.value * 0.025,
+      } as const,
+    ],
+  }));
+
+  const listeningSpinPrimaryStyle = useAnimatedStyle(() => ({
+    opacity:
+      isRecording && shouldAnimate
+        ? 0.18 + pulse.value * 0.12 + energy.value * 0.18
+        : 0,
+    transform: [
+      { rotate: `${spin.value * 360}deg` } as const,
+      {
+        scale:
+          isRecording && shouldAnimate
+            ? 1.01 + pulse.value * 0.03 + energy.value * 0.045
+            : 1,
+      } as const,
+    ],
+  }));
+
+  const listeningSpinSecondaryStyle = useAnimatedStyle(() => ({
+    opacity:
+      isRecording && shouldAnimate
+        ? 0.1 + pulse.value * 0.08 + energy.value * 0.12
+        : 0,
+    transform: [
+      { rotate: `${-40 - spin.value * 270}deg` } as const,
+      {
+        scale:
+          isRecording && shouldAnimate
+            ? 0.98 + pulse.value * 0.02 + energy.value * 0.03
+            : 0.98,
       } as const,
     ],
   }));
@@ -382,6 +446,27 @@ export function WaveformCircle({
     transform: [
       {
         translateY: usesPreciseWaveform ? 0 : -2 - energy.value * 4,
+      } as const,
+    ],
+  }));
+
+  const micIconStyle = useAnimatedStyle(() => ({
+    opacity:
+      isRecording && shouldAnimate
+        ? 0.92 + energy.value * 0.08
+        : 0.96,
+    transform: [
+      {
+        scale:
+          isRecording && shouldAnimate
+            ? 0.98 + pulse.value * 0.045 + energy.value * 0.075
+            : 1,
+      } as const,
+      {
+        translateY:
+          isRecording && shouldAnimate
+            ? -1.5 - energy.value * 2.5
+            : 0,
       } as const,
     ],
   }));
@@ -469,6 +554,40 @@ export function WaveformCircle({
                 style={styles.auraFill}
               />
             </Animated.View>
+            {isRecording ? (
+              <>
+                <Animated.View
+                  pointerEvents="none"
+                  style={[styles.listeningSpinWrap, listeningSpinPrimaryStyle]}
+                >
+                  <LinearGradient
+                    colors={[
+                      "rgba(255,255,255,0)",
+                      "rgba(255, 224, 214, 0.42)",
+                      "rgba(255,255,255,0)",
+                    ]}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.listeningSpinArcPrimary}
+                  />
+                </Animated.View>
+                <Animated.View
+                  pointerEvents="none"
+                  style={[styles.listeningSpinWrap, listeningSpinSecondaryStyle]}
+                >
+                  <LinearGradient
+                    colors={[
+                      "rgba(255,255,255,0)",
+                      "rgba(255, 244, 240, 0.22)",
+                      "rgba(255,255,255,0)",
+                    ]}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.listeningSpinArcSecondary}
+                  />
+                </Animated.View>
+              </>
+            ) : null}
             <View
               style={[
                 styles.innerFrame,
@@ -482,9 +601,9 @@ export function WaveformCircle({
                 isAnimating={shouldAnimate}
               />
             ) : showsStaticMicState ? (
-              <View style={styles.micIconWrap}>
+              <Animated.View style={[styles.micIconWrap, micIconStyle]}>
                 <Feather name="mic" size={40} color="rgba(255, 255, 255, 0.96)" />
-              </View>
+              </Animated.View>
             ) : (
               <Animated.View
                 style={[
@@ -654,6 +773,27 @@ const styles = StyleSheet.create({
     height: 136,
     borderRadius: 32,
     overflow: "hidden",
+  },
+  listeningSpinWrap: {
+    position: "absolute",
+    width: 232,
+    height: 232,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  listeningSpinArcPrimary: {
+    position: "absolute",
+    top: 18,
+    width: 176,
+    height: 34,
+    borderRadius: 17,
+  },
+  listeningSpinArcSecondary: {
+    position: "absolute",
+    bottom: 20,
+    width: 144,
+    height: 28,
+    borderRadius: 14,
   },
   processingDots: {
     flexDirection: "row",
