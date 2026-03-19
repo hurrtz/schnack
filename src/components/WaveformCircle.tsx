@@ -28,6 +28,7 @@ import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Waveform } from "./Waveform";
 import { NativeWaveformView } from "./NativeWaveformView";
+import { supportsNativeOutputWaveformPlayback } from "../services/nativeWaveform";
 import {
   InputMode,
   VoiceVisualPhase,
@@ -191,14 +192,27 @@ export function WaveformCircle({
   onPressOut,
   onPress,
 }: WaveformCircleProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const intensity = normalizeMetering(metering);
+  const isRecording = phase === "recording";
   const isProcessing = phase === "transcribing" || phase === "thinking";
   const isSpeaking = phase === "speaking";
-  const useNativeInputWaveform =
-    Platform.OS === "ios" &&
+  const showsStaticMicState = phase === "idle" || isRecording;
+  const showsOutputBars = isSpeaking && waveformVariant === "oscilloscope";
+  const usesPreciseWaveform =
     waveformVariant === "oscilloscope" &&
-    phase === "recording";
+    !isProcessing &&
+    !showsStaticMicState &&
+    !showsOutputBars;
+  const nativeWaveformChannel =
+    Platform.OS === "ios" &&
+    waveformVariant === "oscilloscope"
+      ? phase === "speaking" &&
+        supportsNativeOutputWaveformPlayback() &&
+        !showsOutputBars
+          ? "output"
+          : null
+      : null;
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
   const pulse = useSharedValue(0);
   const orbit = useSharedValue(0);
@@ -276,59 +290,100 @@ export function WaveformCircle({
     );
   }, [phase, pulse, shouldAnimate]);
 
-  const ringColor = isProcessing ? colors.accentWarm : colors.accent;
-  const showMicIcon = phase === "idle";
-  const gradientColors: [string, string, string] = isProcessing
-    ? [colors.accentWarm, colors.accentGradientStart, colors.accentGradientEnd]
+  const ringColor = isRecording ? colors.danger : colors.accent;
+  const gradientColors: [string, string, string] = isRecording
+    ? isDark
+      ? ["#FF978C", colors.danger, "#D74C5A"]
+      : ["#F29186", colors.danger, "#C94756"]
     : [
         colors.accentGradientStart,
         colors.accentGradientEnd,
         colors.accentGradientEnd,
       ];
+  const ringBorderColor = isRecording
+    ? "rgba(255, 122, 112, 0.2)"
+    : isProcessing
+      ? colors.borderStrong
+      : colors.border;
+  const innerRingBorderColor = isRecording
+    ? "rgba(255, 122, 112, 0.28)"
+    : isProcessing
+      ? colors.accentSoft
+      : colors.borderStrong;
+  const innerFrameBorderColor = isRecording
+    ? "rgba(255, 255, 255, 0.28)"
+    : "rgba(255, 255, 255, 0.22)";
+  const shellShadowColor = isRecording
+    ? isDark
+      ? "rgba(255, 122, 112, 0.42)"
+      : "rgba(231, 104, 91, 0.34)"
+    : colors.glowStrong;
 
   const outerRingStyle = useAnimatedStyle(() => ({
-    opacity: 0.38 + pulse.value * 0.15,
-    transform: [{ scale: 0.98 + pulse.value * 0.03 + energy.value * 0.03 } as const],
+    opacity: usesPreciseWaveform ? 0.34 : 0.38 + pulse.value * 0.15,
+    transform: [
+      {
+        scale: usesPreciseWaveform
+          ? 1
+          : 0.98 + pulse.value * 0.03 + energy.value * 0.03,
+      } as const,
+    ],
   }));
 
   const innerRingStyle = useAnimatedStyle(() => ({
-    opacity: 0.52 + pulse.value * 0.12,
-    transform: [{ scale: 0.995 + pulse.value * 0.025 + energy.value * 0.02 } as const],
+    opacity: usesPreciseWaveform ? 0.46 : 0.52 + pulse.value * 0.12,
+    transform: [
+      {
+        scale: usesPreciseWaveform
+          ? 1
+          : 0.995 + pulse.value * 0.025 + energy.value * 0.02,
+      } as const,
+    ],
   }));
 
   const circleShellStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 0.992 + pulse.value * 0.028 + energy.value * 0.025 } as const],
+    transform: [
+      {
+        scale: usesPreciseWaveform
+          ? 1
+          : 0.992 + pulse.value * 0.028 + energy.value * 0.025,
+      } as const,
+    ],
   }));
 
   const topAuraStyle = useAnimatedStyle(() => ({
-    opacity: 0.16 + pulse.value * 0.14 + energy.value * 0.12,
+    opacity: usesPreciseWaveform ? 0.08 : 0.16 + pulse.value * 0.14 + energy.value * 0.12,
     transform: [
-      { translateX: interpolate(orbit.value, [0, 1], [-12, 12]) } as const,
-      { translateY: interpolate(orbit.value, [0, 1], [6, -8]) } as const,
-      { scale: 1 + pulse.value * 0.08 + energy.value * 0.08 } as const,
+      { translateX: usesPreciseWaveform ? 0 : interpolate(orbit.value, [0, 1], [-12, 12]) } as const,
+      { translateY: usesPreciseWaveform ? 0 : interpolate(orbit.value, [0, 1], [6, -8]) } as const,
+      { scale: usesPreciseWaveform ? 1 : 1 + pulse.value * 0.08 + energy.value * 0.08 } as const,
     ] as any,
   }));
 
   const bottomAuraStyle = useAnimatedStyle(() => ({
-    opacity: 0.18 + pulse.value * 0.1 + energy.value * 0.12,
+    opacity: usesPreciseWaveform ? 0.1 : 0.18 + pulse.value * 0.1 + energy.value * 0.12,
     transform: [
-      { translateX: interpolate(orbit.value, [0, 1], [10, -10]) } as const,
-      { translateY: interpolate(orbit.value, [0, 1], [-8, 10]) } as const,
-      { scale: 1.04 + pulse.value * 0.06 + energy.value * 0.06 } as const,
+      { translateX: usesPreciseWaveform ? 0 : interpolate(orbit.value, [0, 1], [10, -10]) } as const,
+      { translateY: usesPreciseWaveform ? 0 : interpolate(orbit.value, [0, 1], [-8, 10]) } as const,
+      { scale: usesPreciseWaveform ? 1 : 1.04 + pulse.value * 0.06 + energy.value * 0.06 } as const,
     ] as any,
   }));
 
   const sheenStyle = useAnimatedStyle(() => ({
-    opacity: 0.16 + pulse.value * 0.08,
+    opacity: usesPreciseWaveform ? 0.06 : 0.16 + pulse.value * 0.08,
     transform: [
-      { translateX: interpolate(orbit.value, [0, 1], [-20, 16]) } as const,
-      { rotate: `${interpolate(orbit.value, [0, 1], [-8, 8])}deg` } as const,
+      { translateX: usesPreciseWaveform ? 0 : interpolate(orbit.value, [0, 1], [-20, 16]) } as const,
+      { rotate: usesPreciseWaveform ? "0deg" : `${interpolate(orbit.value, [0, 1], [-8, 8])}deg` } as const,
     ] as any,
   }));
 
   const waveformStyle = useAnimatedStyle(() => ({
-    opacity: 0.88 + energy.value * 0.12,
-    transform: [{ translateY: -2 - energy.value * 4 } as const],
+    opacity: usesPreciseWaveform ? 1 : 0.88 + energy.value * 0.12,
+    transform: [
+      {
+        translateY: usesPreciseWaveform ? 0 : -2 - energy.value * 4,
+      } as const,
+    ],
   }));
 
   return (
@@ -337,7 +392,7 @@ export function WaveformCircle({
         style={[
           styles.staticRing,
           styles.staticRingOuter,
-          { borderColor: isProcessing ? colors.borderStrong : colors.border },
+          { borderColor: ringBorderColor },
           outerRingStyle,
         ]}
       />
@@ -345,7 +400,7 @@ export function WaveformCircle({
         style={[
           styles.staticRing,
           styles.staticRingInner,
-          { borderColor: isProcessing ? colors.accentSoft : colors.borderStrong },
+          { borderColor: innerRingBorderColor },
           innerRingStyle,
         ]}
       />
@@ -382,7 +437,7 @@ export function WaveformCircle({
             style={[
               styles.circle,
               {
-                shadowColor: colors.glowStrong,
+                shadowColor: shellShadowColor,
                 shadowOffset: { width: 0, height: 0 },
                 shadowOpacity: isActive ? 1 : 0.55,
                 shadowRadius: isActive ? 28 : 18,
@@ -417,7 +472,7 @@ export function WaveformCircle({
             <View
               style={[
                 styles.innerFrame,
-                { borderColor: "rgba(255, 255, 255, 0.22)" },
+                { borderColor: innerFrameBorderColor },
               ]}
             />
             {isProcessing ? (
@@ -426,7 +481,7 @@ export function WaveformCircle({
                 providerLabel={providerLabel}
                 isAnimating={shouldAnimate}
               />
-            ) : showMicIcon ? (
+            ) : showsStaticMicState ? (
               <View style={styles.micIconWrap}>
                 <Feather name="mic" size={40} color="rgba(255, 255, 255, 0.96)" />
               </View>
@@ -440,27 +495,61 @@ export function WaveformCircle({
                   waveformStyle,
                 ]}
               >
-                {useNativeInputWaveform ? (
+                {nativeWaveformChannel ? (
                   <NativeWaveformView
-                    channel="input"
+                    channel={nativeWaveformChannel}
                     active={isActive}
-                    lineColor="rgba(255, 255, 255, 0.96)"
-                    baselineColor="rgba(255, 255, 255, 0.12)"
-                    lineWidth={2.2}
-                    style={styles.nativeWaveform}
+                    lineColor="rgba(255, 255, 255, 0.95)"
+                    baselineColor="rgba(255, 255, 255, 0.14)"
+                    lineWidth={nativeWaveformChannel === "output" ? 1.8 : 1.9}
+                    renderStyle={
+                      nativeWaveformChannel === "output" ? "envelope" : "automatic"
+                    }
+                    style={[
+                      styles.nativeWaveform,
+                      nativeWaveformChannel === "output"
+                        ? styles.nativeWaveformOutput
+                        : styles.nativeWaveformInput,
+                    ]}
                   />
                 ) : (
                   <Waveform
                     metering={metering}
                     levels={levels}
-                    maxHeight={waveformVariant === "oscilloscope" ? 86 : isSpeaking ? 60 : 66}
-                    barCount={waveformVariant === "oscilloscope" ? 78 : 19}
-                    barWidth={waveformVariant === "oscilloscope" ? 1.75 : 4}
-                    barGap={waveformVariant === "oscilloscope" ? 0.45 : 2}
+                    maxHeight={
+                      showsOutputBars
+                        ? 62
+                        : waveformVariant === "oscilloscope"
+                          ? 86
+                          : isSpeaking
+                            ? 60
+                            : 66
+                    }
+                    barCount={
+                      showsOutputBars
+                        ? 22
+                        : waveformVariant === "oscilloscope"
+                          ? 78
+                          : 19
+                    }
+                    barWidth={
+                      showsOutputBars
+                        ? 4.5
+                        : waveformVariant === "oscilloscope"
+                          ? 1.75
+                          : 4
+                    }
+                    barGap={
+                      showsOutputBars
+                        ? 2.2
+                        : waveformVariant === "oscilloscope"
+                          ? 0.45
+                          : 2
+                    }
                     barColor="rgba(255, 255, 255, 0.96)"
                     barColorInactive="rgba(255, 255, 255, 0.46)"
                     isActive={isActive}
-                    variant={waveformVariant}
+                    variant={showsOutputBars ? "bars" : waveformVariant}
                   />
                 )}
               </Animated.View>
@@ -527,8 +616,15 @@ const styles = StyleSheet.create({
     marginTop: 0,
   },
   nativeWaveform: {
-    width: 172,
-    height: 86,
+    alignSelf: "center",
+  },
+  nativeWaveformInput: {
+    width: 164,
+    height: 36,
+  },
+  nativeWaveformOutput: {
+    width: 156,
+    height: 32,
   },
   coreAura: {
     position: "absolute",

@@ -6,9 +6,10 @@ import React
 final class SchnackNativeWaveform: RCTEventEmitter {
   private static let eventName = "SchnackNativeWaveformEvent"
   private static let rollingSampleCount = 192
-  private static let inputSampleChunkCount = 16
-  private static let inputTapBufferSize: AVAudioFrameCount = 512
+  private static let inputSampleChunkCount = 6
+  private static let inputTapBufferSize: AVAudioFrameCount = 256
   private static let emitIntervalMs = 16
+  private static let inputReferenceFloor: Float = 0.11
 
   private let stateLock = NSLock()
   private var hasListeners = false
@@ -23,6 +24,9 @@ final class SchnackNativeWaveform: RCTEventEmitter {
   )
   private var rollingCursor = 0
   private var rollingFilled = false
+  private var inputReferenceLevel = SchnackNativeWaveform.inputReferenceFloor
+  private var inputVisualGain: Float = 1
+  private var inputEnvelopeLevel: Float = 0
 
   override static func requiresMainQueueSetup() -> Bool {
     true
@@ -38,6 +42,20 @@ final class SchnackNativeWaveform: RCTEventEmitter {
 
   override func stopObserving() {
     hasListeners = false
+  }
+
+  private func logDebug(_ event: String, payload: [String: Any] = [:]) {
+    let body = NSMutableDictionary(dictionary: payload)
+    body["event"] = event
+    body["timestamp"] = ISO8601DateFormatter().string(from: Date())
+
+    if let data = try? JSONSerialization.data(withJSONObject: body, options: []),
+       let message = String(data: data, encoding: .utf8) {
+      NSLog("[waveform-debug] %@", message)
+      return
+    }
+
+    NSLog("[waveform-debug] %@", "{\"event\":\"\(event)\"}")
   }
 
   @objc(startRecording:outputUri:resolver:rejecter:)
@@ -129,7 +147,7 @@ final class SchnackNativeWaveform: RCTEventEmitter {
           }
 
           self.appendRollingSamples(
-            self.extractPeakSamples(
+            self.extractInputEnvelopeSamples(
               from: buffer,
               targetCount: Self.inputSampleChunkCount
             )
@@ -246,10 +264,62 @@ final class SchnackNativeWaveform: RCTEventEmitter {
     }
   }
 
+  @objc(startOutputPlayback:samples:durationMs:resolver:rejecter:)
+  func startOutputPlayback(
+    _ itemId: String,
+    samples: [NSNumber],
+    durationMs: NSNumber,
+    resolver resolve: @escaping RCTPromiseResolveBlock,
+    rejecter reject: @escaping RCTPromiseRejectBlock
+  ) {
+    DispatchQueue.main.async {
+      guard !itemId.isEmpty else {
+        reject("native_waveform_output_error", "itemId is required.", nil)
+        return
+      }
+
+      let normalizedSamples = samples.map(\.doubleValue)
+      self.logDebug(
+        "native-output-playback-bridge-start",
+        payload: [
+          "itemId": itemId,
+          "sampleCount": normalizedSamples.count,
+          "durationMs": durationMs.doubleValue,
+        ]
+      )
+      SchnackWaveformCoordinator.shared.startPlayback(
+        channel: .output,
+        itemId: itemId,
+        samples: normalizedSamples,
+        durationMs: durationMs.doubleValue
+      )
+      resolve(true)
+    }
+  }
+
+  @objc(stopOutputPlayback:resolver:rejecter:)
+  func stopOutputPlayback(
+    _ itemId: String?,
+    resolver resolve: @escaping RCTPromiseResolveBlock,
+    rejecter reject: @escaping RCTPromiseRejectBlock
+  ) {
+    DispatchQueue.main.async {
+      self.logDebug(
+        "native-output-playback-bridge-stop",
+        payload: [
+          "itemId": itemId ?? NSNull(),
+        ]
+      )
+      SchnackWaveformCoordinator.shared.stopPlayback(channel: .output, itemId: itemId)
+      resolve(true)
+    }
+  }
+
   override func invalidate() {
     super.invalidate()
     DispatchQueue.main.async {
       self.cleanupRecording(deleteOutput: false)
+      SchnackWaveformCoordinator.shared.clear(channel: .output)
     }
   }
 
@@ -353,15 +423,20 @@ final class SchnackNativeWaveform: RCTEventEmitter {
     )
     rollingCursor = 0
     rollingFilled = false
+    inputReferenceLevel = Self.inputReferenceFloor
+    inputVisualGain = 1
+    inputEnvelopeLevel = 0
     stateLock.unlock()
 
     SchnackWaveformCoordinator.shared.clear(channel: .input)
   }
 
   private func appendRollingSamples(_ samples: [Float]) {
+    let shapedSamples = shapeInputSamples(samples)
+
     stateLock.lock()
 
-    for sample in samples {
+    for sample in shapedSamples {
       rollingSamples[rollingCursor] = clampSample(sample)
       rollingCursor = (rollingCursor + 1) % rollingSamples.count
       if rollingCursor == 0 {
@@ -374,8 +449,126 @@ final class SchnackNativeWaveform: RCTEventEmitter {
 
     SchnackWaveformCoordinator.shared.setSamples(
       channel: .input,
-      samples: orderedSamples
+      samples: orderedSamples,
+      appendedCount: shapedSamples.count
     )
+  }
+
+  private func shapeInputSamples(_ samples: [Float]) -> [Float] {
+    guard !samples.isEmpty else {
+      return samples
+    }
+
+    let averageMagnitude =
+      samples.reduce(Float.zero) { partialResult, sample in
+        partialResult + sample
+      } / Float(max(1, samples.count))
+
+    let isNearSilence = averageMagnitude < 0.01
+    let detectedLevel =
+      isNearSilence
+        ? Float.zero
+        : averageMagnitude * 2.85
+
+    if isNearSilence {
+      inputReferenceLevel = max(Self.inputReferenceFloor, inputReferenceLevel * 0.992)
+    } else {
+      inputReferenceLevel = max(
+        Self.inputReferenceFloor,
+        detectedLevel > inputReferenceLevel
+          ? inputReferenceLevel * 0.94 + detectedLevel * 0.06
+          : inputReferenceLevel * 0.985 + detectedLevel * 0.015
+      )
+    }
+
+    let targetGain =
+      isNearSilence
+        ? Float(1)
+        : min(
+            Float(8.8),
+            max(
+              Float(2.1),
+              Float(0.8) / max(Self.inputReferenceFloor, inputReferenceLevel)
+            )
+          )
+
+    if abs(targetGain - inputVisualGain) > 0.025 {
+      inputVisualGain =
+        targetGain > inputVisualGain
+          ? inputVisualGain * 0.968 + targetGain * 0.032
+          : inputVisualGain * 0.989 + targetGain * 0.011
+    }
+
+    let shapedSamples = samples.map { sample -> Float in
+      guard sample >= 0.0035 else {
+        return Float.zero
+      }
+
+      let shapedMagnitude = powf(sample, 0.68)
+      return clampSample(shapedMagnitude * inputVisualGain)
+    }
+
+    return shapedSamples.enumerated().map { index, sample in
+      let previous = shapedSamples[index - 1 >= 0 ? index - 1 : index]
+      let next = shapedSamples[index + 1 < shapedSamples.count ? index + 1 : index]
+      return clampSample(previous * 0.26 + sample * 0.48 + next * 0.26)
+    }
+  }
+
+  private func extractInputEnvelopeSamples(
+    from buffer: AVAudioPCMBuffer,
+    targetCount: Int
+  ) -> [Float] {
+    let frameCount = Int(buffer.frameLength)
+    guard frameCount > 0, targetCount > 0 else {
+      return Array(repeating: 0, count: max(0, targetCount))
+    }
+
+    let channelCount = Int(buffer.format.channelCount)
+    let chunkSize = max(1, frameCount / targetCount)
+    var nextEnvelopeLevel = inputEnvelopeLevel
+
+    let samples = (0..<targetCount).map { index in
+      let start = index * chunkSize
+      let end =
+        index == targetCount - 1
+          ? frameCount
+          : min(frameCount, start + chunkSize)
+
+      guard start < end else {
+        return nextEnvelopeLevel
+      }
+
+      var energySum: Float = 0
+      var peakMagnitude: Float = 0
+      var sampleCount = 0
+
+      for frameIndex in start..<end {
+        let sample =
+          (0..<channelCount).reduce(Float.zero) { partialResult, channelIndex in
+            partialResult + sampleValue(in: buffer, channel: channelIndex, frame: frameIndex)
+          } / Float(max(1, channelCount))
+
+        let magnitude = abs(sample)
+        energySum += magnitude * magnitude
+        peakMagnitude = max(peakMagnitude, magnitude)
+        sampleCount += 1
+      }
+
+      guard sampleCount > 0 else {
+        return nextEnvelopeLevel
+      }
+
+      let rms = sqrtf(energySum / Float(sampleCount))
+      let targetEnvelope = min(1, max(rms * 2.2, peakMagnitude * 0.65))
+      let attack: Float = targetEnvelope > nextEnvelopeLevel ? 0.32 : 0.08
+      nextEnvelopeLevel += (targetEnvelope - nextEnvelopeLevel) * attack
+
+      return clampSample(nextEnvelopeLevel)
+    }
+
+    inputEnvelopeLevel = nextEnvelopeLevel
+    return samples
   }
 
   private func snapshotRollingSamples() -> [Double] {

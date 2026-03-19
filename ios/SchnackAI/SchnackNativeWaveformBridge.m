@@ -22,6 +22,16 @@ RCT_EXTERN_METHOD(analyzeAudioFile:(NSString *)uri
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(startOutputPlayback:(NSString *)itemId
+                  samples:(NSArray<NSNumber *> *)samples
+                  durationMs:(NSNumber *)durationMs
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(stopOutputPlayback:(NSString * _Nullable)itemId
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
 @end
 
 @interface RCT_EXTERN_MODULE(SchnackNativeWaveformView, RCTViewManager)
@@ -31,5 +41,6 @@ RCT_EXPORT_VIEW_PROPERTY(active, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(lineColor, UIColor)
 RCT_EXPORT_VIEW_PROPERTY(baselineColor, UIColor)
 RCT_EXPORT_VIEW_PROPERTY(lineWidth, NSNumber)
+RCT_EXPORT_VIEW_PROPERTY(renderStyle, NSString)
 
 @end

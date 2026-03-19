@@ -23,6 +23,8 @@ import {
 import {
   analyzeNativeAudioFile,
   type NativeWaveformAnalysis,
+  startNativeOutputWaveformPlayback,
+  stopNativeOutputWaveformPlayback,
 } from "../services/nativeWaveform";
 import { WaveformVisualizationVariant } from "../types";
 import {
@@ -36,6 +38,8 @@ import {
   getTrailingWaveformWindow,
   levelToMetering,
 } from "../utils/audioVisualization";
+import { logWaveformDebug } from "../utils/waveformDebug";
+import { supportsNativeOutputWaveformPlayback } from "../services/nativeWaveform";
 
 const PLAYER_STATUS_INTERVAL_MS = 250;
 const VISUAL_UPDATE_INTERVAL_MS = 150;
@@ -56,6 +60,8 @@ function nextPlaybackJobId(prefix: "audio" | "native") {
 export function useAudioPlayer() {
   const usingNativeAudioQueue =
     Platform.OS === "ios" && isNativeAudioQueueAvailable();
+  const supportsNativeOutputWaveform =
+    supportsNativeOutputWaveformPlayback();
   const player = useExpoAudioPlayer(null, {
     updateInterval: PLAYER_STATUS_INTERVAL_MS,
     keepAudioSessionActive: true,
@@ -114,6 +120,15 @@ export function useAudioPlayer() {
   const [nativeSpeaking, setNativeSpeaking] = useState(false);
   const [nativeAudioQueuePlaying, setNativeAudioQueuePlaying] = useState(false);
 
+  useEffect(() => {
+    logWaveformDebug("audio-player-init", {
+      platform: Platform.OS,
+      usingNativeAudioQueue,
+      supportsNativeOutputWaveform,
+      expoAudioSamplingSupported: player.isAudioSamplingSupported,
+    });
+  }, [player.isAudioSamplingSupported, supportsNativeOutputWaveform, usingNativeAudioQueue]);
+
   const resetVisualState = useCallback(() => {
     setMeteringData(-160);
     setWaveformData(EMPTY_VISUAL_LEVELS);
@@ -128,6 +143,17 @@ export function useAudioPlayer() {
   }, []);
 
   const stopNativeOutputWaveform = useCallback(() => {
+    if (usingNativeAudioQueue) {
+      logWaveformDebug("output-waveform-stop-requested", {
+        itemId: nativeOutputWaveformItemIdRef.current ?? null,
+        usingNativeAudioQueue,
+        supportsNativeOutputWaveform,
+      });
+      void stopNativeOutputWaveformPlayback(
+        nativeOutputWaveformItemIdRef.current ?? null
+      );
+    }
+
     if (nativeOutputWaveformIntervalRef.current) {
       clearInterval(nativeOutputWaveformIntervalRef.current);
       nativeOutputWaveformIntervalRef.current = null;
@@ -136,7 +162,7 @@ export function useAudioPlayer() {
     nativeOutputWaveformItemIdRef.current = null;
     nativeOutputWaveformStartedAtRef.current = null;
     setWaveformVariant("bars");
-  }, []);
+  }, [supportsNativeOutputWaveform, usingNativeAudioQueue]);
 
   const clearNativeAudioQueueState = useCallback(() => {
     nativeAudioQueueContextsRef.current.clear();
@@ -185,13 +211,31 @@ export function useAudioPlayer() {
   const startNativeOutputWaveform = useCallback(
     (itemId: string, analysis: NativeWaveformAnalysis) => {
       if (!analysis.samples.length || analysis.durationMs <= 0) {
+        logWaveformDebug("output-waveform-skipped", {
+          itemId,
+          reason: "empty-analysis",
+          durationMs: analysis.durationMs,
+          sampleCount: analysis.samples.length,
+        });
         return;
       }
 
+      logWaveformDebug("output-waveform-primed", {
+        itemId,
+        durationMs: analysis.durationMs,
+        sampleCount: analysis.samples.length,
+        usingNativeAudioQueue,
+        supportsNativeOutputWaveform,
+      });
       stopNativeOutputWaveform();
       nativeOutputWaveformItemIdRef.current = itemId;
       nativeOutputWaveformStartedAtRef.current = Date.now();
       setWaveformVariant("oscilloscope");
+      void startNativeOutputWaveformPlayback({
+        itemId,
+        samples: analysis.samples,
+        durationMs: analysis.durationMs,
+      });
 
       const tick = () => {
         if (nativeOutputWaveformItemIdRef.current !== itemId) {
@@ -219,7 +263,7 @@ export function useAudioPlayer() {
         OSCILLOSCOPE_TICK_INTERVAL_MS
       );
     },
-    [stopNativeOutputWaveform]
+    [stopNativeOutputWaveform, supportsNativeOutputWaveform, usingNativeAudioQueue]
   );
 
   const hasPendingPlaybackNow = useCallback(() => {
@@ -538,6 +582,13 @@ export function useAudioPlayer() {
 
       switch (event.type) {
         case "started": {
+          logWaveformDebug("native-audio-queue-event", {
+            type: event.type,
+            itemId,
+            uri: context?.uri ?? event.uri ?? null,
+            usingNativeAudioQueue,
+            supportsNativeOutputWaveform,
+          });
           stopNativeOutputWaveform();
           if (context) {
             currentAudioRef.current = {
@@ -580,6 +631,13 @@ export function useAudioPlayer() {
           break;
         }
         case "finished": {
+          logWaveformDebug("native-audio-queue-event", {
+            type: event.type,
+            itemId,
+            uri: context?.uri ?? event.uri ?? null,
+            usingNativeAudioQueue,
+            supportsNativeOutputWaveform,
+          });
           if (
             itemId &&
             nativeOutputWaveformItemIdRef.current === itemId
@@ -623,6 +681,14 @@ export function useAudioPlayer() {
           break;
         }
         case "failed": {
+          logWaveformDebug("native-audio-queue-event", {
+            type: event.type,
+            itemId,
+            uri: context?.uri ?? event.uri ?? null,
+            message: event.message ?? null,
+            usingNativeAudioQueue,
+            supportsNativeOutputWaveform,
+          });
           if (
             itemId &&
             nativeOutputWaveformItemIdRef.current === itemId
@@ -666,6 +732,12 @@ export function useAudioPlayer() {
           break;
         }
         case "stopped": {
+          logWaveformDebug("native-audio-queue-event", {
+            type: event.type,
+            itemId,
+            usingNativeAudioQueue,
+            supportsNativeOutputWaveform,
+          });
           if (
             itemId &&
             nativeOutputWaveformItemIdRef.current === itemId
@@ -675,6 +747,12 @@ export function useAudioPlayer() {
           break;
         }
         case "drained": {
+          logWaveformDebug("native-audio-queue-event", {
+            type: event.type,
+            itemId,
+            usingNativeAudioQueue,
+            supportsNativeOutputWaveform,
+          });
           stopNativeOutputWaveform();
           currentAudioRef.current = null;
           hasSeenAudioPlayingRef.current = false;
@@ -881,6 +959,13 @@ export function useAudioPlayer() {
 
       if (usingNativeAudioQueue) {
         const itemId = nextPlaybackJobId("audio");
+        logWaveformDebug("output-audio-enqueued", {
+          itemId,
+          route: "native-audio-queue",
+          uri: audioUri,
+          usingNativeAudioQueue,
+          supportsNativeOutputWaveform,
+        });
         nativeAudioQueueContextsRef.current.set(itemId, {
           uri: audioUri,
           diagnostics,
@@ -944,6 +1029,12 @@ export function useAudioPlayer() {
         return;
       }
 
+      logWaveformDebug("output-audio-enqueued", {
+        route: "expo-audio-player",
+        uri: audioUri,
+        usingNativeAudioQueue,
+        supportsNativeOutputWaveform,
+      });
       queueRef.current.push({
         id: nextPlaybackJobId("audio"),
         uri: audioUri,

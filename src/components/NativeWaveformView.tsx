@@ -15,6 +15,7 @@ type NativeWaveformViewProps = ViewProps & {
   lineColor?: ColorValue;
   baselineColor?: ColorValue;
   lineWidth?: number;
+  renderStyle?: "automatic" | "waveform" | "envelope";
   style?: StyleProp<ViewStyle>;
 };
 

@@ -7,12 +7,14 @@ import {
   Text,
   Platform,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalization } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Waveform } from "./Waveform";
 import { NativeWaveformView } from "./NativeWaveformView";
+import { supportsNativeOutputWaveformPlayback } from "../services/nativeWaveform";
 import {
   InputMode,
   VoiceVisualPhase,
@@ -42,52 +44,47 @@ export function WaveformBar({
   onPressOut,
   onPress,
 }: WaveformBarProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useLocalization();
+  const isRecording = phase === "recording";
   const isProcessing = phase === "transcribing" || phase === "thinking";
-  const useNativeInputWaveform =
+  const nativeWaveformChannel =
     Platform.OS === "ios" &&
-    waveformVariant === "oscilloscope" &&
-    phase === "recording";
-  const hint =
-    phase === "recording"
-      ? t("listening")
-      : phase === "transcribing"
-        ? t("parsing")
-        : phase === "thinking"
-          ? t("thinking")
-          : phase === "speaking"
-            ? t("speaking")
-            : inputMode === "push-to-talk"
-              ? t("hold")
-              : t("tap");
+    waveformVariant === "oscilloscope"
+      ? phase === "speaking" && supportsNativeOutputWaveformPlayback()
+          ? "output"
+          : null
+      : null;
+  const buttonGradientColors: [string, string, string] = isRecording
+    ? isDark
+      ? ["#FF978C", colors.danger, "#D74C5A"]
+      : ["#F29186", colors.danger, "#C94756"]
+    : [colors.accentGradientStart, colors.accentGradientEnd, colors.accentGradientEnd];
+  const micButtonBorderColor = isRecording
+    ? "rgba(255, 255, 255, 0.28)"
+    : "rgba(255, 255, 255, 0.22)";
 
   const content = (
     <View style={styles.contentRow}>
-      <View
-        style={[
-          styles.stateBadge,
-          {
-            backgroundColor: isActive
-              ? "rgba(255, 255, 255, 0.16)"
-              : colors.accentSoft,
-            borderColor: isActive ? "rgba(255, 255, 255, 0.18)" : colors.border,
-          },
-        ]}
+      <LinearGradient
+        colors={buttonGradientColors}
+        locations={[0, 0.58, 1]}
+        start={{ x: 0.12, y: 0 }}
+        end={{ x: 0.88, y: 1 }}
+        style={styles.micButton}
       >
-        <Text
+        <View
           style={[
-            styles.stateBadgeText,
-            { color: isActive ? "#F6FBFF" : colors.accent },
+            styles.micButtonFrame,
+            { borderColor: micButtonBorderColor },
           ]}
-        >
-          {hint}
-        </Text>
-      </View>
+        />
+        <Feather name="mic" size={18} color="rgba(255, 255, 255, 0.96)" />
+      </LinearGradient>
       {isProcessing ? (
         <Text
           style={[
-            styles.processingText,
+          styles.processingText,
             { color: isActive ? "#F6FBFF" : colors.textSecondary },
           ]}
         >
@@ -95,9 +92,13 @@ export function WaveformBar({
         </Text>
       ) : (
         <View style={styles.waveformWrap}>
-          {useNativeInputWaveform ? (
+          {isRecording ? (
+            <View style={styles.recordingIndicator}>
+              <Feather name="mic" size={18} color="rgba(255, 255, 255, 0.94)" />
+            </View>
+          ) : nativeWaveformChannel ? (
             <NativeWaveformView
-              channel="input"
+              channel={nativeWaveformChannel}
               active={isActive}
               lineColor={isActive ? "rgba(255, 255, 255, 0.95)" : colors.accent}
               baselineColor={
@@ -127,8 +128,23 @@ export function WaveformBar({
     </View>
   );
 
+  const activeGradientColors: [string, string, string] = isRecording
+    ? isDark
+      ? ["#FF978C", colors.danger, "#D74C5A"]
+      : ["#F29186", colors.danger, "#C94756"]
+    : [
+        colors.accentGradientStart,
+        colors.accentGradientEnd,
+        colors.accentGradientEnd,
+      ];
   const glowShadow = {
-    shadowColor: isActive ? colors.glow : "transparent",
+    shadowColor: isActive
+      ? isRecording
+        ? isDark
+          ? "rgba(255, 122, 112, 0.34)"
+          : "rgba(231, 104, 91, 0.28)"
+        : colors.glow
+      : "transparent",
     shadowOffset: { width: 0, height: 0 } as const,
     shadowOpacity: isActive ? 1 : 0,
     shadowRadius: isActive ? 8 : 0,
@@ -145,15 +161,7 @@ export function WaveformBar({
     >
       {isActive ? (
         <LinearGradient
-          colors={
-            isProcessing
-              ? [colors.accentWarm, colors.accentGradientStart, colors.accentGradientEnd]
-              : [
-                  colors.accentGradientStart,
-                  colors.accentGradientEnd,
-                  colors.accentGradientEnd,
-                ]
-          }
+          colors={activeGradientColors}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={[styles.bar, glowShadow]}
@@ -204,20 +212,33 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 32,
   },
-  stateBadge: {
-    minWidth: 64,
+  micButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 999,
+    overflow: "hidden",
+    shadowColor: "rgba(12, 20, 33, 0.18)",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  micButtonFrame: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    bottom: 4,
+    left: 4,
+    borderRadius: 18,
     borderWidth: 1,
   },
-  stateBadgeText: {
-    fontSize: 11,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    fontFamily: fonts.mono,
+  recordingIndicator: {
+    flex: 1,
+    minHeight: 28,
+    alignItems: "center",
+    justifyContent: "center",
   },
   processingText: {
     flex: 1,
