@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import {
+  type StyleProp,
   View,
+  type ViewStyle,
   Text,
   TouchableOpacity,
   Modal,
@@ -18,6 +20,9 @@ interface PickerProps {
   options: { value: string; label: string }[];
   onChange: (value: string) => void;
   disabled?: boolean;
+  dropdownLabel?: string;
+  hideLabel?: boolean;
+  containerStyle?: StyleProp<ViewStyle>;
 }
 
 export function Picker({
@@ -26,6 +31,9 @@ export function Picker({
   options,
   onChange,
   disabled = false,
+  dropdownLabel,
+  hideLabel = false,
+  containerStyle,
 }: PickerProps) {
   const { colors } = useTheme();
   const { t } = useLocalization();
@@ -33,10 +41,12 @@ export function Picker({
   const selected = options.find((o) => o.value === value);
 
   return (
-    <View style={styles.section}>
-      <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-        {label}
-      </Text>
+    <View style={[styles.section, containerStyle]}>
+      {hideLabel ? null : (
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+          {label}
+        </Text>
+      )}
       <TouchableOpacity
         style={[
           styles.dropdown,
@@ -56,7 +66,7 @@ export function Picker({
       >
         <View style={styles.dropdownText}>
           <Text style={[styles.dropdownLabel, { color: colors.textSecondary }]}>
-            {disabled ? t("unavailable") : t("selection")}
+            {disabled ? t("unavailable") : dropdownLabel || t("selection")}
           </Text>
           <Text style={[styles.dropdownValue, { color: colors.text }]}>
             {disabled ? t("chooseCompatibleProviderFirst") : selected?.label || value}

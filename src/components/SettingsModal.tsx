@@ -35,6 +35,7 @@ import {
   PROVIDER_LABELS,
   PROVIDER_MODELS,
   PROVIDER_ORDER,
+  getProviderModelName,
   getNativeSttLanguageNote,
   getNativeTtsLanguageNote,
   getProviderApiKeyHint,
@@ -61,6 +62,8 @@ import {
   LocalTtsVoiceSelections,
   Provider,
   ReplyPlayback,
+  ResponseMode,
+  ResponseModeRoute,
   Settings,
   ThemeMode,
   SttBackendMode,
@@ -74,6 +77,12 @@ import {
   getEnabledSttProviders,
   getEnabledTtsProviders,
 } from "../utils/providerCapabilities";
+import {
+  getDefaultModelForProvider,
+  getProviderValidationModel,
+  isValidModelForProvider,
+  RESPONSE_MODE_ORDER,
+} from "../utils/responseModes";
 import { Picker } from "./Picker";
 import { ProviderIcon } from "./ProviderIcon";
 
@@ -84,7 +93,10 @@ interface SettingsModalProps {
   onUpdate: (
     partial: Partial<Omit<Settings, "apiKeys" | "providerModels">>,
   ) => void;
-  onUpdateProviderModel: (provider: Provider, model: string) => void;
+  onUpdateResponseModeRoute: (
+    mode: ResponseMode,
+    route: ResponseModeRoute,
+  ) => void;
   onUpdateProviderTtsVoice: (provider: Provider, voice: string) => void;
   onUpdateLocalTtsVoice: (
     language: keyof LocalTtsVoiceSelections,
@@ -253,6 +265,34 @@ function getResponseToneOptions(t: ReturnType<typeof useLocalization>["t"]): {
       description: t("eli5Description"),
     },
   ];
+}
+
+function getResponseModeLabel(
+  mode: ResponseMode,
+  t: ReturnType<typeof useLocalization>["t"],
+) {
+  switch (mode) {
+    case "quick":
+      return "Quick";
+    case "normal":
+      return t("normal");
+    case "deep":
+      return "Deep";
+  }
+}
+
+function getResponseModeDescription(
+  mode: ResponseMode,
+  t: ReturnType<typeof useLocalization>["t"],
+) {
+  switch (mode) {
+    case "quick":
+      return t("quickModeDescription");
+    case "normal":
+      return t("normalModeDescription");
+    case "deep":
+      return t("deepModeDescription");
+  }
 }
 
 function getLocalPreviewSampleText(language: TtsListenLanguage) {
@@ -517,17 +557,125 @@ function UsagePricingReferenceSection() {
   );
 }
 
+function ResponseModesSection({
+  settings,
+  onUpdateResponseModeRoute,
+}: {
+  settings: Settings;
+  onUpdateResponseModeRoute: (
+    mode: ResponseMode,
+    route: ResponseModeRoute,
+  ) => void;
+}) {
+  const { colors } = useTheme();
+  const { t } = useLocalization();
+
+  return (
+    <View
+      style={[
+        styles.sectionCard,
+        { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+      ]}
+    >
+      <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+        {t("responseModes")}
+      </Text>
+
+      <View style={styles.responseModeList}>
+        {RESPONSE_MODE_ORDER.map((mode, index) => {
+          const route = settings.responseModes[mode];
+
+          return (
+            <View
+              key={mode}
+              style={[
+                styles.responseModeItem,
+                {
+                  borderTopColor: colors.border,
+                  borderTopWidth: index === 0 ? 0 : 1,
+                  paddingBottom:
+                    index === RESPONSE_MODE_ORDER.length - 1 ? 4 : 18,
+                  paddingTop: index === 0 ? 8 : 20,
+                },
+              ]}
+            >
+              <View style={styles.responseModeCopy}>
+                <Text style={[styles.responseModeTitle, { color: colors.text }]}>
+                  {getResponseModeLabel(mode, t)}
+                </Text>
+                <Text
+                  style={[
+                    styles.responseModeDescription,
+                    { color: colors.textMuted },
+                  ]}
+                >
+                  {getResponseModeDescription(mode, t)}
+                </Text>
+              </View>
+
+              <Picker
+                label={t("provider")}
+                dropdownLabel={t("provider")}
+                hideLabel
+                containerStyle={styles.responseModePicker}
+                value={route.provider}
+                options={renderProviderPickerOptions(PROVIDER_ORDER)}
+                onChange={(value) => {
+                  const nextProvider = value as Provider;
+                  const preferredModel = settings.providerModels[nextProvider];
+                  const nextModel = isValidModelForProvider(
+                    nextProvider,
+                    preferredModel,
+                  )
+                    ? preferredModel
+                    : getDefaultModelForProvider(nextProvider);
+
+                  onUpdateResponseModeRoute(mode, {
+                    provider: nextProvider,
+                    model: nextModel,
+                  });
+                }}
+              />
+
+              <Picker
+                label={t("model")}
+                dropdownLabel={t("model")}
+                hideLabel
+                containerStyle={styles.responseModePickerLast}
+                value={route.model}
+                options={PROVIDER_MODELS[route.provider].map((model) => ({
+                  value: model.id,
+                  label: model.name,
+                }))}
+                onChange={(value) =>
+                  onUpdateResponseModeRoute(mode, {
+                    ...route,
+                    model: value,
+                  })
+                }
+              />
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function ProviderSection({
   settings,
   focusProvider,
-  onUpdateProviderModel,
+  onUpdateResponseModeRoute,
   onUpdateApiKey,
   onTextInputFocus,
   onValidateProvider,
 }: {
   settings: Settings;
   focusProvider?: Provider;
-  onUpdateProviderModel: (provider: Provider, model: string) => void;
+  onUpdateResponseModeRoute: (
+    mode: ResponseMode,
+    route: ResponseModeRoute,
+  ) => void;
   onUpdateApiKey: (provider: Provider, apiKey: string) => void;
   onTextInputFocus: TextInputFocusHandler;
   onValidateProvider: (provider: Provider) => Promise<void>;
@@ -562,7 +710,10 @@ function ProviderSection({
   }, [selectedProvider]);
 
   const selectedProviderApiKey = settings.apiKeys[selectedProvider];
-  const selectedProviderModel = settings.providerModels[selectedProvider];
+  const selectedProviderModel = getProviderValidationModel(
+    settings,
+    selectedProvider,
+  );
 
   useEffect(() => {
     setValidationStateByProvider((previous) => ({
@@ -571,8 +722,15 @@ function ProviderSection({
     }));
   }, [selectedProvider, selectedProviderApiKey, selectedProviderModel]);
 
+  const activeResponseRoute = settings.responseModes[settings.activeResponseMode];
   const replyRouteLabel = t("replyModelRoute", {
-    route: PROVIDER_LABELS[settings.lastProvider],
+    route: `${getResponseModeLabel(
+      settings.activeResponseMode,
+      t,
+    )} · ${PROVIDER_LABELS[activeResponseRoute.provider]} · ${getProviderModelName(
+      activeResponseRoute.provider,
+      activeResponseRoute.model,
+    )}`,
   });
   const speechInputRouteLabel = t("speechInputRoute", {
     route:
@@ -594,7 +752,7 @@ function ProviderSection({
     {
       id: "reply",
       label: replyRouteLabel,
-      ready: settings.apiKeys[settings.lastProvider].trim().length > 0,
+      ready: settings.apiKeys[activeResponseRoute.provider].trim().length > 0,
     },
     {
       id: "stt",
@@ -692,18 +850,11 @@ function ProviderSection({
   };
 
   return (
-    <View
-      style={[
-        styles.sectionCard,
-        { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
-      ]}
-    >
-      <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-        {t("providers")}
-      </Text>
-      <Text style={[styles.sectionIntro, { color: colors.textMuted }]}>
-        {t("providersTabDescription")}
-      </Text>
+    <>
+      <ResponseModesSection
+        settings={settings}
+        onUpdateResponseModeRoute={onUpdateResponseModeRoute}
+      />
 
       <View
         style={[
@@ -802,288 +953,275 @@ function ProviderSection({
         </View>
       </View>
 
-      <View style={styles.providerButtonGrid}>
-        {PROVIDER_ORDER.map((provider) => {
-          const active = provider === selectedProvider;
-
-          return (
-            <Pressable
-              key={provider}
-              style={[
-                styles.providerButton,
-                {
-                  backgroundColor: active
-                    ? colors.surface
-                    : colors.surfaceElevated,
-                  borderColor: active ? colors.borderStrong : colors.border,
-                  shadowColor: active ? colors.glow : "transparent",
-                },
-              ]}
-              onPress={() => setSelectedProvider(provider)}
-              accessibilityRole="button"
-              accessibilityLabel={t("openProviderSettings", {
-                provider: PROVIDER_LABELS[provider],
-              })}
-              accessibilityState={{ selected: active }}
-            >
-              <ProviderIcon
-                provider={provider}
-                color={active ? colors.text : colors.textSecondary}
-              />
-            </Pressable>
-          );
-        })}
-      </View>
-
       <View
         style={[
-          styles.apiKeyCard,
+          styles.sectionCard,
           {
-            backgroundColor: colors.surface,
+            backgroundColor: colors.surfaceElevated,
             borderColor: colors.border,
           },
         ]}
       >
-        <Text style={[styles.apiKeyTitle, { color: colors.text }]}>
-          {PROVIDER_LABELS[selectedProvider]}
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+          {t("providers")}
         </Text>
+
+        <View style={styles.providerButtonGrid}>
+          {PROVIDER_ORDER.map((provider) => {
+            const active = provider === selectedProvider;
+
+            return (
+              <Pressable
+                key={provider}
+                style={[
+                  styles.providerButton,
+                  {
+                    backgroundColor: active
+                      ? colors.surface
+                      : colors.surfaceElevated,
+                    borderColor: active ? colors.borderStrong : colors.border,
+                    shadowColor: active ? colors.glow : "transparent",
+                  },
+                ]}
+                onPress={() => setSelectedProvider(provider)}
+                accessibilityRole="button"
+                accessibilityLabel={t("openProviderSettings", {
+                  provider: PROVIDER_LABELS[provider],
+                })}
+                accessibilityState={{ selected: active }}
+              >
+                <ProviderIcon
+                  provider={provider}
+                  color={active ? colors.text : colors.textSecondary}
+                />
+              </Pressable>
+            );
+          })}
+        </View>
+
         <View
           style={[
-            styles.providerStatusPill,
+            styles.apiKeyCard,
             {
-              backgroundColor: hasApiKey
-                ? colors.accentSoft
-                : colors.surfaceElevated,
-              borderColor: hasApiKey ? colors.borderStrong : colors.border,
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
             },
           ]}
         >
-          <Text
-            style={[
-              styles.providerStatusText,
-              { color: hasApiKey ? colors.accent : colors.textSecondary },
-            ]}
-          >
-            {hasApiKey ? t("configured") : t("missing")}
+          <Text style={[styles.apiKeyTitle, { color: colors.text }]}>
+            {PROVIDER_LABELS[selectedProvider]}
           </Text>
-        </View>
-        <Text style={[styles.apiKeyHint, { color: colors.textMuted }]}>
-          {getProviderApiKeyHint(selectedProvider, language)}
-        </Text>
-        <View style={styles.apiKeyActionRow}>
-          <TouchableOpacity
-            style={[
-              styles.apiKeyLinkButton,
-              styles.apiKeyActionButton,
-              {
-                backgroundColor: colors.surfaceElevated,
-                borderColor: colors.border,
-              },
-            ]}
-            onPress={handleOpenProviderPortal}
-            accessibilityRole="link"
-            accessibilityLabel={t("createProviderApiKey", {
-              provider: PROVIDER_LABELS[selectedProvider],
-            })}
-            activeOpacity={0.85}
+          <Text
+            style={[styles.apiKeyHint, { color: colors.textMuted }]}
           >
-            <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
-              {t("createApiKey")}
-            </Text>
-            <Feather name="external-link" size={14} color={colors.accent} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.apiKeyLinkButton,
-              styles.apiKeyActionButton,
-              {
-                backgroundColor: colors.surfaceElevated,
-                borderColor: colors.border,
-                opacity:
-                  hasApiKey && validationState.status !== "validating"
-                    ? 1
-                    : 0.5,
-              },
-            ]}
-            onPress={() => {
-              void handleValidateProviderKey();
-            }}
-            activeOpacity={0.85}
-            disabled={!hasApiKey || validationState.status === "validating"}
-          >
-            <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
-              {validationState.status === "validating"
-                ? t("validatingKey")
-                : t("validateKey")}
-            </Text>
-            <Feather
-              name={
-                validationState.status === "validating"
-                  ? "loader"
-                  : "check-circle"
-              }
-              size={14}
-              color={colors.accent}
+            {getProviderApiKeyHint(selectedProvider, language)}
+          </Text>
+          <View style={styles.apiKeyActionRow}>
+            <TouchableOpacity
+              style={[
+                styles.apiKeyLinkButton,
+                styles.apiKeyActionButton,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={handleOpenProviderPortal}
+              accessibilityRole="link"
+              accessibilityLabel={t("createProviderApiKey", {
+                provider: PROVIDER_LABELS[selectedProvider],
+              })}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
+                {t("createApiKey")}
+              </Text>
+              <Feather name="external-link" size={14} color={colors.accent} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.apiKeyLinkButton,
+                styles.apiKeyActionButton,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                  opacity:
+                    hasApiKey && validationState.status !== "validating"
+                      ? 1
+                      : 0.5,
+                },
+              ]}
+              onPress={() => {
+                void handleValidateProviderKey();
+              }}
+              activeOpacity={0.85}
+              disabled={!hasApiKey || validationState.status === "validating"}
+            >
+              <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
+                {validationState.status === "validating"
+                  ? t("validatingKey")
+                  : t("validateKey")}
+              </Text>
+              <Feather
+                name={
+                  validationState.status === "validating"
+                    ? "loader"
+                    : "check-circle"
+                }
+                size={14}
+                color={colors.accent}
+              />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.apiKeyInputRow}>
+            <TextInput
+              value={settings.apiKeys[selectedProvider]}
+              onChangeText={(value) => onUpdateApiKey(selectedProvider, value)}
+              onFocus={onTextInputFocus}
+              placeholder={getProviderApiKeyPlaceholder(
+                selectedProvider,
+                language,
+              )}
+              placeholderTextColor={colors.textMuted}
+              selectionColor={colors.accent}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="off"
+              textContentType="password"
+              importantForAutofill="no"
+              spellCheck={false}
+              contextMenuHidden={false}
+              selectTextOnFocus={apiKeyVisible}
+              keyboardType="ascii-capable"
+              returnKeyType="done"
+              secureTextEntry={secureApiKey}
+              style={[
+                styles.apiKeyInput,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
+              ]}
             />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.apiKeyInputRow}>
-          <TextInput
-            value={settings.apiKeys[selectedProvider]}
-            onChangeText={(value) => onUpdateApiKey(selectedProvider, value)}
-            onFocus={onTextInputFocus}
-            placeholder={getProviderApiKeyPlaceholder(
-              selectedProvider,
-              language,
-            )}
-            placeholderTextColor={colors.textMuted}
-            selectionColor={colors.accent}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="off"
-            textContentType="password"
-            importantForAutofill="no"
-            spellCheck={false}
-            contextMenuHidden={false}
-            selectTextOnFocus={apiKeyVisible}
-            keyboardType="ascii-capable"
-            returnKeyType="done"
-            secureTextEntry={secureApiKey}
-            style={[
-              styles.apiKeyInput,
-              {
-                backgroundColor: colors.surfaceElevated,
-                borderColor: colors.border,
-                color: colors.text,
-              },
-            ]}
-          />
-          <TouchableOpacity
-            style={[
-              styles.apiKeyVisibilityButton,
-              {
-                backgroundColor: colors.surfaceElevated,
-                borderColor: colors.border,
-              },
-            ]}
-            onPress={() => setApiKeyVisible((previous) => !previous)}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel={apiKeyVisible ? t("hideKey") : t("showKey")}
-          >
-            <Feather
-              name={apiKeyVisible ? "eye-off" : "eye"}
-              size={16}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.apiKeyActionRow}>
-          <TouchableOpacity
-            style={[
-              styles.apiKeyLinkButton,
-              styles.apiKeyActionButton,
-              {
-                backgroundColor: colors.surfaceElevated,
-                borderColor: colors.border,
-              },
-            ]}
-            onPress={() => {
-              void handlePasteApiKey();
-            }}
-            activeOpacity={0.85}
-          >
-            <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
-              {clipboardStatus === "pasted" ? t("pasted") : t("paste")}
-            </Text>
-            <Feather name="clipboard" size={14} color={colors.accent} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.apiKeyLinkButton,
-              styles.apiKeyActionButton,
-              {
-                backgroundColor: colors.surfaceElevated,
-                borderColor: colors.border,
-                opacity: hasApiKey ? 1 : 0.5,
-              },
-            ]}
-            onPress={() => {
-              void handleCopyApiKey();
-            }}
-            activeOpacity={0.85}
-            disabled={!hasApiKey}
-          >
-            <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
-              {clipboardStatus === "copied" ? t("copied") : t("copy")}
-            </Text>
-            <Feather name="copy" size={14} color={colors.accent} />
-          </TouchableOpacity>
-        </View>
-        <Text
-          style={[
-            styles.sectionHint,
-            { color: colors.textMuted, marginTop: 8 },
-          ]}
-        >
-          {t("apiKeyProtectedHint")}
-        </Text>
-        {clipboardStatus === "empty" ? (
+            <TouchableOpacity
+              style={[
+                styles.apiKeyVisibilityButton,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => setApiKeyVisible((previous) => !previous)}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={apiKeyVisible ? t("hideKey") : t("showKey")}
+            >
+              <Feather
+                name={apiKeyVisible ? "eye-off" : "eye"}
+                size={16}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.apiKeyActionRow}>
+            <TouchableOpacity
+              style={[
+                styles.apiKeyLinkButton,
+                styles.apiKeyActionButton,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => {
+                void handlePasteApiKey();
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
+                {clipboardStatus === "pasted" ? t("pasted") : t("paste")}
+              </Text>
+              <Feather name="clipboard" size={14} color={colors.accent} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.apiKeyLinkButton,
+                styles.apiKeyActionButton,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                  opacity: hasApiKey ? 1 : 0.5,
+                },
+              ]}
+              onPress={() => {
+                void handleCopyApiKey();
+              }}
+              activeOpacity={0.85}
+              disabled={!hasApiKey}
+            >
+              <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
+                {clipboardStatus === "copied" ? t("copied") : t("copy")}
+              </Text>
+              <Feather name="copy" size={14} color={colors.accent} />
+            </TouchableOpacity>
+          </View>
           <Text
             style={[
               styles.sectionHint,
-              { color: colors.textMuted, marginTop: 6 },
+              { color: colors.textMuted, marginTop: 8 },
             ]}
           >
-            {t("clipboardEmpty")}
+            {t("apiKeyProtectedHint")}
           </Text>
-        ) : null}
-        {validationState.status !== "idle" && validationState.message ? (
-          <View
-            style={[
-              styles.validationCard,
-              {
-                backgroundColor:
-                  validationState.status === "success"
-                    ? colors.accentSoft
-                    : colors.surfaceElevated,
-                borderColor:
-                  validationState.status === "success"
-                    ? colors.borderStrong
-                    : validationState.status === "error"
-                      ? colors.danger
-                      : colors.border,
-              },
-            ]}
-          >
+          {clipboardStatus === "empty" ? (
             <Text
               style={[
-                styles.validationText,
+                styles.sectionHint,
+                { color: colors.textMuted, marginTop: 6 },
+              ]}
+            >
+              {t("clipboardEmpty")}
+            </Text>
+          ) : null}
+          {validationState.status !== "idle" && validationState.message ? (
+            <View
+              style={[
+                styles.validationCard,
                 {
-                  color:
+                  backgroundColor:
                     validationState.status === "success"
-                      ? colors.accent
+                      ? colors.accentSoft
+                      : colors.surfaceElevated,
+                  borderColor:
+                    validationState.status === "success"
+                      ? colors.borderStrong
                       : validationState.status === "error"
                         ? colors.danger
-                        : colors.textSecondary,
+                        : colors.border,
                 },
               ]}
             >
-              {validationState.message}
-            </Text>
-          </View>
-        ) : null}
-        <Picker
-          label={`${PROVIDER_LABELS[selectedProvider]} ${t("model")}`}
-          value={settings.providerModels[selectedProvider]}
-          options={PROVIDER_MODELS[selectedProvider].map((model) => ({
-            value: model.id,
-            label: model.name,
-          }))}
-          onChange={(value) => onUpdateProviderModel(selectedProvider, value)}
-        />
+              <Text
+                style={[
+                  styles.validationText,
+                  {
+                    color:
+                      validationState.status === "success"
+                        ? colors.accent
+                        : validationState.status === "error"
+                          ? colors.danger
+                          : colors.textSecondary,
+                  },
+                ]}
+              >
+                {validationState.message}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
-    </View>
+    </>
   );
 }
 
@@ -1850,7 +1988,7 @@ export function SettingsModal({
   settings,
   focusProvider,
   onUpdate,
-  onUpdateProviderModel,
+  onUpdateResponseModeRoute,
   onUpdateProviderTtsVoice,
   onUpdateLocalTtsVoice,
   onUpdateApiKey,
@@ -2425,7 +2563,7 @@ export function SettingsModal({
               <ProviderSection
                 settings={settings}
                 focusProvider={focusProvider}
-                onUpdateProviderModel={onUpdateProviderModel}
+                onUpdateResponseModeRoute={onUpdateResponseModeRoute}
                 onUpdateApiKey={onUpdateApiKey}
                 onTextInputFocus={handleTextInputFocus}
                 onValidateProvider={onValidateProvider}
@@ -2849,6 +2987,37 @@ const styles = StyleSheet.create({
   pricingSourceButtonText: {
     fontSize: 12,
     fontFamily: fonts.body,
+  },
+  responseModeList: {
+    marginBottom: 14,
+  },
+  responseModeItem: {
+    paddingBottom: 10,
+    paddingTop: 14,
+  },
+  responseModeCopy: {
+    gap: 4,
+    marginBottom: 16,
+  },
+  responseModeTitle: {
+    fontSize: 14,
+    lineHeight: 18,
+    fontFamily: fonts.display,
+  },
+  responseModeDescription: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: fonts.body,
+  },
+  responseModePicker: {
+    marginBottom: 10,
+  },
+  responseModePickerLast: {
+    marginBottom: 0,
+  },
+  responseModePills: {
+    alignItems: "flex-end",
+    gap: 8,
   },
   providerButtonGrid: {
     flexDirection: "row",

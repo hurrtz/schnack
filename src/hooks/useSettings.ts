@@ -9,12 +9,20 @@ import {
   ProviderModelSelections,
   ProviderTtsVoiceSelections,
   ReplyPlayback,
+  ResponseMode,
+  ResponseModeRoute,
+  ResponseModeSelections,
   Settings,
   DEFAULT_SETTINGS,
   getDefaultTtsListenLanguages,
   getDefaultAssistantInstructions,
   isDefaultAssistantInstructions,
 } from "../types";
+import {
+  getDefaultModelForProvider,
+  isValidModelForProvider,
+  RESPONSE_MODE_ORDER,
+} from "../utils/responseModes";
 
 const STORAGE_KEY = "@schnackai/settings";
 const API_KEY_STORAGE_PREFIX = "schnackai.provider_key";
@@ -53,6 +61,17 @@ const LEGACY_MODEL_FIELD_KEYS: Record<Provider, keyof LegacyStoredSettings> = {
 function getApiKeyStorageKey(provider: Provider) {
   const safeProvider = provider.replace(/[^0-9A-Za-z._-]/g, "_");
   return `${API_KEY_STORAGE_PREFIX}.${safeProvider}`;
+}
+
+function isProvider(value: unknown): value is Provider {
+  return typeof value === "string" && PROVIDER_ORDER.includes(value as Provider);
+}
+
+function isResponseMode(value: unknown): value is ResponseMode {
+  return (
+    typeof value === "string" &&
+    RESPONSE_MODE_ORDER.includes(value as ResponseMode)
+  );
 }
 
 function extractStoredProviderModels(
@@ -131,6 +150,64 @@ function extractStoredLocalTtsVoices(
   );
 }
 
+function getLegacyResponseModeRoute(
+  storedSettings: LegacyStoredSettings | undefined,
+  providerModels: ProviderModelSelections
+): ResponseModeRoute {
+  const provider = isProvider(storedSettings?.lastProvider)
+    ? storedSettings.lastProvider
+    : DEFAULT_SETTINGS.lastProvider;
+  const providerModel = providerModels[provider];
+
+  return {
+    provider,
+    model: isValidModelForProvider(provider, providerModel)
+      ? providerModel
+      : getDefaultModelForProvider(provider),
+  };
+}
+
+function extractStoredResponseModes(
+  storedSettings: LegacyStoredSettings | undefined,
+  providerModels: ProviderModelSelections
+): Partial<ResponseModeSelections> {
+  const storedResponseModes = storedSettings?.responseModes;
+
+  if (!storedResponseModes || typeof storedResponseModes !== "object") {
+    return {};
+  }
+
+  return RESPONSE_MODE_ORDER.reduce((accumulator, mode) => {
+    const entry = storedResponseModes[mode];
+
+    if (!entry || typeof entry !== "object") {
+      return accumulator;
+    }
+
+    const provider = isProvider(entry.provider) ? entry.provider : undefined;
+
+    if (!provider) {
+      return accumulator;
+    }
+
+    const fallbackModel = providerModels[provider] || getDefaultModelForProvider(provider);
+    const model =
+      typeof entry.model === "string" &&
+      isValidModelForProvider(provider, entry.model)
+        ? entry.model
+        : isValidModelForProvider(provider, fallbackModel)
+          ? fallbackModel
+          : getDefaultModelForProvider(provider);
+
+    accumulator[mode] = {
+      provider,
+      model,
+    };
+
+    return accumulator;
+  }, {} as Partial<ResponseModeSelections>);
+}
+
 function mergeSettings(
   storedSettings?: LegacyStoredSettings,
   storedApiKeys?: Partial<ProviderApiKeys>
@@ -156,6 +233,21 @@ function mergeSettings(
     ...(storedSettings?.apiKeys ?? {}),
     ...storedApiKeys,
   };
+  const mergedProviderModels = {
+    ...DEFAULT_SETTINGS.providerModels,
+    ...extractStoredProviderModels(storedSettings),
+  };
+  const legacyResponseModeRoute = getLegacyResponseModeRoute(
+    storedSettings,
+    mergedProviderModels,
+  );
+  const extractedResponseModes = extractStoredResponseModes(
+    storedSettings,
+    mergedProviderModels,
+  );
+  const hasStoredResponseModes = RESPONSE_MODE_ORDER.some(
+    (mode) => !!extractedResponseModes[mode],
+  );
   const hasConfiguredKeys = Object.values(mergedApiKeys).some(
     (apiKey) => apiKey.trim().length > 0
   );
@@ -174,10 +266,23 @@ function mergeSettings(
         ? storedSettings.setupGuideDismissed
         : hasConfiguredKeys,
     assistantInstructions,
-    providerModels: {
-      ...DEFAULT_SETTINGS.providerModels,
-      ...extractStoredProviderModels(storedSettings),
-    },
+    activeResponseMode: isResponseMode(storedSettings?.activeResponseMode)
+      ? storedSettings.activeResponseMode
+      : DEFAULT_SETTINGS.activeResponseMode,
+    responseModes:
+      !storedSettings
+        ? DEFAULT_SETTINGS.responseModes
+        : hasStoredResponseModes
+          ? {
+              ...DEFAULT_SETTINGS.responseModes,
+              ...extractedResponseModes,
+            }
+          : {
+              quick: legacyResponseModeRoute,
+              normal: legacyResponseModeRoute,
+              deep: legacyResponseModeRoute,
+            },
+    providerModels: mergedProviderModels,
     providerTtsVoices: {
       ...DEFAULT_SETTINGS.providerTtsVoices,
       ...extractStoredProviderTtsVoices(storedSettings),
@@ -193,6 +298,10 @@ function mergeSettings(
 function toPublicSettings(settings: Settings): PublicSettings {
   const { apiKeys: _apiKeys, ...publicSettings } = settings;
   return publicSettings;
+}
+
+function persistPublicSettings(settings: Settings) {
+  return AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toPublicSettings(settings)));
 }
 
 async function loadStoredApiKeys(): Promise<ProviderApiKeys> {
@@ -266,8 +375,9 @@ export function useSettings() {
           : partial.assistantInstructions ?? prev.assistantInstructions,
         apiKeys: prev.apiKeys,
         providerModels: prev.providerModels,
+        responseModes: partial.responseModes ?? prev.responseModes,
       });
-      void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toPublicSettings(next)));
+      void persistPublicSettings(next);
       return next;
     });
   }, []);
@@ -281,7 +391,35 @@ export function useSettings() {
           [provider]: value,
         },
       };
-      void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toPublicSettings(next)));
+      void persistPublicSettings(next);
+      return next;
+    });
+  }, []);
+
+  const updateResponseModeRoute = useCallback(
+    (mode: ResponseMode, value: ResponseModeRoute) => {
+      setSettings((prev) => {
+        const next = {
+          ...prev,
+          responseModes: {
+            ...prev.responseModes,
+            [mode]: value,
+          },
+        };
+        void persistPublicSettings(next);
+        return next;
+      });
+    },
+    [],
+  );
+
+  const updateActiveResponseMode = useCallback((value: ResponseMode) => {
+    setSettings((prev) => {
+      const next = {
+        ...prev,
+        activeResponseMode: value,
+      };
+      void persistPublicSettings(next);
       return next;
     });
   }, []);
@@ -295,7 +433,7 @@ export function useSettings() {
           [provider]: value,
         },
       };
-      void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toPublicSettings(next)));
+      void persistPublicSettings(next);
       return next;
     });
   }, []);
@@ -310,7 +448,7 @@ export function useSettings() {
             [language]: value,
           },
         };
-        void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toPublicSettings(next)));
+        void persistPublicSettings(next);
         return next;
       });
     },
@@ -335,6 +473,8 @@ export function useSettings() {
     settings,
     updateSettings,
     updateProviderModel,
+    updateResponseModeRoute,
+    updateActiveResponseMode,
     updateProviderTtsVoice,
     updateLocalTtsVoice,
     updateApiKey,

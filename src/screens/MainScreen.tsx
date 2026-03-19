@@ -20,7 +20,7 @@ import {
 import { ChatTranscript } from "../components/ChatTranscript";
 import { ConversationMemoryModal } from "../components/ConversationMemoryModal";
 import { ConversationDrawer } from "../components/ConversationDrawer";
-import { ProviderToggle } from "../components/ProviderToggle";
+import { ResponseModeToggle } from "../components/ResponseModeToggle";
 import { SettingsModal } from "../components/SettingsModal";
 import { SetupGuideModal } from "../components/SetupGuideModal";
 import { Toast } from "../components/Toast";
@@ -54,22 +54,40 @@ import { fonts } from "../theme/typography";
 import {
   Conversation,
   Provider,
+  ResponseMode,
   TtsListenLanguage,
   VoicePreviewRequest,
   VoiceVisualPhase,
 } from "../types";
 import { formatConversationForCopy } from "../utils/conversationExport";
 import {
-  getEnabledProviders,
   getEnabledSttProviders,
   getEnabledTtsProviders,
 } from "../utils/providerCapabilities";
+import {
+  getAvailableResponseModes,
+  getProviderValidationModel,
+} from "../utils/responseModes";
 import {
   aggregateConversationUsage,
   aggregateConversationUsageByRoute,
   formatTokenCount,
   formatUsd,
 } from "../utils/usageStats";
+
+function getResponseModeLabel(
+  mode: ResponseMode,
+  t: ReturnType<typeof useLocalization>["t"],
+) {
+  switch (mode) {
+    case "quick":
+      return t("quickAndShallow");
+    case "normal":
+      return t("normal");
+    case "deep":
+      return t("deepThinking");
+  }
+}
 
 export function MainScreen() {
   const { colors, isDark } = useTheme();
@@ -78,7 +96,8 @@ export function MainScreen() {
   const {
     settings,
     updateSettings,
-    updateProviderModel,
+    updateActiveResponseMode,
+    updateResponseModeRoute,
     updateProviderTtsVoice,
     updateLocalTtsVoice,
     updateApiKey,
@@ -128,10 +147,12 @@ export function MainScreen() {
 
   const recordingStartedRef = useRef<Promise<void> | null>(null);
 
-  const provider = settings.lastProvider;
+  const activeResponseMode = settings.activeResponseMode;
+  const activeResponseRoute = settings.responseModes[activeResponseMode];
+  const provider = activeResponseRoute.provider;
   const providerApiKey = settings.apiKeys[provider].trim();
-  const model = settings.providerModels[provider];
-  const availableProviders = getEnabledProviders(settings);
+  const model = activeResponseRoute.model;
+  const availableResponseModes = getAvailableResponseModes(settings);
   const availableSttProviders = getEnabledSttProviders(settings);
   const availableTtsProviders = getEnabledTtsProviders(settings);
   const sttProvider =
@@ -152,6 +173,7 @@ export function MainScreen() {
     : "";
   const providerLabel = PROVIDER_LABELS[provider];
   const modelLabel = getProviderModelName(provider, model);
+  const responseModeLabel = getResponseModeLabel(activeResponseMode, t);
   const isRecording =
     settings.sttMode === "native"
       ? nativeStt.isRecording
@@ -374,6 +396,54 @@ export function MainScreen() {
     [showToast, t, toggleConversationPinned],
   );
 
+  const resetVoiceSessionState = useCallback(async () => {
+    abortRef.current?.abort();
+    setPipelinePhase("idle");
+    setStreamingText("");
+    lastCompletedReplyRef.current = "";
+
+    if (player.isPlaying) {
+      await player.stopPlayback();
+    }
+
+    if (!isRecording) {
+      return;
+    }
+
+    try {
+      if (settings.sttMode === "native") {
+        await nativeStt.abortRecognition();
+      } else {
+        await recorder.stopRecording();
+      }
+    } catch {
+      // Ignore recorder cleanup failures while switching conversations.
+    }
+  }, [
+    abortRef,
+    isRecording,
+    lastCompletedReplyRef,
+    nativeStt,
+    player,
+    recorder,
+    setPipelinePhase,
+    setStreamingText,
+    settings.sttMode,
+  ]);
+
+  const handleSelectConversation = useCallback(
+    async (conversationId: string) => {
+      await resetVoiceSessionState();
+      await selectConversation(conversationId);
+    },
+    [resetVoiceSessionState, selectConversation],
+  );
+
+  const handleStartNewSession = useCallback(async () => {
+    await resetVoiceSessionState();
+    clearActiveConversation();
+  }, [clearActiveConversation, resetVoiceSessionState]);
+
   const openSettings = useCallback((focusProvider?: Provider) => {
     setSettingsFocusProvider(focusProvider);
     setSettingsVisible(true);
@@ -389,12 +459,18 @@ export function MainScreen() {
       return;
     }
 
-    const fallbackProvider = availableProviders[0];
+    const fallbackMode = availableResponseModes[0];
 
-    if (fallbackProvider && fallbackProvider !== provider) {
-      updateSettings({ lastProvider: fallbackProvider });
+    if (fallbackMode && fallbackMode !== activeResponseMode) {
+      updateActiveResponseMode(fallbackMode);
     }
-  }, [availableProviders, loaded, provider, providerApiKey, updateSettings]);
+  }, [
+    activeResponseMode,
+    availableResponseModes,
+    loaded,
+    providerApiKey,
+    updateActiveResponseMode,
+  ]);
 
   useEffect(() => {
     if (!loaded || settings.sttMode !== "provider") {
@@ -686,8 +762,10 @@ export function MainScreen() {
     t,
   ]);
 
-  const handleProviderChange = useCallback(
-    (nextProvider: Provider) => {
+  const handleResponseModeChange = useCallback(
+    (nextMode: ResponseMode) => {
+      const nextProvider = settings.responseModes[nextMode].provider;
+
       if (!settings.apiKeys[nextProvider].trim()) {
         showToast(
           t("addProviderKeyToEnableProvider", {
@@ -697,9 +775,9 @@ export function MainScreen() {
         return;
       }
 
-      updateSettings({ lastProvider: nextProvider });
+      updateActiveResponseMode(nextMode);
     },
-    [settings.apiKeys, showToast, t, updateSettings],
+    [settings.apiKeys, settings.responseModes, showToast, t, updateActiveResponseMode],
   );
 
   const handleDismissSetupGuide = useCallback(() => {
@@ -711,6 +789,21 @@ export function MainScreen() {
     (preset: "fastest" | "full-voice") => {
       if (preset === "fastest") {
         updateSettings({
+          activeResponseMode: "quick",
+          responseModes: {
+            quick: {
+              provider: "groq",
+              model: "llama-3.1-8b-instant",
+            },
+            normal: {
+              provider: "groq",
+              model: "llama-3.1-8b-instant",
+            },
+            deep: {
+              provider: "groq",
+              model: "llama-3.3-70b-versatile",
+            },
+          },
           setupGuideDismissed: true,
           lastProvider: "groq",
           sttMode: "native",
@@ -724,6 +817,21 @@ export function MainScreen() {
       }
 
       updateSettings({
+        activeResponseMode: "normal",
+        responseModes: {
+          quick: {
+            provider: "openai",
+            model: "gpt-5-mini-2025-08-07",
+          },
+          normal: {
+            provider: "openai",
+            model: "gpt-5.4",
+          },
+          deep: {
+            provider: "openai",
+            model: "gpt-5.4",
+          },
+        },
         setupGuideDismissed: true,
         lastProvider: "openai",
         sttMode: "provider",
@@ -859,12 +967,12 @@ export function MainScreen() {
 
       await validateProviderConnection({
         provider: nextProvider,
-        model: settings.providerModels[nextProvider],
+        model: getProviderValidationModel(settings, nextProvider),
         apiKey,
         language,
       });
     },
-    [language, settings.apiKeys, settings.providerModels],
+    [language, settings],
   );
 
   const baseMessages = activeConversation?.messages || [];
@@ -894,7 +1002,7 @@ export function MainScreen() {
 
   const messageCountLabel =
     messages.length > 0 ? t("messageCount", { count: messages.length }) : null;
-  const routeModelLabel = `${providerLabel} · ${modelLabel}`;
+  const routeModelLabel = `${responseModeLabel} · ${providerLabel} · ${modelLabel}`;
   const statusTitle =
     visualPhase === "recording"
       ? t("listening")
@@ -1195,11 +1303,12 @@ export function MainScreen() {
               end={{ x: 1, y: 1 }}
               style={styles.heroCardGlow}
             />
-            {loaded && availableProviders.length > 0 ? (
-              <ProviderToggle
-                selected={provider}
-                onSelect={handleProviderChange}
-                visibleProviders={availableProviders}
+            {loaded && availableResponseModes.length > 0 ? (
+              <ResponseModeToggle
+                selected={activeResponseMode}
+                onSelect={handleResponseModeChange}
+                routes={settings.responseModes}
+                readyModes={availableResponseModes}
               />
             ) : (
               <TouchableOpacity
@@ -1859,7 +1968,7 @@ export function MainScreen() {
         settings={settings}
         focusProvider={settingsFocusProvider}
         onUpdate={updateSettings}
-        onUpdateProviderModel={updateProviderModel}
+        onUpdateResponseModeRoute={updateResponseModeRoute}
         onUpdateProviderTtsVoice={updateProviderTtsVoice}
         onUpdateLocalTtsVoice={updateLocalTtsVoice}
         onUpdateApiKey={updateApiKey}
@@ -1892,7 +2001,7 @@ export function MainScreen() {
         conversations={conversations}
         activeId={activeConversation?.id || null}
         onSearchConversations={searchConversations}
-        onSelect={selectConversation}
+        onSelect={handleSelectConversation}
         onCopyThread={(id) => {
           void handleCopyThread(id);
         }}
@@ -1906,7 +2015,7 @@ export function MainScreen() {
           void handleRenameThread(id, title);
         }}
         onTogglePinned={handleTogglePinned}
-        onNewSession={clearActiveConversation}
+        onNewSession={handleStartNewSession}
         onDelete={deleteConversation}
         onClose={() => setDrawerVisible(false)}
       />

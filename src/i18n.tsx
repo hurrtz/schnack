@@ -33,7 +33,27 @@ const translations = {
     instructionsTabDescription:
       "Shape the hidden guidance that steers the assistant before any provider sees the request.",
     providersTabDescription:
-      "Connect providers, store keys on-device, and decide which model each provider should use.",
+      "Connect providers, store keys on-device, and map each home-screen response mode to a provider and model.",
+    responseModes: "Response Modes",
+    responseModesDescription:
+      "Map each home-screen response category to its own provider and model.",
+    quickAndShallow: "Quick + Shallow",
+    deepThinking: "Deep Thinking",
+    quickModeHint: "Fastest route",
+    normalModeHint: "Balanced default",
+    deepModeHint: "Most capable route",
+    quickModeDescription:
+      "Use this for fast answers where speed matters more than nuance.",
+    normalModeDescription:
+      "Use this for most conversations when you want a balanced answer.",
+    deepModeDescription:
+      "Use this when you want the strongest model for detail, tradeoffs, and reasoning.",
+    activeResponseMode: "Active",
+    useResponseMode: ({ mode }) => `Use ${mode}`,
+    responseModeReadyHint: ({ provider }) =>
+      `${provider} is ready for this response mode.`,
+    responseModeMissingKeyHint: ({ provider }) =>
+      `Add a ${provider} API key below to use this response mode.`,
     setupChecklist: "Voice Setup Checklist",
     setupChecklistReady:
       "This setup is ready for reply generation, speech input, and spoken playback.",
@@ -477,7 +497,27 @@ const translations = {
     instructionsTabDescription:
       "Bestimme die unsichtbare Anweisung, die den Assistenten lenkt, noch bevor ein Anbieter die Anfrage erhält.",
     providersTabDescription:
-      "Verbinde Anbieter, speichere Schlüssel auf dem Gerät und lege fest, welches Modell jeder Anbieter nutzen soll.",
+      "Verbinde Anbieter, speichere Schlüssel auf dem Gerät und ordne jedem Antwortmodus auf dem Home-Bildschirm einen Anbieter und ein Modell zu.",
+    responseModes: "Antwortmodi",
+    responseModesDescription:
+      "Ordne jeder Antwort-Kategorie auf dem Home-Bildschirm ihren eigenen Anbieter und ihr eigenes Modell zu.",
+    quickAndShallow: "Schnell + knapp",
+    deepThinking: "Tiefes Denken",
+    quickModeHint: "Schnellste Route",
+    normalModeHint: "Ausgewogener Standard",
+    deepModeHint: "Stärkste Route",
+    quickModeDescription:
+      "Nutze das für schnelle Antworten, wenn Tempo wichtiger ist als Nuancen.",
+    normalModeDescription:
+      "Nutze das für die meisten Gespräche, wenn du eine ausgewogene Antwort willst.",
+    deepModeDescription:
+      "Nutze das, wenn du das stärkste Modell für Details, Abwägungen und Reasoning willst.",
+    activeResponseMode: "Aktiv",
+    useResponseMode: ({ mode }) => `${mode} verwenden`,
+    responseModeReadyHint: ({ provider }) =>
+      `${provider} ist für diesen Antwortmodus bereit.`,
+    responseModeMissingKeyHint: ({ provider }) =>
+      `Füge unten einen API-Schlüssel für ${provider} hinzu, um diesen Antwortmodus zu nutzen.`,
     setupChecklist: "Sprach-Checkliste",
     setupChecklistReady:
       "Dieses Setup ist bereit für Antworten, Spracheingabe und Sprachausgabe.",

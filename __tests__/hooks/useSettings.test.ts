@@ -106,6 +106,43 @@ describe("useSettings", () => {
     );
   });
 
+  it("migrates legacy active provider state into all response modes", async () => {
+    const legacyStored = {
+      ...DEFAULT_SETTINGS,
+      lastProvider: "anthropic" as const,
+      providerModels: {
+        ...DEFAULT_SETTINGS.providerModels,
+        anthropic: "claude-opus-4-6",
+      },
+    };
+
+    delete (legacyStored as Partial<typeof legacyStored>).responseModes;
+    delete (legacyStored as Partial<typeof legacyStored>).activeResponseMode;
+
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(
+      JSON.stringify(legacyStored),
+    );
+
+    const { result } = renderHook(() => useSettings());
+    await flushSettingsLoad();
+
+    expect(result.current.settings.responseModes).toEqual({
+      quick: {
+        provider: "anthropic",
+        model: "claude-opus-4-6",
+      },
+      normal: {
+        provider: "anthropic",
+        model: "claude-opus-4-6",
+      },
+      deep: {
+        provider: "anthropic",
+        model: "claude-opus-4-6",
+      },
+    });
+    expect(result.current.settings.activeResponseMode).toBe("normal");
+  });
+
   it("persists settings on update", async () => {
     const { result } = renderHook(() => useSettings());
     await flushSettingsLoad();
@@ -193,6 +230,44 @@ describe("useSettings", () => {
     expect(result.current.settings.providerModels.groq).toBe(
       "openai/gpt-oss-120b",
     );
+  });
+
+  it("persists response mode route selections", async () => {
+    const { result } = renderHook(() => useSettings());
+    await flushSettingsLoad();
+
+    await act(async () => {
+      result.current.updateResponseModeRoute("deep", {
+        provider: "gemini",
+        model: "gemini-2.5-pro",
+      });
+    });
+
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      "@schnackai/settings",
+      expect.stringContaining(
+        '"deep":{"provider":"gemini","model":"gemini-2.5-pro"}',
+      ),
+    );
+    expect(result.current.settings.responseModes.deep).toEqual({
+      provider: "gemini",
+      model: "gemini-2.5-pro",
+    });
+  });
+
+  it("persists the active response mode", async () => {
+    const { result } = renderHook(() => useSettings());
+    await flushSettingsLoad();
+
+    await act(async () => {
+      result.current.updateActiveResponseMode("deep");
+    });
+
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      "@schnackai/settings",
+      expect.stringContaining('"activeResponseMode":"deep"'),
+    );
+    expect(result.current.settings.activeResponseMode).toBe("deep");
   });
 
   it("persists provider TTS voice selections", async () => {

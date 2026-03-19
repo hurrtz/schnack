@@ -16,6 +16,7 @@ export type ReplyPlayback = "stream" | "wait";
 export type TtsPlayback = ReplyPlayback;
 export type ThemeMode = "light" | "dark" | "system";
 export type AppLanguage = "en" | "de";
+export type ResponseMode = "quick" | "normal" | "deep";
 export type TtsListenLanguage =
   | "en"
   | "de"
@@ -36,10 +37,15 @@ export type AssistantResponseTone =
   | "concise"
   | "socratic"
   | "eli5";
+export interface ResponseModeRoute {
+  provider: Provider;
+  model: string;
+}
 export type ProviderApiKeys = Record<Provider, string>;
 export type ProviderModelSelections = Record<Provider, string>;
 export type ProviderTtsVoiceSelections = Record<Provider, string>;
 export type LocalTtsVoiceSelections = Record<TtsListenLanguage, string>;
+export type ResponseModeSelections = Record<ResponseMode, ResponseModeRoute>;
 export type UsageEstimateKind = "reply" | "summary";
 export type VoicePreviewRequest =
   | {
@@ -69,6 +75,8 @@ export type VoiceVisualPhase =
 export interface Settings {
   inputMode: InputMode;
   replyPlayback: ReplyPlayback;
+  activeResponseMode: ResponseMode;
+  responseModes: ResponseModeSelections;
   providerModels: ProviderModelSelections;
   providerTtsVoices: ProviderTtsVoiceSelections;
   language: AppLanguage;
@@ -129,6 +137,21 @@ export function getDefaultTtsListenLanguages(
 export const DEFAULT_SETTINGS: Settings = {
   inputMode: "push-to-talk",
   replyPlayback: "stream",
+  activeResponseMode: "normal",
+  responseModes: {
+    quick: {
+      provider: "groq",
+      model: "llama-3.1-8b-instant",
+    },
+    normal: {
+      provider: "anthropic",
+      model: "claude-sonnet-4-6",
+    },
+    deep: {
+      provider: "openai",
+      model: "gpt-5.4",
+    },
+  },
   providerModels: {
     openai: "gpt-5.4",
     anthropic: "claude-sonnet-4-6",

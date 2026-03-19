@@ -24,13 +24,13 @@ interface ConversationDrawerProps {
   conversations: ConversationMeta[];
   activeId: string | null;
   onSearchConversations: (query: string) => Promise<ConversationMeta[]>;
-  onSelect: (id: string) => void;
+  onSelect: (id: string) => Promise<void> | void;
   onCopyThread: (id: string) => void;
   onShareThread: (id: string) => void;
   onManageMemory: (id: string) => void;
   onRenameThread: (id: string, title: string) => void;
   onTogglePinned: (id: string) => void;
-  onNewSession: () => void;
+  onNewSession: () => Promise<void> | void;
   onDelete: (id: string) => void;
   onClose: () => void;
 }
@@ -188,8 +188,10 @@ export function ConversationDrawer({
           <TouchableOpacity
             activeOpacity={0.92}
             onPress={() => {
-              onNewSession();
-              onClose();
+              void (async () => {
+                await onNewSession();
+                onClose();
+              })();
             }}
           >
             <LinearGradient
@@ -285,8 +287,10 @@ export function ConversationDrawer({
                         },
                       ]}
                       onPress={() => {
-                        onSelect(item.id);
-                        onClose();
+                        void (async () => {
+                          await onSelect(item.id);
+                          onClose();
+                        })();
                       }}
                       activeOpacity={0.9}
                     >
