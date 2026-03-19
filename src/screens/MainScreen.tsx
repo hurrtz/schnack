@@ -1559,49 +1559,51 @@ export function MainScreen() {
             </View>
           </View>
 
-          <View
-            style={[
-              styles.transcriptShell,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                shadowColor: colors.glow,
-              },
-            ]}
-          >
-            <View style={styles.transcriptHeader}>
-              <TouchableOpacity
-                style={[
-                  styles.expandButton,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-                onPress={openTranscript}
-              >
-                <Text
-                  style={[styles.expandButtonText, { color: colors.text }]}
+          {messages.length > 0 ? (
+            <View
+              style={[
+                styles.transcriptShell,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  shadowColor: colors.glow,
+                },
+              ]}
+            >
+              <View style={styles.transcriptHeader}>
+                <TouchableOpacity
+                  style={[
+                    styles.expandButton,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={openTranscript}
                 >
-                  {t("showTranscript")}
-                </Text>
-              </TouchableOpacity>
-            </View>
+                  <Text
+                    style={[styles.expandButtonText, { color: colors.text }]}
+                  >
+                    {t("showTranscript")}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-            <View style={styles.transcriptBody}>
-              <ChatTranscript
-                messages={messages}
-                emptyTitle={t("noTranscriptYet")}
-                emptyDescription={t("previewTranscriptEmptyDescription")}
-                contentContainerStyle={styles.previewTranscriptContent}
-                scrollEnabled={false}
-                showUsageStats={settings.showUsageStats}
-                onCopyMessage={(message) => {
-                  void handleCopyMessage(message.content);
-                }}
-              />
+              <View style={styles.transcriptBody}>
+                <ChatTranscript
+                  messages={messages}
+                  emptyTitle={t("noTranscriptYet")}
+                  emptyDescription={t("previewTranscriptEmptyDescription")}
+                  contentContainerStyle={styles.previewTranscriptContent}
+                  scrollEnabled={false}
+                  showUsageStats={settings.showUsageStats}
+                  onCopyMessage={(message) => {
+                    void handleCopyMessage(message.content);
+                  }}
+                />
+              </View>
             </View>
-          </View>
+          ) : null}
         </ScrollView>
       </View>
 
