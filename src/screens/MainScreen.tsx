@@ -1232,7 +1232,11 @@ export function MainScreen() {
         ]}
         onPress={() => setDrawerVisible(true)}
       >
-        <Feather name="menu" size={18} color={colors.textSecondary} />
+        <Feather
+          name="message-square"
+          size={18}
+          color={colors.textSecondary}
+        />
       </TouchableOpacity>
 
       {compact ? (
