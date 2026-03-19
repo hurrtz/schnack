@@ -35,7 +35,6 @@ import {
   PROVIDER_LABELS,
   PROVIDER_MODELS,
   PROVIDER_ORDER,
-  getProviderModelName,
   getNativeSttLanguageNote,
   getNativeTtsLanguageNote,
   getProviderApiKeyHint,
@@ -722,57 +721,6 @@ function ProviderSection({
     }));
   }, [selectedProvider, selectedProviderApiKey, selectedProviderModel]);
 
-  const activeResponseRoute = settings.responseModes[settings.activeResponseMode];
-  const replyRouteLabel = t("replyModelRoute", {
-    route: `${getResponseModeLabel(
-      settings.activeResponseMode,
-      t,
-    )} · ${PROVIDER_LABELS[activeResponseRoute.provider]} · ${getProviderModelName(
-      activeResponseRoute.provider,
-      activeResponseRoute.model,
-    )}`,
-  });
-  const speechInputRouteLabel = t("speechInputRoute", {
-    route:
-      settings.sttMode === "native"
-        ? t("appNative")
-        : settings.sttProvider
-          ? PROVIDER_LABELS[settings.sttProvider]
-          : t("noProviderYet"),
-  });
-  const voiceOutputRouteLabel = t("voiceOutputRoute", {
-    route:
-      settings.ttsMode === "native"
-        ? t("systemVoice")
-        : settings.ttsProvider
-          ? PROVIDER_LABELS[settings.ttsProvider]
-          : t("noTtsProvider"),
-  });
-  const setupChecklistItems = [
-    {
-      id: "reply",
-      label: replyRouteLabel,
-      ready: settings.apiKeys[activeResponseRoute.provider].trim().length > 0,
-    },
-    {
-      id: "stt",
-      label: speechInputRouteLabel,
-      ready:
-        settings.sttMode === "native" ||
-        (!!settings.sttProvider &&
-          settings.apiKeys[settings.sttProvider].trim().length > 0),
-    },
-    {
-      id: "tts",
-      label: voiceOutputRouteLabel,
-      ready:
-        settings.ttsMode === "native" ||
-        (!!settings.ttsProvider &&
-          settings.apiKeys[settings.ttsProvider].trim().length > 0),
-    },
-  ];
-  const setupChecklistReady = setupChecklistItems.every((item) => item.ready);
-
   const handleOpenProviderPortal = React.useCallback(() => {
     void Linking.openURL(PROVIDER_API_KEY_URLS[selectedProvider]);
   }, [selectedProvider]);
@@ -855,103 +803,6 @@ function ProviderSection({
         settings={settings}
         onUpdateResponseModeRoute={onUpdateResponseModeRoute}
       />
-
-      <View
-        style={[
-          styles.setupChecklistCard,
-          {
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-          },
-        ]}
-      >
-        <View style={styles.setupChecklistHeader}>
-          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-            {t("setupChecklist")}
-          </Text>
-          <View
-            style={[
-              styles.providerStatusPill,
-              styles.setupChecklistStatusPill,
-              {
-                backgroundColor: setupChecklistReady
-                  ? colors.accentSoft
-                  : colors.surfaceElevated,
-                borderColor: setupChecklistReady
-                  ? colors.borderStrong
-                  : colors.border,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.providerStatusText,
-                {
-                  color: setupChecklistReady
-                    ? colors.accent
-                    : colors.textSecondary,
-                },
-              ]}
-            >
-              {setupChecklistReady ? t("configured") : t("missing")}
-            </Text>
-          </View>
-        </View>
-        <Text
-          style={[
-            styles.sectionHint,
-            styles.setupChecklistHint,
-            { color: colors.textMuted },
-          ]}
-        >
-          {setupChecklistReady
-            ? t("setupChecklistReady")
-            : t("setupChecklistNeedsWork")}
-        </Text>
-
-        <View style={styles.setupChecklistList}>
-          {setupChecklistItems.map((item) => (
-            <View key={item.id} style={styles.setupChecklistItem}>
-              <View
-                style={[
-                  styles.setupChecklistIcon,
-                  {
-                    backgroundColor: item.ready
-                      ? colors.accentSoft
-                      : colors.surfaceElevated,
-                    borderColor: item.ready
-                      ? colors.borderStrong
-                      : colors.border,
-                  },
-                ]}
-              >
-                <Feather
-                  name={item.ready ? "check" : "minus"}
-                  size={14}
-                  color={item.ready ? colors.accent : colors.textMuted}
-                />
-              </View>
-              <View style={styles.setupChecklistCopy}>
-                <Text
-                  style={[styles.setupChecklistLabel, { color: colors.text }]}
-                >
-                  {item.label}
-                </Text>
-                <Text
-                  style={[
-                    styles.setupChecklistState,
-                    {
-                      color: item.ready ? colors.accent : colors.textSecondary,
-                    },
-                  ]}
-                >
-                  {item.ready ? t("configured") : t("missing")}
-                </Text>
-              </View>
-            </View>
-          ))}
-        </View>
-      </View>
 
       <View
         style={[
