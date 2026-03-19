@@ -12,7 +12,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import * as Clipboard from "expo-clipboard";
 import * as Speech from "expo-speech";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -126,7 +125,12 @@ type SettingsTab = "instructions" | "providers" | "stt" | "tts" | "ui";
 type TextInputFocusHandler = NonNullable<
   React.ComponentProps<typeof TextInput>["onFocus"]
 >;
-type ApiKeyClipboardStatus = "idle" | "pasted" | "copied" | "empty";
+type ProviderValidationState = {
+  status: "idle" | "validating" | "success" | "error";
+  message?: string;
+  apiKey?: string;
+  model?: string;
+};
 
 const TABS: SettingsTab[] = ["instructions", "providers", "stt", "tts", "ui"];
 
@@ -685,18 +689,8 @@ function ProviderSection({
     focusProvider ?? settings.lastProvider,
   );
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
-  const [clipboardStatus, setClipboardStatus] =
-    useState<ApiKeyClipboardStatus>("idle");
   const [validationStateByProvider, setValidationStateByProvider] = useState<
-    Partial<
-      Record<
-        Provider,
-        {
-          status: "idle" | "validating" | "success" | "error";
-          message?: string;
-        }
-      >
-    >
+    Partial<Record<Provider, ProviderValidationState>>
   >({});
 
   useEffect(() => {
@@ -705,7 +699,6 @@ function ProviderSection({
 
   useEffect(() => {
     setApiKeyVisible(false);
-    setClipboardStatus("idle");
   }, [selectedProvider]);
 
   const selectedProviderApiKey = settings.apiKeys[selectedProvider];
@@ -713,21 +706,21 @@ function ProviderSection({
     settings,
     selectedProvider,
   );
-
-  useEffect(() => {
-    setValidationStateByProvider((previous) => ({
-      ...previous,
-      [selectedProvider]: { status: "idle" },
-    }));
-  }, [selectedProvider, selectedProviderApiKey, selectedProviderModel]);
+  const trimmedSelectedProviderApiKey = selectedProviderApiKey.trim();
 
   const handleOpenProviderPortal = React.useCallback(() => {
     void Linking.openURL(PROVIDER_API_KEY_URLS[selectedProvider]);
   }, [selectedProvider]);
-  const validationState = validationStateByProvider[selectedProvider] ?? {
-    status: "idle" as const,
-  };
-  const hasApiKey = selectedProviderApiKey.trim().length > 0;
+  const storedValidationState = validationStateByProvider[selectedProvider];
+  const validationStateMatchesCurrentSelection =
+    storedValidationState?.apiKey === trimmedSelectedProviderApiKey &&
+    storedValidationState?.model === selectedProviderModel;
+  const validationState = validationStateMatchesCurrentSelection
+    ? storedValidationState ?? { status: "idle" as const }
+    : { status: "idle" as const };
+  const hasApiKey = trimmedSelectedProviderApiKey.length > 0;
+  const shouldShowValidateAction =
+    hasApiKey && validationState.status !== "success";
   const secureApiKey = hasApiKey && !apiKeyVisible;
 
   const handleValidateProviderKey = async () => {
@@ -735,6 +728,8 @@ function ProviderSection({
       ...previous,
       [selectedProvider]: {
         status: "validating",
+        apiKey: trimmedSelectedProviderApiKey,
+        model: selectedProviderModel,
       },
     }));
 
@@ -747,6 +742,8 @@ function ProviderSection({
           message: t("providerValidationSuccess", {
             provider: PROVIDER_LABELS[selectedProvider],
           }),
+          apiKey: trimmedSelectedProviderApiKey,
+          model: selectedProviderModel,
         },
       }));
     } catch (error) {
@@ -758,43 +755,11 @@ function ProviderSection({
             error instanceof Error
               ? error.message
               : t("providerValidationFailed"),
+          apiKey: trimmedSelectedProviderApiKey,
+          model: selectedProviderModel,
         },
       }));
     }
-  };
-
-  useEffect(() => {
-    if (clipboardStatus === "idle") {
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      setClipboardStatus("idle");
-    }, 1800);
-
-    return () => clearTimeout(timeout);
-  }, [clipboardStatus]);
-
-  const handlePasteApiKey = async () => {
-    const clipboardValue = (await Clipboard.getStringAsync()).trim();
-
-    if (!clipboardValue) {
-      setClipboardStatus("empty");
-      return;
-    }
-
-    onUpdateApiKey(selectedProvider, clipboardValue);
-    setClipboardStatus("pasted");
-  };
-
-  const handleCopyApiKey = async () => {
-    if (!selectedProviderApiKey.trim()) {
-      setClipboardStatus("empty");
-      return;
-    }
-
-    await Clipboard.setStringAsync(selectedProviderApiKey);
-    setClipboardStatus("copied");
   };
 
   return (
@@ -820,6 +785,7 @@ function ProviderSection({
         <View style={styles.providerButtonGrid}>
           {PROVIDER_ORDER.map((provider) => {
             const active = provider === selectedProvider;
+            const configured = settings.apiKeys[provider].trim().length > 0;
 
             return (
               <Pressable
@@ -828,10 +794,20 @@ function ProviderSection({
                   styles.providerButton,
                   {
                     backgroundColor: active
-                      ? colors.surface
+                      ? colors.accentSoft
+                      : configured
+                        ? colors.surface
                       : colors.surfaceElevated,
-                    borderColor: active ? colors.borderStrong : colors.border,
-                    shadowColor: active ? colors.glow : "transparent",
+                    borderColor: active
+                      ? colors.accent
+                      : configured
+                        ? colors.borderStrong
+                        : colors.border,
+                    shadowColor: active
+                      ? colors.accent
+                      : configured
+                        ? colors.glow
+                        : "transparent",
                   },
                 ]}
                 onPress={() => setSelectedProvider(provider)}
@@ -843,8 +819,29 @@ function ProviderSection({
               >
                 <ProviderIcon
                   provider={provider}
-                  color={active ? colors.text : colors.textSecondary}
+                  color={
+                    active || configured ? colors.text : colors.textSecondary
+                  }
                 />
+                {configured ? (
+                  <View
+                    style={[
+                      styles.providerButtonBadge,
+                      {
+                        backgroundColor: active
+                          ? colors.surface
+                          : colors.accent,
+                        borderColor: colors.borderStrong,
+                      },
+                    ]}
+                  >
+                    <Feather
+                      name="check"
+                      size={10}
+                      color={active ? colors.accent : colors.surface}
+                    />
+                  </View>
+                ) : null}
               </Pressable>
             );
           })}
@@ -859,71 +856,32 @@ function ProviderSection({
             },
           ]}
         >
-          <Text style={[styles.apiKeyTitle, { color: colors.text }]}>
-            {PROVIDER_LABELS[selectedProvider]}
-          </Text>
-          <Text
-            style={[styles.apiKeyHint, { color: colors.textMuted }]}
-          >
-            {getProviderApiKeyHint(selectedProvider, language)}
-          </Text>
-          <View style={styles.apiKeyActionRow}>
+          <View style={styles.apiKeyHeader}>
+            <Text style={[styles.apiKeyTitle, { color: colors.text }]}>
+              {PROVIDER_LABELS[selectedProvider]}
+            </Text>
             <TouchableOpacity
-              style={[
-                styles.apiKeyLinkButton,
-                styles.apiKeyActionButton,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.border,
-                },
-              ]}
+              style={styles.apiKeyPortalLink}
               onPress={handleOpenProviderPortal}
               accessibilityRole="link"
               accessibilityLabel={t("createProviderApiKey", {
                 provider: PROVIDER_LABELS[selectedProvider],
               })}
-              activeOpacity={0.85}
+              activeOpacity={0.75}
             >
-              <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
+              <Text
+                style={[styles.apiKeyPortalLinkText, { color: colors.accent }]}
+              >
                 {t("createApiKey")}
               </Text>
-              <Feather name="external-link" size={14} color={colors.accent} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.apiKeyLinkButton,
-                styles.apiKeyActionButton,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.border,
-                  opacity:
-                    hasApiKey && validationState.status !== "validating"
-                      ? 1
-                      : 0.5,
-                },
-              ]}
-              onPress={() => {
-                void handleValidateProviderKey();
-              }}
-              activeOpacity={0.85}
-              disabled={!hasApiKey || validationState.status === "validating"}
-            >
-              <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
-                {validationState.status === "validating"
-                  ? t("validatingKey")
-                  : t("validateKey")}
-              </Text>
-              <Feather
-                name={
-                  validationState.status === "validating"
-                    ? "loader"
-                    : "check-circle"
-                }
-                size={14}
-                color={colors.accent}
-              />
+              <Feather name="external-link" size={13} color={colors.accent} />
             </TouchableOpacity>
           </View>
+          <Text
+            style={[styles.apiKeyHint, { color: colors.textMuted }]}
+          >
+            {getProviderApiKeyHint(selectedProvider, language)}
+          </Text>
           <View style={styles.apiKeyInputRow}>
             <TextInput
               value={settings.apiKeys[selectedProvider]}
@@ -959,8 +917,7 @@ function ProviderSection({
               style={[
                 styles.apiKeyVisibilityButton,
                 {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.border,
+                  backgroundColor: colors.surface,
                 },
               ]}
               onPress={() => setApiKeyVisible((previous) => !previous)}
@@ -975,66 +932,45 @@ function ProviderSection({
               />
             </TouchableOpacity>
           </View>
-          <View style={styles.apiKeyActionRow}>
-            <TouchableOpacity
-              style={[
-                styles.apiKeyLinkButton,
-                styles.apiKeyActionButton,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.border,
-                },
-              ]}
-              onPress={() => {
-                void handlePasteApiKey();
-              }}
-              activeOpacity={0.85}
-            >
-              <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
-                {clipboardStatus === "pasted" ? t("pasted") : t("paste")}
-              </Text>
-              <Feather name="clipboard" size={14} color={colors.accent} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.apiKeyLinkButton,
-                styles.apiKeyActionButton,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.border,
-                  opacity: hasApiKey ? 1 : 0.5,
-                },
-              ]}
-              onPress={() => {
-                void handleCopyApiKey();
-              }}
-              activeOpacity={0.85}
-              disabled={!hasApiKey}
-            >
-              <Text style={[styles.apiKeyLinkText, { color: colors.text }]}>
-                {clipboardStatus === "copied" ? t("copied") : t("copy")}
-              </Text>
-              <Feather name="copy" size={14} color={colors.accent} />
-            </TouchableOpacity>
-          </View>
+          {shouldShowValidateAction ? (
+            <View style={styles.apiKeyMetaRow}>
+              <TouchableOpacity
+                style={[
+                  styles.apiKeyValidateLink,
+                  validationState.status === "validating"
+                    ? styles.apiKeyValidateLinkDisabled
+                    : null,
+                ]}
+                onPress={() => {
+                  void handleValidateProviderKey();
+                }}
+                activeOpacity={0.75}
+                disabled={validationState.status === "validating"}
+              >
+                <Text
+                  style={[
+                    styles.apiKeyValidateText,
+                    { color: colors.accent },
+                  ]}
+                >
+                  {validationState.status === "validating"
+                    ? t("validatingKey")
+                    : t("validateKey")}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
           <Text
             style={[
               styles.sectionHint,
-              { color: colors.textMuted, marginTop: 8 },
+              {
+                color: colors.textMuted,
+                marginTop: shouldShowValidateAction ? 8 : 10,
+              },
             ]}
           >
             {t("apiKeyProtectedHint")}
           </Text>
-          {clipboardStatus === "empty" ? (
-            <Text
-              style={[
-                styles.sectionHint,
-                { color: colors.textMuted, marginTop: 6 },
-              ]}
-            >
-              {t("clipboardEmpty")}
-            </Text>
-          ) : null}
           {validationState.status !== "idle" && validationState.message ? (
             <View
               style={[
@@ -2938,27 +2874,39 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 4,
   },
+  providerButtonBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   apiKeyCard: {
     borderRadius: 18,
     borderWidth: 1,
     padding: 14,
   },
-  providerStatusPill: {
-    alignSelf: "flex-start",
-    marginTop: 10,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  providerStatusText: {
-    fontSize: 10,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    fontFamily: fonts.mono,
+  apiKeyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
   },
   apiKeyTitle: {
     fontSize: 14,
+    fontFamily: fonts.display,
+  },
+  apiKeyPortalLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  apiKeyPortalLinkText: {
+    fontSize: 12,
     fontFamily: fonts.display,
   },
   apiKeyHint: {
@@ -2969,48 +2917,45 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
   },
   apiKeyInputRow: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    gap: 10,
+    position: "relative",
+    justifyContent: "center",
   },
   apiKeyInput: {
     minHeight: 48,
-    flex: 1,
+    width: "100%",
     borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 14,
+    paddingRight: 54,
     paddingVertical: 12,
     fontSize: 14,
     fontFamily: fonts.body,
   },
   apiKeyVisibilityButton: {
-    width: 48,
-    minHeight: 48,
-    borderRadius: 14,
-    borderWidth: 1,
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  apiKeyLinkButton: {
-    minHeight: 42,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 10,
-    paddingHorizontal: 14,
+  apiKeyMetaRow: {
+    marginTop: 10,
+    minHeight: 18,
+    justifyContent: "center",
+  },
+  apiKeyValidateLink: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
+    alignSelf: "flex-start",
   },
-  apiKeyActionRow: {
-    flexDirection: "row",
-    gap: 10,
+  apiKeyValidateLinkDisabled: {
+    opacity: 0.6,
   },
-  apiKeyActionButton: {
-    flex: 1,
-  },
-  apiKeyLinkText: {
-    fontSize: 13,
+  apiKeyValidateText: {
+    fontSize: 12,
     fontFamily: fonts.display,
   },
   validationCard: {
