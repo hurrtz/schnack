@@ -13,6 +13,9 @@
 		6BBAA95B51D3F6322E30BD0D /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C52F9AF8602F178C80F51B50 /* ExpoModulesProvider.swift */; };
 		7C4A2D4D5A9E4A6FB6500101 /* SchnackNativeAudioQueue.m in Sources */ = {isa = PBXBuildFile; fileRef = 7C4A2D4D5A9E4A6FB6500001 /* SchnackNativeAudioQueue.m */; };
 		7C4A2D4D5A9E4A6FB6500102 /* SchnackNativeLocalTts.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7C4A2D4D5A9E4A6FB6500002 /* SchnackNativeLocalTts.mm */; };
+		7C4A2D4D5A9E4A6FB6500103 /* SchnackNativeWaveform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C4A2D4D5A9E4A6FB6500003 /* SchnackNativeWaveform.swift */; };
+		7C4A2D4D5A9E4A6FB6500104 /* SchnackNativeWaveformBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 7C4A2D4D5A9E4A6FB6500004 /* SchnackNativeWaveformBridge.m */; };
+		7C4A2D4D5A9E4A6FB6500105 /* SchnackNativeWaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C4A2D4D5A9E4A6FB6500005 /* SchnackNativeWaveformView.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		E2385A0D49ADF64A271D5FFE /* libPods-SchnackAI.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C2E18CB4910ACB38E443AFE /* libPods-SchnackAI.a */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
@@ -27,6 +30,9 @@
 		64F9FFC99FC7060C97837358 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = SchnackAI/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		7C4A2D4D5A9E4A6FB6500001 /* SchnackNativeAudioQueue.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = SchnackNativeAudioQueue.m; path = SchnackAI/SchnackNativeAudioQueue.m; sourceTree = "<group>"; };
 		7C4A2D4D5A9E4A6FB6500002 /* SchnackNativeLocalTts.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = SchnackNativeLocalTts.mm; path = SchnackAI/SchnackNativeLocalTts.mm; sourceTree = "<group>"; };
+		7C4A2D4D5A9E4A6FB6500003 /* SchnackNativeWaveform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SchnackNativeWaveform.swift; path = SchnackAI/SchnackNativeWaveform.swift; sourceTree = "<group>"; };
+		7C4A2D4D5A9E4A6FB6500004 /* SchnackNativeWaveformBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = SchnackNativeWaveformBridge.m; path = SchnackAI/SchnackNativeWaveformBridge.m; sourceTree = "<group>"; };
+		7C4A2D4D5A9E4A6FB6500005 /* SchnackNativeWaveformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SchnackNativeWaveformView.swift; path = SchnackAI/SchnackNativeWaveformView.swift; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = SchnackAI/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		C52F9AF8602F178C80F51B50 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SchnackAI/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
@@ -54,6 +60,9 @@
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
 				7C4A2D4D5A9E4A6FB6500001 /* SchnackNativeAudioQueue.m */,
 				7C4A2D4D5A9E4A6FB6500002 /* SchnackNativeLocalTts.mm */,
+				7C4A2D4D5A9E4A6FB6500003 /* SchnackNativeWaveform.swift */,
+				7C4A2D4D5A9E4A6FB6500004 /* SchnackNativeWaveformBridge.m */,
+				7C4A2D4D5A9E4A6FB6500005 /* SchnackNativeWaveformView.swift */,
 				F11748442D0722820044C1D9 /* SchnackAI-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
@@ -363,6 +372,9 @@
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
 				7C4A2D4D5A9E4A6FB6500101 /* SchnackNativeAudioQueue.m in Sources */,
 				7C4A2D4D5A9E4A6FB6500102 /* SchnackNativeLocalTts.mm in Sources */,
+				7C4A2D4D5A9E4A6FB6500103 /* SchnackNativeWaveform.swift in Sources */,
+				7C4A2D4D5A9E4A6FB6500104 /* SchnackNativeWaveformBridge.m in Sources */,
+				7C4A2D4D5A9E4A6FB6500105 /* SchnackNativeWaveformView.swift in Sources */,
 				6BBAA95B51D3F6322E30BD0D /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

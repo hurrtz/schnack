@@ -71,6 +71,7 @@ export type VoiceVisualPhase =
   | "transcribing"
   | "thinking"
   | "speaking";
+export type WaveformVisualizationVariant = "bars" | "oscilloscope";
 
 export interface Settings {
   inputMode: InputMode;

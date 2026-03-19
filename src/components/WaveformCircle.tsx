@@ -7,6 +7,7 @@ import {
   StyleSheet,
   GestureResponderEvent,
   Text,
+  Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Animated, {
@@ -26,7 +27,12 @@ import { useLocalization } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Waveform } from "./Waveform";
-import { InputMode, VoiceVisualPhase } from "../types";
+import { NativeWaveformView } from "./NativeWaveformView";
+import {
+  InputMode,
+  VoiceVisualPhase,
+  WaveformVisualizationVariant,
+} from "../types";
 import { normalizeMetering } from "../utils/audioVisualization";
 
 interface WaveformCircleProps {
@@ -35,6 +41,7 @@ interface WaveformCircleProps {
   isActive: boolean;
   phase: VoiceVisualPhase;
   providerLabel: string;
+  waveformVariant?: WaveformVisualizationVariant;
   inputMode: InputMode;
   onPressIn?: (e: GestureResponderEvent) => void;
   onPressOut?: (e: GestureResponderEvent) => void;
@@ -178,6 +185,7 @@ export function WaveformCircle({
   isActive,
   phase,
   providerLabel,
+  waveformVariant = "bars",
   inputMode,
   onPressIn,
   onPressOut,
@@ -187,6 +195,10 @@ export function WaveformCircle({
   const intensity = normalizeMetering(metering);
   const isProcessing = phase === "transcribing" || phase === "thinking";
   const isSpeaking = phase === "speaking";
+  const useNativeInputWaveform =
+    Platform.OS === "ios" &&
+    waveformVariant === "oscilloscope" &&
+    phase === "recording";
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
   const pulse = useSharedValue(0);
   const orbit = useSharedValue(0);
@@ -419,18 +431,38 @@ export function WaveformCircle({
                 <Feather name="mic" size={40} color="rgba(255, 255, 255, 0.96)" />
               </View>
             ) : (
-              <Animated.View style={[styles.waveformWrap, waveformStyle]}>
-                <Waveform
-                  metering={metering}
-                  levels={levels}
-                  maxHeight={isSpeaking ? 60 : 66}
-                  barCount={19}
-                  barWidth={4}
-                  barGap={2}
-                  barColor="rgba(255, 255, 255, 0.96)"
-                  barColorInactive="rgba(255, 255, 255, 0.46)"
-                  isActive={isActive}
-                />
+              <Animated.View
+                style={[
+                  styles.waveformWrap,
+                  waveformVariant === "oscilloscope"
+                    ? styles.waveformWrapOscilloscope
+                    : null,
+                  waveformStyle,
+                ]}
+              >
+                {useNativeInputWaveform ? (
+                  <NativeWaveformView
+                    channel="input"
+                    active={isActive}
+                    lineColor="rgba(255, 255, 255, 0.96)"
+                    baselineColor="rgba(255, 255, 255, 0.12)"
+                    lineWidth={2.2}
+                    style={styles.nativeWaveform}
+                  />
+                ) : (
+                  <Waveform
+                    metering={metering}
+                    levels={levels}
+                    maxHeight={waveformVariant === "oscilloscope" ? 86 : isSpeaking ? 60 : 66}
+                    barCount={waveformVariant === "oscilloscope" ? 78 : 19}
+                    barWidth={waveformVariant === "oscilloscope" ? 1.75 : 4}
+                    barGap={waveformVariant === "oscilloscope" ? 0.45 : 2}
+                    barColor="rgba(255, 255, 255, 0.96)"
+                    barColorInactive="rgba(255, 255, 255, 0.46)"
+                    isActive={isActive}
+                    variant={waveformVariant}
+                  />
+                )}
               </Animated.View>
             )}
           </LinearGradient>
@@ -490,6 +522,13 @@ const styles = StyleSheet.create({
   },
   waveformWrap: {
     marginTop: 18,
+  },
+  waveformWrapOscilloscope: {
+    marginTop: 0,
+  },
+  nativeWaveform: {
+    width: 172,
+    height: 86,
   },
   coreAura: {
     position: "absolute",

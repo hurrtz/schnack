@@ -1,21 +1,36 @@
 import { useEffect, useRef, useCallback, useState } from "react";
+import { Platform } from "react-native";
 import {
   RecordingPresets,
   requestRecordingPermissionsAsync,
-  setAudioModeAsync,
   useAudioRecorder as useExpoAudioRecorder,
   useAudioRecorderState,
 } from "expo-audio";
 import {
+  EMPTY_OSCILLOSCOPE_SAMPLES,
   EMPTY_VISUAL_LEVELS,
+  levelToMetering,
+  averageSampleMagnitude,
   appendMeterHistory,
+  blendWaveformSamples,
+  enhanceInputWaveformSamples,
+  INPUT_WAVEFORM_REFERENCE_FLOOR,
 } from "../utils/audioVisualization";
 import { useLocalization } from "../i18n";
+import { WaveformVisualizationVariant } from "../types";
+import {
+  cancelNativeWaveformRecording,
+  isNativeWaveformAvailable,
+  startNativeWaveformRecording,
+  stopNativeWaveformRecording,
+  subscribeToNativeWaveform,
+} from "../services/nativeWaveform";
 
 export interface RecorderState {
   isRecording: boolean;
   meteringData: number;
   waveformData: number[];
+  waveformVariant: WaveformVisualizationVariant;
 }
 
 const RECORDING_OPTIONS = {
@@ -27,12 +42,56 @@ const RECORDER_STATUS_INTERVAL_MS = 150;
 
 export function useAudioRecorder() {
   const { t } = useLocalization();
+  const usingNativeRecorder =
+    Platform.OS === "ios" && isNativeWaveformAvailable();
   const recorder = useExpoAudioRecorder(RECORDING_OPTIONS);
   const recorderState = useAudioRecorderState(recorder, RECORDER_STATUS_INTERVAL_MS);
   const startTimeRef = useRef<number>(0);
-  const [waveformData, setWaveformData] = useState(EMPTY_VISUAL_LEVELS);
+  const nativeSessionIdRef = useRef<string | null>(null);
+  const inputReferenceLevelRef = useRef(INPUT_WAVEFORM_REFERENCE_FLOOR);
+  const [nativeRecording, setNativeRecording] = useState(false);
+  const [nativeMeteringData, setNativeMeteringData] = useState(-160);
+  const [waveformData, setWaveformData] = useState(
+    usingNativeRecorder ? EMPTY_OSCILLOSCOPE_SAMPLES : EMPTY_VISUAL_LEVELS
+  );
 
   useEffect(() => {
+    if (!usingNativeRecorder) {
+      return;
+    }
+
+    return subscribeToNativeWaveform((event) => {
+      if (
+        event.type !== "levels" ||
+        !nativeSessionIdRef.current ||
+        event.sessionId !== nativeSessionIdRef.current
+      ) {
+        return;
+      }
+
+      const { samples, referenceLevel } = enhanceInputWaveformSamples(
+        event.samples?.length ? event.samples : EMPTY_OSCILLOSCOPE_SAMPLES,
+        inputReferenceLevelRef.current
+      );
+      inputReferenceLevelRef.current = referenceLevel;
+
+      setWaveformData((previous) => blendWaveformSamples(previous, samples, 0.08));
+      setNativeMeteringData(
+        levelToMetering(averageSampleMagnitude(samples))
+      );
+    });
+  }, [usingNativeRecorder]);
+
+  useEffect(() => {
+    if (usingNativeRecorder) {
+      if (!nativeRecording) {
+        inputReferenceLevelRef.current = INPUT_WAVEFORM_REFERENCE_FLOOR;
+        setNativeMeteringData(-160);
+        setWaveformData(EMPTY_OSCILLOSCOPE_SAMPLES);
+      }
+      return;
+    }
+
     if (!recorderState.isRecording) {
       setWaveformData(EMPTY_VISUAL_LEVELS);
       return;
@@ -41,9 +100,45 @@ export function useAudioRecorder() {
     setWaveformData((previous) =>
       appendMeterHistory(previous, recorderState.metering ?? -160)
     );
-  }, [recorderState.isRecording, recorderState.metering]);
+  }, [
+    nativeRecording,
+    recorderState.isRecording,
+    recorderState.metering,
+    usingNativeRecorder,
+  ]);
 
   const startRecording = useCallback(async () => {
+    if (usingNativeRecorder) {
+      if (nativeRecording) {
+        return;
+      }
+
+      const permission = await requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        throw new Error(t("microphonePermissionNotGranted"));
+      }
+
+      const sessionId = `native-recorder-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
+
+      nativeSessionIdRef.current = sessionId;
+      inputReferenceLevelRef.current = INPUT_WAVEFORM_REFERENCE_FLOOR;
+      setNativeMeteringData(-160);
+      setWaveformData(EMPTY_OSCILLOSCOPE_SAMPLES);
+
+      try {
+        await startNativeWaveformRecording({ sessionId });
+        startTimeRef.current = Date.now();
+        setNativeRecording(true);
+      } catch (error) {
+        nativeSessionIdRef.current = null;
+        setNativeRecording(false);
+        throw error;
+      }
+      return;
+    }
+
     if (recorderState.isRecording) {
       return;
     }
@@ -53,39 +148,74 @@ export function useAudioRecorder() {
       throw new Error(t("microphonePermissionNotGranted"));
     }
 
-    await setAudioModeAsync({
-      allowsRecording: true,
-      playsInSilentMode: true,
-    });
-
     await recorder.prepareToRecordAsync(RECORDING_OPTIONS);
     recorder.record();
     startTimeRef.current = Date.now();
-  }, [recorder, recorderState.isRecording, t]);
+  }, [nativeRecording, recorder, recorderState.isRecording, t, usingNativeRecorder]);
 
   const stopRecording = useCallback(async (): Promise<string | null> => {
+    if (usingNativeRecorder) {
+      const sessionId = nativeSessionIdRef.current;
+      if (!sessionId) {
+        return null;
+      }
+
+      const duration = Date.now() - startTimeRef.current;
+      nativeSessionIdRef.current = null;
+
+      try {
+        if (duration < 300) {
+          await cancelNativeWaveformRecording(sessionId);
+          inputReferenceLevelRef.current = INPUT_WAVEFORM_REFERENCE_FLOOR;
+          setNativeRecording(false);
+          setNativeMeteringData(-160);
+          setWaveformData(EMPTY_OSCILLOSCOPE_SAMPLES);
+          return null;
+        }
+
+        const result = await stopNativeWaveformRecording(sessionId);
+        inputReferenceLevelRef.current = INPUT_WAVEFORM_REFERENCE_FLOOR;
+        setNativeRecording(false);
+        setNativeMeteringData(-160);
+        setWaveformData(EMPTY_OSCILLOSCOPE_SAMPLES);
+
+        return result.uri ?? null;
+      } catch (error) {
+        inputReferenceLevelRef.current = INPUT_WAVEFORM_REFERENCE_FLOOR;
+        setNativeRecording(false);
+        setNativeMeteringData(-160);
+        setWaveformData(EMPTY_OSCILLOSCOPE_SAMPLES);
+        throw error;
+      }
+    }
+
     if (!recorderState.isRecording && !recorderState.canRecord) {
       return null;
     }
 
     const duration = Date.now() - startTimeRef.current;
     await recorder.stop();
-    await setAudioModeAsync({
-      allowsRecording: false,
-      playsInSilentMode: true,
-    });
 
     if (duration < 300) {
       return null;
     }
 
     return recorder.uri ?? recorderState.url;
-  }, [recorder, recorderState.canRecord, recorderState.isRecording, recorderState.url]);
+  }, [
+    recorder,
+    recorderState.canRecord,
+    recorderState.isRecording,
+    recorderState.url,
+    usingNativeRecorder,
+  ]);
 
   return {
-    isRecording: recorderState.isRecording,
-    meteringData: recorderState.metering ?? -160,
+    isRecording: usingNativeRecorder ? nativeRecording : recorderState.isRecording,
+    meteringData: usingNativeRecorder
+      ? nativeMeteringData
+      : recorderState.metering ?? -160,
     waveformData,
+    waveformVariant: usingNativeRecorder ? "oscilloscope" : "bars",
     startRecording,
     stopRecording,
   };

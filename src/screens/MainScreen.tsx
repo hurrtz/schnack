@@ -58,6 +58,7 @@ import {
   TtsListenLanguage,
   VoicePreviewRequest,
   VoiceVisualPhase,
+  WaveformVisualizationVariant,
 } from "../types";
 import { formatConversationForCopy } from "../utils/conversationExport";
 import {
@@ -186,6 +187,10 @@ export function MainScreen() {
     settings.sttMode === "native"
       ? nativeStt.waveformData
       : recorder.waveformData;
+  const recordingWaveformVariant: WaveformVisualizationVariant =
+    settings.sttMode === "native"
+      ? (nativeStt.waveformVariant as WaveformVisualizationVariant)
+      : (recorder.waveformVariant as WaveformVisualizationVariant);
   const ttsStatusLabel =
     settings.ttsMode === "native"
       ? t("systemVoice")
@@ -210,6 +215,11 @@ export function MainScreen() {
     : player.isPlaying
       ? player.waveformData
       : undefined;
+  const signalWaveformVariant: WaveformVisualizationVariant = isRecording
+    ? recordingWaveformVariant
+    : player.isPlaying
+      ? (player.waveformVariant as WaveformVisualizationVariant)
+      : "bars";
 
   const showToast = useCallback((message: string, onRetry?: () => void) => {
     setToast({ message, onRetry });
@@ -1379,6 +1389,7 @@ export function MainScreen() {
               isActive={isActive}
               phase={visualPhase}
               providerLabel={providerLabel}
+              waveformVariant={signalWaveformVariant}
               inputMode={settings.inputMode}
               onPressIn={handlePressIn}
               onPressOut={handlePressOut}
@@ -1697,6 +1708,7 @@ export function MainScreen() {
                 levels={signalLevels}
                 isActive={isActive}
                 phase={visualPhase}
+                waveformVariant={signalWaveformVariant}
                 inputMode={settings.inputMode}
                 onPressIn={handlePressIn}
                 onPressOut={handlePressOut}

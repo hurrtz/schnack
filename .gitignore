@@ -43,6 +43,9 @@ yarn-error.*
 /ios/SchnackAI/*
 !/ios/SchnackAI/SchnackNativeAudioQueue.m
 !/ios/SchnackAI/SchnackNativeLocalTts.mm
+!/ios/SchnackAI/SchnackNativeWaveform.swift
+!/ios/SchnackAI/SchnackNativeWaveformView.swift
+!/ios/SchnackAI/SchnackNativeWaveformBridge.m
 !/ios/SchnackAI.xcodeproj/
 /ios/SchnackAI.xcodeproj/*
 !/ios/SchnackAI.xcodeproj/project.pbxproj

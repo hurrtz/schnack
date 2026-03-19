@@ -1,11 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Platform } from "react-native";
 import {
   ExpoSpeechRecognitionModule,
   type ExpoSpeechRecognitionErrorEvent,
   type ExpoSpeechRecognitionResultEvent,
 } from "expo-speech-recognition";
 import { useLocalization } from "../i18n";
-import { EMPTY_VISUAL_LEVELS, appendMeterHistory } from "../utils/audioVisualization";
+import {
+  EMPTY_OSCILLOSCOPE_SAMPLES,
+  EMPTY_VISUAL_LEVELS,
+  appendMeterHistory,
+  averageSampleMagnitude,
+  blendWaveformSamples,
+  enhanceInputWaveformSamples,
+  INPUT_WAVEFORM_REFERENCE_FLOOR,
+  levelToMetering,
+} from "../utils/audioVisualization";
+import { WaveformVisualizationVariant } from "../types";
+import {
+  cancelNativeWaveformRecording,
+  isNativeWaveformAvailable,
+  startNativeWaveformRecording,
+  stopNativeWaveformRecording,
+  subscribeToNativeWaveform,
+} from "../services/nativeWaveform";
 
 const MIN_RECOGNITION_DURATION_MS = 300;
 const RECOGNITION_METER_INTERVAL_MS = 150;
@@ -45,10 +63,15 @@ function buildErrorMessage(
 
 export function useNativeSpeechRecognizer() {
   const { t } = useLocalization();
+  const usingNativeRecorder =
+    Platform.OS === "ios" && isNativeWaveformAvailable();
+  const emptyWaveform = usingNativeRecorder
+    ? EMPTY_OSCILLOSCOPE_SAMPLES
+    : EMPTY_VISUAL_LEVELS;
   const [isRecording, setIsRecording] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const [meteringData, setMeteringData] = useState(-160);
-  const [waveformData, setWaveformData] = useState(EMPTY_VISUAL_LEVELS);
+  const [waveformData, setWaveformData] = useState(emptyWaveform);
   const isRecordingRef = useRef(false);
   const startedAtRef = useRef(0);
   const latestTranscriptRef = useRef("");
@@ -57,11 +80,14 @@ export function useNativeSpeechRecognizer() {
   const stopRejectRef = useRef<((error: Error) => void) | null>(null);
   const stopRequestedRef = useRef(false);
   const abortRequestedRef = useRef(false);
+  const nativeSessionIdRef = useRef<string | null>(null);
+  const inputReferenceLevelRef = useRef(INPUT_WAVEFORM_REFERENCE_FLOOR);
 
   const resetVisualState = useCallback(() => {
+    inputReferenceLevelRef.current = INPUT_WAVEFORM_REFERENCE_FLOOR;
     setMeteringData(-160);
-    setWaveformData(EMPTY_VISUAL_LEVELS);
-  }, []);
+    setWaveformData(emptyWaveform);
+  }, [emptyWaveform]);
 
   const clearPendingResolution = useCallback(() => {
     stopResolverRef.current = null;
@@ -131,6 +157,37 @@ export function useNativeSpeechRecognizer() {
   );
 
   useEffect(() => {
+    if (!usingNativeRecorder) {
+      return;
+    }
+
+    return subscribeToNativeWaveform((event) => {
+      if (
+        event.type !== "levels" ||
+        !nativeSessionIdRef.current ||
+        event.sessionId !== nativeSessionIdRef.current
+      ) {
+        return;
+      }
+
+      const { samples, referenceLevel } = enhanceInputWaveformSamples(
+        event.samples?.length ? event.samples : EMPTY_OSCILLOSCOPE_SAMPLES,
+        inputReferenceLevelRef.current
+      );
+      inputReferenceLevelRef.current = referenceLevel;
+
+      setWaveformData((previous) => blendWaveformSamples(previous, samples, 0.08));
+      setMeteringData(
+        levelToMetering(averageSampleMagnitude(samples))
+      );
+    });
+  }, [usingNativeRecorder]);
+
+  useEffect(() => {
+    if (usingNativeRecorder) {
+      return;
+    }
+
     const startSubscription = ExpoSpeechRecognitionModule.addListener("start", () => {
       isRecordingRef.current = true;
       setIsRecording(true);
@@ -184,7 +241,103 @@ export function useNativeSpeechRecognizer() {
         ExpoSpeechRecognitionModule.abort();
       }
     };
-  }, [handleError, handleResult, resetVisualState, resolvePendingStop]);
+  }, [
+    handleError,
+    handleResult,
+    resetVisualState,
+    resolvePendingStop,
+    usingNativeRecorder,
+  ]);
+
+  useEffect(() => {
+    if (!usingNativeRecorder) {
+      return;
+    }
+
+    return () => {
+      if (nativeSessionIdRef.current) {
+        void cancelNativeWaveformRecording(nativeSessionIdRef.current);
+        nativeSessionIdRef.current = null;
+      }
+    };
+  }, [usingNativeRecorder]);
+
+  const transcribeRecordedFile = useCallback(
+    async (fileUri: string) =>
+      new Promise<string | null>((resolve, reject) => {
+        latestTranscriptRef.current = "";
+        finalTranscriptRef.current = "";
+
+        const cleanup = () => {
+          resultSubscription.remove();
+          errorSubscription.remove();
+          endSubscription.remove();
+        };
+
+        const finish = (value: string | null) => {
+          cleanup();
+          resolve(value);
+        };
+
+        const fail = (error: Error) => {
+          cleanup();
+          reject(error);
+        };
+
+        const resultSubscription = ExpoSpeechRecognitionModule.addListener(
+          "result",
+          (event) => {
+            const transcript = event.results[0]?.transcript?.trim() ?? "";
+            if (!transcript) {
+              return;
+            }
+
+            latestTranscriptRef.current = transcript;
+            if (event.isFinal) {
+              finalTranscriptRef.current = transcript;
+            }
+          }
+        );
+
+        const errorSubscription = ExpoSpeechRecognitionModule.addListener(
+          "error",
+          (event) => {
+            if (event.error === "aborted" || event.error === "no-speech") {
+              finish(null);
+              return;
+            }
+
+            fail(new Error(buildErrorMessage(event, t)));
+          }
+        );
+
+        const endSubscription = ExpoSpeechRecognitionModule.addListener("end", () => {
+          const transcript =
+            finalTranscriptRef.current.trim() || latestTranscriptRef.current.trim() || null;
+          finish(transcript);
+        });
+
+        try {
+          ExpoSpeechRecognitionModule.start({
+            lang: getRecognitionLocale(),
+            interimResults: true,
+            continuous: false,
+            addsPunctuation: true,
+            requiresOnDeviceRecognition: false,
+            audioSource: {
+              uri: fileUri,
+            },
+          });
+        } catch (error) {
+          fail(
+            error instanceof Error
+              ? error
+              : new Error(t("nativeSpeechRecognitionFailed"))
+          );
+        }
+      }),
+    [t]
+  );
 
   const startRecognition = useCallback(async () => {
     if (isRecordingRef.current) {
@@ -210,6 +363,27 @@ export function useNativeSpeechRecognizer() {
     isRecordingRef.current = true;
     setIsRecording(true);
 
+    if (usingNativeRecorder) {
+      const sessionId = `native-stt-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
+
+      nativeSessionIdRef.current = sessionId;
+
+      try {
+        await startNativeWaveformRecording({ sessionId });
+      } catch (error) {
+        nativeSessionIdRef.current = null;
+        isRecordingRef.current = false;
+        setIsRecording(false);
+        resetVisualState();
+        throw error instanceof Error
+          ? error
+          : new Error(t("couldntStartNativeSpeechRecognition"));
+      }
+      return;
+    }
+
     try {
       ExpoSpeechRecognitionModule.start({
         lang: getRecognitionLocale(),
@@ -232,12 +406,26 @@ export function useNativeSpeechRecognizer() {
         ? error
         : new Error(t("couldntStartNativeSpeechRecognition"));
     }
-  }, [clearPendingResolution, resetVisualState, t]);
+  }, [clearPendingResolution, resetVisualState, t, usingNativeRecorder]);
 
   const abortRecognition = useCallback(async () => {
     if (!isRecordingRef.current) {
       clearPendingResolution();
       resetVisualState();
+      return;
+    }
+
+    if (usingNativeRecorder) {
+      const sessionId = nativeSessionIdRef.current;
+      nativeSessionIdRef.current = null;
+      isRecordingRef.current = false;
+      setIsRecording(false);
+      resetVisualState();
+      clearPendingResolution();
+
+      if (sessionId) {
+        await cancelNativeWaveformRecording(sessionId);
+      }
       return;
     }
 
@@ -249,7 +437,7 @@ export function useNativeSpeechRecognizer() {
       stopRejectRef.current = () => resolve();
       ExpoSpeechRecognitionModule.abort();
     });
-  }, [clearPendingResolution, resetVisualState]);
+  }, [clearPendingResolution, resetVisualState, usingNativeRecorder]);
 
   const stopRecognition = useCallback(async (): Promise<string | null> => {
     if (!isRecordingRef.current) {
@@ -261,6 +449,30 @@ export function useNativeSpeechRecognizer() {
       return null;
     }
 
+    if (usingNativeRecorder) {
+      const sessionId = nativeSessionIdRef.current;
+      if (!sessionId) {
+        isRecordingRef.current = false;
+        setIsRecording(false);
+        resetVisualState();
+        return null;
+      }
+
+      nativeSessionIdRef.current = null;
+      isRecordingRef.current = false;
+      setIsRecording(false);
+      resetVisualState();
+
+      const recording = await stopNativeWaveformRecording(sessionId);
+      const fileUri = recording.uri ?? null;
+
+      if (!fileUri) {
+        return null;
+      }
+
+      return transcribeRecordedFile(fileUri);
+    }
+
     stopRequestedRef.current = true;
     abortRequestedRef.current = false;
 
@@ -269,7 +481,12 @@ export function useNativeSpeechRecognizer() {
       stopRejectRef.current = reject;
       ExpoSpeechRecognitionModule.stop();
     });
-  }, [abortRecognition]);
+  }, [
+    abortRecognition,
+    resetVisualState,
+    transcribeRecordedFile,
+    usingNativeRecorder,
+  ]);
 
   const clearLastError = useCallback(() => {
     setLastError(null);
@@ -281,6 +498,7 @@ export function useNativeSpeechRecognizer() {
     lastError,
     meteringData,
     waveformData,
+    waveformVariant: (usingNativeRecorder ? "oscilloscope" : "bars") as WaveformVisualizationVariant,
     startRecognition,
     stopRecognition,
     abortRecognition,

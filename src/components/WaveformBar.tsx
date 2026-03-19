@@ -5,19 +5,26 @@ import {
   GestureResponderEvent,
   View,
   Text,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalization } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import { Waveform } from "./Waveform";
-import { InputMode, VoiceVisualPhase } from "../types";
+import { NativeWaveformView } from "./NativeWaveformView";
+import {
+  InputMode,
+  VoiceVisualPhase,
+  WaveformVisualizationVariant,
+} from "../types";
 
 interface WaveformBarProps {
   metering: number;
   levels?: number[];
   isActive: boolean;
   phase: VoiceVisualPhase;
+  waveformVariant?: WaveformVisualizationVariant;
   inputMode: InputMode;
   onPressIn?: (e: GestureResponderEvent) => void;
   onPressOut?: (e: GestureResponderEvent) => void;
@@ -29,6 +36,7 @@ export function WaveformBar({
   levels,
   isActive,
   phase,
+  waveformVariant = "bars",
   inputMode,
   onPressIn,
   onPressOut,
@@ -37,6 +45,10 @@ export function WaveformBar({
   const { colors } = useTheme();
   const { t } = useLocalization();
   const isProcessing = phase === "transcribing" || phase === "thinking";
+  const useNativeInputWaveform =
+    Platform.OS === "ios" &&
+    waveformVariant === "oscilloscope" &&
+    phase === "recording";
   const hint =
     phase === "recording"
       ? t("listening")
@@ -83,19 +95,33 @@ export function WaveformBar({
         </Text>
       ) : (
         <View style={styles.waveformWrap}>
-          <Waveform
-            metering={metering}
-            levels={levels}
-            maxHeight={26}
-            barCount={28}
-            barWidth={2}
-            barGap={1}
-            barColor={isActive ? "rgba(255, 255, 255, 0.95)" : colors.accent}
-            barColorInactive={
-              isActive ? "rgba(255, 255, 255, 0.55)" : colors.textMuted
-            }
-            isActive={isActive}
-          />
+          {useNativeInputWaveform ? (
+            <NativeWaveformView
+              channel="input"
+              active={isActive}
+              lineColor={isActive ? "rgba(255, 255, 255, 0.95)" : colors.accent}
+              baselineColor={
+                isActive ? "rgba(255, 255, 255, 0.14)" : colors.borderStrong
+              }
+              lineWidth={1.9}
+              style={styles.nativeWaveform}
+            />
+          ) : (
+            <Waveform
+              metering={metering}
+              levels={levels}
+              maxHeight={waveformVariant === "oscilloscope" ? 32 : 26}
+              barCount={waveformVariant === "oscilloscope" ? 64 : 28}
+              barWidth={waveformVariant === "oscilloscope" ? 1.5 : 2}
+              barGap={waveformVariant === "oscilloscope" ? 0.4 : 1}
+              barColor={isActive ? "rgba(255, 255, 255, 0.95)" : colors.accent}
+              barColorInactive={
+                isActive ? "rgba(255, 255, 255, 0.55)" : colors.textMuted
+              }
+              isActive={isActive}
+              variant={waveformVariant}
+            />
+          )}
         </View>
       )}
     </View>
@@ -173,6 +199,10 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 28,
     justifyContent: "center",
+  },
+  nativeWaveform: {
+    width: "100%",
+    height: 32,
   },
   stateBadge: {
     minWidth: 64,
