@@ -118,6 +118,8 @@ export function MainScreen() {
     searchConversations,
     deleteConversation,
     clearActiveConversation,
+    captureActiveConversationSnapshot,
+    restoreActiveConversationSnapshot,
   } = useConversations();
 
   const recorder = useAudioRecorder();
@@ -147,6 +149,11 @@ export function MainScreen() {
   } | null>(null);
 
   const recordingStartedRef = useRef<Promise<void> | null>(null);
+  const voiceTurnSessionRef = useRef(0);
+  const voiceTurnSnapshotRef = useRef<ReturnType<
+    typeof captureActiveConversationSnapshot
+  > | null>(null);
+  const cancelableVoiceTurnSessionRef = useRef<number | null>(null);
 
   const activeResponseMode = settings.activeResponseMode;
   const activeResponseRoute = settings.responseModes[activeResponseMode];
@@ -232,8 +239,10 @@ export function MainScreen() {
     setStreamingText,
     abortRef,
     lastCompletedReplyRef,
-    playReplyText,
+    replayPhase,
+    activeReplayMessageId,
     handleRepeatLastReply,
+    stopReplay,
     handleVoiceCaptureDone,
   } = useVoicePipeline({
     activeConversation,
@@ -270,10 +279,69 @@ export function MainScreen() {
       ? "transcribing"
       : player.isPlaying
         ? "speaking"
+        : pipelinePhase === "synthesizing"
+          ? "synthesizing"
         : pipelinePhase === "thinking"
           ? "thinking"
           : "idle";
   const isActive = visualPhase !== "idle";
+
+  const rollbackCancelableVoiceTurn = useCallback(async () => {
+    const snapshot = voiceTurnSnapshotRef.current;
+
+    if (!snapshot || cancelableVoiceTurnSessionRef.current === null) {
+      return;
+    }
+
+    voiceTurnSnapshotRef.current = null;
+    cancelableVoiceTurnSessionRef.current = null;
+    await restoreActiveConversationSnapshot(snapshot);
+  }, [restoreActiveConversationSnapshot]);
+
+  const cancelCurrentInteraction = useCallback(
+    async ({ rollbackConversation }: { rollbackConversation: boolean }) => {
+      abortRef.current?.abort();
+      setPipelinePhase("idle");
+      setStreamingText("");
+
+      if (player.isPlaying) {
+        await player.stopPlayback();
+      }
+
+      if (rollbackConversation) {
+        await rollbackCancelableVoiceTurn();
+      }
+    },
+    [abortRef, player, rollbackCancelableVoiceTurn, setPipelinePhase, setStreamingText],
+  );
+
+  const processCapturedVoiceTurn = useCallback(
+    async (params: { audioUri?: string; transcriptionOverride?: string }) => {
+      const sessionId = voiceTurnSessionRef.current + 1;
+      voiceTurnSessionRef.current = sessionId;
+      voiceTurnSnapshotRef.current = captureActiveConversationSnapshot();
+      cancelableVoiceTurnSessionRef.current = sessionId;
+
+      try {
+        await handleVoiceCaptureDone(params);
+      } finally {
+        if (cancelableVoiceTurnSessionRef.current === sessionId) {
+          cancelableVoiceTurnSessionRef.current = null;
+        }
+
+        if (voiceTurnSessionRef.current === sessionId) {
+          voiceTurnSnapshotRef.current = null;
+        }
+      }
+    },
+    [captureActiveConversationSnapshot, handleVoiceCaptureDone],
+  );
+
+  useEffect(() => {
+    if (player.isPlaying && cancelableVoiceTurnSessionRef.current !== null) {
+      cancelableVoiceTurnSessionRef.current = null;
+    }
+  }, [player.isPlaying]);
 
   const handleInstallLocalTtsLanguage = useCallback(
     async (languageCode: TtsListenLanguage) => {
@@ -406,11 +474,25 @@ export function MainScreen() {
     [showToast, t, toggleConversationPinned],
   );
 
+  const handleRepeatMessage = useCallback(
+    async (message: { id: string; content: string }) => {
+      if (activeReplayMessageId === message.id) {
+        await stopReplay();
+        return;
+      }
+
+      await handleRepeatLastReply(message.content, message.id);
+    },
+    [activeReplayMessageId, handleRepeatLastReply, stopReplay],
+  );
+
   const resetVoiceSessionState = useCallback(async () => {
     abortRef.current?.abort();
     setPipelinePhase("idle");
     setStreamingText("");
     lastCompletedReplyRef.current = "";
+    voiceTurnSnapshotRef.current = null;
+    cancelableVoiceTurnSessionRef.current = null;
 
     if (player.isPlaying) {
       await player.stopPlayback();
@@ -431,6 +513,7 @@ export function MainScreen() {
     }
   }, [
     abortRef,
+    cancelableVoiceTurnSessionRef,
     isRecording,
     lastCompletedReplyRef,
     nativeStt,
@@ -439,6 +522,7 @@ export function MainScreen() {
     setPipelinePhase,
     setStreamingText,
     settings.sttMode,
+    voiceTurnSnapshotRef,
   ]);
 
   const handleSelectConversation = useCallback(
@@ -624,21 +708,19 @@ export function MainScreen() {
   ]);
 
   const handlePressIn = useCallback(async () => {
+    if (player.isPlaying) {
+      await cancelCurrentInteraction({ rollbackConversation: false });
+      return;
+    }
+    if (isBusy) {
+      await cancelCurrentInteraction({ rollbackConversation: true });
+      return;
+    }
+
     if (!ensureVoiceSessionReady()) {
       return;
     }
 
-    if (player.isPlaying) {
-      await player.stopPlayback();
-      abortRef.current?.abort();
-      setPipelinePhase("idle");
-      setStreamingText("");
-    }
-    if (isBusy) {
-      abortRef.current?.abort();
-      setPipelinePhase("idle");
-      setStreamingText("");
-    }
     try {
       const startPromise =
         settings.sttMode === "native"
@@ -659,6 +741,7 @@ export function MainScreen() {
     nativeStt,
     player,
     recorder,
+    cancelCurrentInteraction,
     settings.sttMode,
     showToast,
     t,
@@ -678,14 +761,14 @@ export function MainScreen() {
       if (settings.sttMode === "native") {
         const transcription = await nativeStt.stopRecognition();
         if (transcription) {
-          handleVoiceCaptureDone({ transcriptionOverride: transcription });
+          void processCapturedVoiceTurn({ transcriptionOverride: transcription });
         }
         return;
       }
 
       const uri = await recorder.stopRecording();
       if (uri) {
-        handleVoiceCaptureDone({ audioUri: uri });
+        void processCapturedVoiceTurn({ audioUri: uri });
       }
     } catch (error) {
       const message =
@@ -693,8 +776,8 @@ export function MainScreen() {
       showToast(message);
     }
   }, [
-    handleVoiceCaptureDone,
     nativeStt,
+    processCapturedVoiceTurn,
     recorder,
     settings.sttMode,
     showToast,
@@ -712,16 +795,11 @@ export function MainScreen() {
     }
 
     if (player.isPlaying) {
-      await player.stopPlayback();
-      abortRef.current?.abort();
-      setPipelinePhase("idle");
-      setStreamingText("");
+      await cancelCurrentInteraction({ rollbackConversation: false });
       return;
     }
     if (isBusy) {
-      abortRef.current?.abort();
-      setPipelinePhase("idle");
-      setStreamingText("");
+      await cancelCurrentInteraction({ rollbackConversation: true });
       return;
     }
     if (isRecording) {
@@ -729,14 +807,14 @@ export function MainScreen() {
         if (settings.sttMode === "native") {
           const transcription = await nativeStt.stopRecognition();
           if (transcription) {
-            handleVoiceCaptureDone({ transcriptionOverride: transcription });
+            void processCapturedVoiceTurn({ transcriptionOverride: transcription });
           }
           return;
         }
 
         const uri = await recorder.stopRecording();
         if (uri) {
-          handleVoiceCaptureDone({ audioUri: uri });
+          void processCapturedVoiceTurn({ audioUri: uri });
         }
       } catch (error) {
         const message =
@@ -761,12 +839,13 @@ export function MainScreen() {
     }
   }, [
     ensureVoiceSessionReady,
-    handleVoiceCaptureDone,
     isBusy,
     isRecording,
     nativeStt,
     player,
+    processCapturedVoiceTurn,
     recorder,
+    cancelCurrentInteraction,
     settings.sttMode,
     showToast,
     t,
@@ -1018,6 +1097,8 @@ export function MainScreen() {
       ? t("listening")
       : visualPhase === "transcribing"
         ? t("parsing")
+        : visualPhase === "synthesizing"
+          ? t("voiceOutput")
         : visualPhase === "thinking"
           ? t("thinking")
           : visualPhase === "speaking"
@@ -1028,18 +1109,20 @@ export function MainScreen() {
   const statusTitle =
     visualPhase === "recording"
       ? t("listening")
+      : visualPhase === "speaking"
+        ? t("speaking")
       : pipelinePhase === "synthesizing"
         ? t("voiceOutput")
         : visualPhase === "transcribing"
           ? t("parsing")
           : visualPhase === "thinking"
             ? t("thinking")
-            : visualPhase === "speaking"
-              ? t("speaking")
               : t("idle");
   const statusDetail =
     visualPhase === "recording"
       ? t("listeningToYourVoice")
+      : visualPhase === "speaking"
+        ? t("speakingBackToYou")
       : pipelinePhase === "synthesizing"
         ? t("preparingVoiceWithProvider", {
             provider: ttsProvider
@@ -1050,8 +1133,6 @@ export function MainScreen() {
           ? t("parsingYourVoiceInput")
           : visualPhase === "thinking"
             ? t("waitingForProvider", { provider: providerLabel })
-            : visualPhase === "speaking"
-              ? t("speakingBackToYou")
               : (messageCountLabel ?? t("freshSession"));
   const activeConversationTitle =
     activeConversation?.title.trim() || t("untitledConversation");
@@ -1412,7 +1493,16 @@ export function MainScreen() {
                       styles.statusStripDot,
                       {
                         backgroundColor: isActive
-                          ? colors.success
+                          ? visualPhase === "recording"
+                            ? colors.danger
+                            : visualPhase === "speaking"
+                              ? colors.accent
+                              : pipelinePhase === "synthesizing"
+                                ? colors.textMuted
+                                : visualPhase === "thinking" ||
+                                    visualPhase === "transcribing"
+                                  ? colors.textMuted
+                                  : colors.success
                           : colors.accentWarm,
                       },
                     ]}
@@ -1922,6 +2012,8 @@ export function MainScreen() {
                 emptyDescription={t("expandedTranscriptEmptyDescription")}
                 contentContainerStyle={styles.expandedTranscriptContent}
                 showUsageStats={settings.showUsageStats}
+                activeRepeatMessageId={activeReplayMessageId}
+                repeatPlaybackStatus={replayPhase}
                 onCopyMessage={(message) => {
                   void handleCopyMessage(message.content);
                 }}
@@ -1929,7 +2021,7 @@ export function MainScreen() {
                   void handleShareMessage(message.content);
                 }}
                 onRepeatMessage={(message) => {
-                  void handleRepeatLastReply(message.content);
+                  void handleRepeatMessage(message);
                 }}
                 messageSelectionEnabled
               />

@@ -1,5 +1,11 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useEffect, useRef } from "react";
+import {
+  Animated,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+} from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { getProviderModelName, PROVIDER_LABELS } from "../constants/models";
@@ -14,8 +20,67 @@ interface ChatBubbleProps {
   onCopy?: (message: Message) => void;
   onShare?: (message: Message) => void;
   onRepeat?: (message: Message) => void;
+  repeatState?: "idle" | "preparing" | "speaking";
   selectable?: boolean;
   showUsageStats?: boolean;
+}
+
+function RepeatActionIcon({
+  state,
+  color,
+}: {
+  state: "idle" | "preparing" | "speaking";
+  color: string;
+}) {
+  const rotation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (state !== "preparing") {
+      rotation.stopAnimation();
+      rotation.setValue(0);
+      return;
+    }
+
+    const animation = Animated.loop(
+      Animated.timing(rotation, {
+        toValue: 1,
+        duration: 1100,
+        useNativeDriver: true,
+      }),
+    );
+    animation.start();
+
+    return () => {
+      animation.stop();
+      rotation.stopAnimation();
+      rotation.setValue(0);
+    };
+  }, [rotation, state]);
+
+  if (state === "speaking") {
+    return <Feather name="square" size={14} color={color} />;
+  }
+
+  if (state === "preparing") {
+    return (
+      <Animated.View
+        style={{
+          transform: [
+            {
+              rotate: rotation.interpolate({
+                inputRange: [0, 1],
+                outputRange: ["0deg", "360deg"],
+              }),
+            },
+          ],
+        }}
+      >
+        <Feather name="loader" size={14} color={color} />
+      </Animated.View>
+    );
+  }
+
+  return <Feather name="volume-2" size={14} color={color} />;
 }
 
 export function ChatBubble({
@@ -23,6 +88,7 @@ export function ChatBubble({
   onCopy,
   onShare,
   onRepeat,
+  repeatState = "idle",
   selectable = false,
   showUsageStats = false,
 }: ChatBubbleProps) {
@@ -97,15 +163,26 @@ export function ChatBubble({
               style={[
                 styles.iconAction,
                 {
-                  backgroundColor: colors.surfaceAlt,
-                  borderColor: colors.border,
+                  backgroundColor:
+                    repeatState === "idle"
+                      ? colors.surfaceAlt
+                      : colors.accentSoft,
+                  borderColor:
+                    repeatState === "idle" ? colors.border : colors.borderStrong,
                 },
               ]}
               onPress={() => onRepeat(message)}
               activeOpacity={0.88}
-              accessibilityLabel={t("repeatReply")}
+              accessibilityLabel={
+                repeatState === "speaking" ? t("stop") : t("repeatReply")
+              }
             >
-              <Feather name="volume-2" size={14} color={colors.textSecondary} />
+              <RepeatActionIcon
+                state={repeatState}
+                color={
+                  repeatState === "idle" ? colors.textSecondary : colors.accent
+                }
+              />
             </TouchableOpacity>
           ) : null}
           {onCopy ? (

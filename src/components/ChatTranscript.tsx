@@ -24,6 +24,8 @@ interface ChatTranscriptProps {
   onCopyMessage?: (message: Message) => void;
   onShareMessage?: (message: Message) => void;
   onRepeatMessage?: (message: Message) => void;
+  activeRepeatMessageId?: string | null;
+  repeatPlaybackStatus?: "idle" | "preparing" | "speaking";
   messageSelectionEnabled?: boolean;
   showUsageStats?: boolean;
 }
@@ -38,6 +40,8 @@ export function ChatTranscript({
   onCopyMessage,
   onShareMessage,
   onRepeatMessage,
+  activeRepeatMessageId = null,
+  repeatPlaybackStatus = "idle",
   messageSelectionEnabled = false,
   showUsageStats = false,
 }: ChatTranscriptProps) {
@@ -71,6 +75,9 @@ export function ChatTranscript({
           onCopy={onCopyMessage}
           onShare={onShareMessage}
           onRepeat={onRepeatMessage}
+          repeatState={
+            activeRepeatMessageId === item.id ? repeatPlaybackStatus : "idle"
+          }
           selectable={messageSelectionEnabled}
           showUsageStats={showUsageStats}
         />

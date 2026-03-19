@@ -78,6 +78,27 @@ function normalizeConversationTitle(title: string, fallback: string) {
   return truncateTitle(trimmed, 60);
 }
 
+function buildConversationMetaFromConversation(
+  conversation: Conversation,
+  existingMeta?: ConversationMeta | null,
+): ConversationMeta {
+  const inferredState = inferLastAssistantState(conversation.messages);
+
+  return normalizeConversationMeta({
+    id: conversation.id,
+    title: conversation.title,
+    updatedAt: conversation.updatedAt,
+    lastModel: inferredState.lastModel ?? existingMeta?.lastModel ?? null,
+    lastProvider: inferredState.lastProvider ?? existingMeta?.lastProvider ?? null,
+    pinned: existingMeta?.pinned ?? false,
+  });
+}
+
+export interface ActiveConversationSnapshot {
+  conversation: Conversation | null;
+  meta: ConversationMeta | null;
+}
+
 export function useConversations() {
   const [conversations, setConversations] = useState<ConversationMeta[]>([]);
   const [activeConversation, setActiveConversation] =
@@ -501,6 +522,65 @@ export function useConversations() {
     setActiveConversationValue(null);
   }, [setActiveConversationValue]);
 
+  const captureActiveConversationSnapshot =
+    useCallback((): ActiveConversationSnapshot => {
+      const conversation = activeConversationRef.current;
+      const meta = conversation
+        ? conversations.find((entry) => entry.id === conversation.id) ?? null
+        : null;
+
+      return {
+        conversation: conversation
+          ? JSON.parse(JSON.stringify(conversation))
+          : null,
+        meta: meta ? { ...meta } : null,
+      };
+    }, [conversations]);
+
+  const restoreActiveConversationSnapshot = useCallback(
+    async (snapshot: ActiveConversationSnapshot) => {
+      const currentConversation = activeConversationRef.current;
+
+      if (!snapshot.conversation) {
+        if (currentConversation) {
+          await AsyncStorage.removeItem(conversationKey(currentConversation.id));
+          setConversations((prev) =>
+            persistConversationMeta(
+              prev.filter((entry) => entry.id !== currentConversation.id),
+            ),
+          );
+        }
+
+        setActiveConversationValue(null);
+        return;
+      }
+
+      const restoredConversation = snapshot.conversation;
+      const restoredMeta = buildConversationMetaFromConversation(
+        restoredConversation,
+        snapshot.meta,
+      );
+
+      if (currentConversation && currentConversation.id !== restoredConversation.id) {
+        await AsyncStorage.removeItem(conversationKey(currentConversation.id));
+      }
+
+      saveConversation(restoredConversation);
+      setActiveConversationValue(restoredConversation);
+      setConversations((prev) =>
+        persistConversationMeta([
+          ...prev.filter(
+            (entry) =>
+              entry.id !== restoredConversation.id &&
+              entry.id !== currentConversation?.id,
+          ),
+          restoredMeta,
+        ]),
+      );
+    },
+    [persistConversationMeta, saveConversation, setActiveConversationValue],
+  );
+
   return {
     conversations,
     activeConversation,
@@ -515,5 +595,7 @@ export function useConversations() {
     searchConversations,
     deleteConversation,
     clearActiveConversation,
+    captureActiveConversationSnapshot,
+    restoreActiveConversationSnapshot,
   };
 }

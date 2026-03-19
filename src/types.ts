@@ -70,6 +70,7 @@ export type VoiceVisualPhase =
   | "recording"
   | "transcribing"
   | "thinking"
+  | "synthesizing"
   | "speaking";
 export type WaveformVisualizationVariant = "bars" | "oscilloscope";
 

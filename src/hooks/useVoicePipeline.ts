@@ -28,6 +28,8 @@ export type PipelinePhase =
   | "synthesizing"
   | "speaking";
 
+export type ReplayPhase = "idle" | "preparing" | "speaking";
+
 type AudioPlayer = ReturnType<typeof useAudioPlayer>;
 
 export interface UseVoicePipelineParams {
@@ -127,8 +129,11 @@ export interface UseVoicePipelineResult {
   setStreamingText: (text: string) => void;
   abortRef: React.MutableRefObject<AbortController | null>;
   lastCompletedReplyRef: React.MutableRefObject<string>;
-  playReplyText: (text: string) => Promise<void>;
-  handleRepeatLastReply: (textOverride?: string) => Promise<void>;
+  replayPhase: ReplayPhase;
+  activeReplayMessageId: string | null;
+  playReplyText: (text: string, messageId?: string) => Promise<void>;
+  handleRepeatLastReply: (textOverride?: string, messageId?: string) => Promise<void>;
+  stopReplay: () => Promise<void>;
   handleVoiceCaptureDone: (params: {
     audioUri?: string;
     transcriptionOverride?: string;
@@ -173,11 +178,14 @@ export function useVoicePipeline(
   const lastCompletedReplyRef = useRef("");
   const ttsFallbackToastShownRef = useRef(false);
   const replayingRef = useRef(false);
+  const replaySessionRef = useRef(0);
+  const [replayPhase, setReplayPhase] = useState<ReplayPhase>("idle");
+  const [activeReplayMessageId, setActiveReplayMessageId] = useState<string | null>(null);
 
   const isBusy = pipelinePhase !== "idle";
 
   const playReplyText = useCallback(
-    async (text: string) => {
+    async (text: string, messageId?: string) => {
       const trimmed = text.trim();
 
       if (!trimmed) {
@@ -188,6 +196,10 @@ export function useVoicePipeline(
         return;
       }
       replayingRef.current = true;
+      const replaySession = replaySessionRef.current + 1;
+      replaySessionRef.current = replaySession;
+      setActiveReplayMessageId(messageId ?? null);
+      setReplayPhase("preparing");
 
       try {
         if (player.isPlaying) {
@@ -201,6 +213,11 @@ export function useVoicePipeline(
         };
 
         if (ttsMode === "native") {
+          if (replaySessionRef.current !== replaySession) {
+            return;
+          }
+
+          setReplayPhase("speaking");
           player.speakText(trimmed, {
             diagnostics: speechDiagnostics,
           });
@@ -224,6 +241,11 @@ export function useVoicePipeline(
           localVoices: localTtsVoices,
           diagnostics: speechDiagnostics,
         }).catch(async () => {
+          if (replaySessionRef.current !== replaySession) {
+            return null;
+          }
+
+          setReplayPhase("speaking");
           player.speakText(trimmed, {
             diagnostics: speechDiagnostics,
           });
@@ -236,15 +258,28 @@ export function useVoicePipeline(
         });
 
         if (!audioUris) {
+          if (player.isPlaying && replaySessionRef.current === replaySession) {
+            setReplayPhase("speaking");
+            await player.waitForDrain();
+          }
           return;
         }
 
+        if (replaySessionRef.current !== replaySession) {
+          return;
+        }
+
+        setReplayPhase("speaking");
         audioUris.forEach((audioUri) => {
           player.enqueueAudio(audioUri, speechDiagnostics);
         });
         await player.waitForDrain();
       } finally {
-        replayingRef.current = false;
+        if (replaySessionRef.current === replaySession) {
+          replayingRef.current = false;
+          setReplayPhase("idle");
+          setActiveReplayMessageId(null);
+        }
       }
     },
     [
@@ -261,8 +296,20 @@ export function useVoicePipeline(
     ],
   );
 
+  const stopReplay = useCallback(async () => {
+    replaySessionRef.current += 1;
+    replayingRef.current = false;
+    setReplayPhase("idle");
+    setActiveReplayMessageId(null);
+    player.resetCancellation();
+
+    if (player.isPlaying) {
+      await player.stopPlayback();
+    }
+  }, [player]);
+
   const handleRepeatLastReply = useCallback(
-    async (textOverride?: string) => {
+    async (textOverride?: string, messageId?: string) => {
       const replyText =
         textOverride?.trim() || lastCompletedReplyRef.current.trim();
 
@@ -277,7 +324,7 @@ export function useVoicePipeline(
       }
 
       try {
-        await playReplyText(replyText);
+        await playReplyText(replyText, messageId);
       } catch (error) {
         const message =
           error instanceof Error ? error.message : t("couldntReplayReply");
@@ -459,8 +506,11 @@ export function useVoicePipeline(
     setStreamingText,
     abortRef,
     lastCompletedReplyRef,
+    replayPhase,
+    activeReplayMessageId,
     playReplyText,
     handleRepeatLastReply,
+    stopReplay,
     handleVoiceCaptureDone,
   };
 }
