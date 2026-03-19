@@ -876,7 +876,7 @@ const translations = {
     hold: "Halten",
     tap: "Tippen",
     holdToSpeak: "Zum Sprechen halten",
-    tapToSpeak: "Zum Sprechen tippen",
+    tapToSpeak: "Zum Schnacken tippen",
     waitingOnModel: "Warte auf das Modell",
     convertingSpeech: "Sprache wird umgewandelt",
     waitingForReply: "Warte auf Antwort",
