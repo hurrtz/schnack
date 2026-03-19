@@ -48,12 +48,28 @@ export const PROVIDER_ORDER: Provider[] = [
 
 const OPENAI_MODELS: ModelInfo[] = [
   { id: "gpt-5.4", name: "GPT-5.4", releaseDate: "2026-03-01" },
-  { id: "gpt-5-mini-2025-08-07", name: "GPT-5 Mini", releaseDate: "2025-08-07" },
+  { id: "gpt-5.4-mini", name: "GPT-5.4 Mini" },
+  { id: "gpt-5.4-nano", name: "GPT-5.4 Nano" },
+  { id: "gpt-5.2", name: "GPT-5.2" },
+  { id: "gpt-5.1", name: "GPT-5.1" },
+  { id: "gpt-5", name: "GPT-5" },
+  { id: "gpt-5-mini", name: "GPT-5 Mini", releaseDate: "2025-08-07" },
+  { id: "gpt-5-nano", name: "GPT-5 Nano" },
   { id: "o3", name: "o3", releaseDate: "2025-04-16" },
   { id: "o4-mini", name: "o4 Mini", releaseDate: "2025-04-16" },
+  { id: "o3-mini", name: "o3 Mini" },
+  { id: "o1", name: "o1" },
+  { id: "o1-mini", name: "o1 Mini (Deprecated)" },
+  { id: "o1-preview", name: "o1 Preview (Deprecated)" },
+  { id: "gpt-4.5-preview", name: "GPT-4.5 Preview (Deprecated)" },
   { id: "gpt-4.1", name: "GPT-4.1", releaseDate: "2025-04-14" },
   { id: "gpt-4.1-mini", name: "GPT-4.1 Mini", releaseDate: "2025-04-14" },
   { id: "gpt-4.1-nano", name: "GPT-4.1 Nano", releaseDate: "2025-04-14" },
+  { id: "gpt-4o", name: "GPT-4o" },
+  { id: "gpt-4o-mini", name: "GPT-4o Mini" },
+  { id: "gpt-4-turbo", name: "GPT-4 Turbo" },
+  { id: "gpt-4", name: "GPT-4" },
+  { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo" },
 ];
 
 const ANTHROPIC_MODELS: ModelInfo[] = [
@@ -71,6 +87,21 @@ const ANTHROPIC_MODELS: ModelInfo[] = [
     releaseDate: "2025-10-01",
   },
   {
+    id: "claude-opus-4-5-20251101",
+    name: "Claude Opus 4.5",
+    releaseDate: "2025-11-01",
+  },
+  {
+    id: "claude-sonnet-4-5-20250929",
+    name: "Claude Sonnet 4.5",
+    releaseDate: "2025-09-29",
+  },
+  {
+    id: "claude-opus-4-1-20250805",
+    name: "Claude Opus 4.1",
+    releaseDate: "2025-08-05",
+  },
+  {
     id: "claude-opus-4-20250514",
     name: "Claude Opus 4",
     releaseDate: "2025-05-14",
@@ -79,16 +110,6 @@ const ANTHROPIC_MODELS: ModelInfo[] = [
     id: "claude-sonnet-4-20250514",
     name: "Claude Sonnet 4",
     releaseDate: "2025-05-14",
-  },
-  {
-    id: "claude-3-7-sonnet-20250219",
-    name: "Claude 3.7 Sonnet",
-    releaseDate: "2025-02-19",
-  },
-  {
-    id: "claude-3-5-haiku-20241022",
-    name: "Claude 3.5 Haiku",
-    releaseDate: "2024-10-22",
   },
   {
     id: "claude-3-haiku-20240307",

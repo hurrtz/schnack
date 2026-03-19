@@ -821,7 +821,7 @@ export function MainScreen() {
         responseModes: {
           quick: {
             provider: "openai",
-            model: "gpt-5-mini-2025-08-07",
+            model: "gpt-5-mini",
           },
           normal: {
             provider: "openai",

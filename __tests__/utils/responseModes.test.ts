@@ -26,7 +26,7 @@ describe("response mode selectors", () => {
         ...DEFAULT_SETTINGS.responseModes,
         quick: {
           provider: "openai" as const,
-          model: "gpt-5-mini-2025-08-07",
+          model: "gpt-5-mini",
         },
         deep: {
           provider: "openai" as const,
@@ -40,7 +40,7 @@ describe("response mode selectors", () => {
     };
 
     expect(getProviderValidationModel(settings, "openai")).toBe(
-      "gpt-5-mini-2025-08-07",
+      "gpt-5-mini",
     );
   });
 });
