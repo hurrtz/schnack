@@ -50,12 +50,14 @@ const OPENAI_MODELS: ModelInfo[] = [
   { id: "gpt-5.4", name: "GPT-5.4", releaseDate: "2026-03-01" },
   { id: "gpt-5.4-mini", name: "GPT-5.4 Mini" },
   { id: "gpt-5.4-nano", name: "GPT-5.4 Nano" },
+  { id: "gpt-5.4-pro", name: "GPT-5.4 Pro" },
   { id: "gpt-5.2", name: "GPT-5.2" },
   { id: "gpt-5.1", name: "GPT-5.1" },
   { id: "gpt-5", name: "GPT-5" },
   { id: "gpt-5-mini", name: "GPT-5 Mini", releaseDate: "2025-08-07" },
   { id: "gpt-5-nano", name: "GPT-5 Nano" },
   { id: "o3", name: "o3", releaseDate: "2025-04-16" },
+  { id: "o3-pro", name: "o3 Pro" },
   { id: "o4-mini", name: "o4 Mini", releaseDate: "2025-04-16" },
   { id: "o3-mini", name: "o3 Mini" },
   { id: "o1", name: "o1" },
@@ -102,9 +104,9 @@ const ANTHROPIC_MODELS: ModelInfo[] = [
     releaseDate: "2025-08-05",
   },
   {
-    id: "claude-opus-4-20250514",
+    id: "claude-opus-4-20250522",
     name: "Claude Opus 4",
-    releaseDate: "2025-05-14",
+    releaseDate: "2025-05-22",
   },
   {
     id: "claude-sonnet-4-20250514",
@@ -119,33 +121,47 @@ const ANTHROPIC_MODELS: ModelInfo[] = [
 ];
 
 const GOOGLE_MODELS: ModelInfo[] = [
+  { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview" },
+  {
+    id: "gemini-3.1-flash-lite-preview",
+    name: "Gemini 3.1 Flash-Lite Preview",
+  },
+  { id: "gemini-3-flash-preview", name: "Gemini 3 Flash Preview" },
   { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
   { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
   { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite" },
+  { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+  { id: "gemini-2.0-flash-lite", name: "Gemini 2.0 Flash-Lite" },
 ];
 
 const XAI_MODELS: ModelInfo[] = [
-  {
-    id: "grok-4.20-beta-latest-non-reasoning",
-    name: "Grok 4.20 Beta",
-  },
   { id: "grok-4", name: "Grok 4" },
-  { id: "grok-4-fast-reasoning", name: "Grok 4 Fast Reasoning" },
+  { id: "grok-4-1-fast-reasoning", name: "Grok 4.1 Fast Reasoning" },
+  {
+    id: "grok-4-1-fast-non-reasoning",
+    name: "Grok 4.1 Fast Non-Reasoning",
+  },
+  { id: "grok-code-fast-1", name: "Grok Code Fast 1" },
   { id: "grok-3", name: "Grok 3" },
+  { id: "grok-3-fast", name: "Grok 3 Fast" },
   { id: "grok-3-mini", name: "Grok 3 Mini" },
 ];
 
 const GROQ_MODELS: ModelInfo[] = [
   { id: "groq/compound", name: "Compound" },
   { id: "groq/compound-mini", name: "Compound Mini" },
+  {
+    id: "meta-llama/llama-4-maverick-17b-128e-instruct",
+    name: "Llama 4 Maverick",
+  },
+  {
+    id: "meta-llama/llama-4-scout-17b-16e-instruct",
+    name: "Llama 4 Scout",
+  },
   { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B Versatile" },
   { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B Instant" },
   { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B" },
   { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B" },
-  {
-    id: "grok-4.20-beta-latest-non-reasoning",
-    name: "Grok 4.20 Beta Non-Reasoning",
-  },
   {
     id: "moonshotai/kimi-k2-instruct-0905",
     name: "Kimi K2 Instruct",
@@ -159,14 +175,14 @@ const DEEPSEEK_MODELS: ModelInfo[] = [
 ];
 
 const MISTRAL_MODELS: ModelInfo[] = [
-  { id: "mistral-large-2512", name: "Mistral Large 3" },
-  { id: "mistral-medium-2508", name: "Mistral Medium 3.1" },
-  { id: "mistral-small-2506", name: "Mistral Small 3.2" },
-  { id: "magistral-medium-2509", name: "Magistral Medium 1.2" },
-  { id: "magistral-small-2509", name: "Magistral Small 1.2" },
-  { id: "ministral-14b-2512", name: "Ministral 3 14B" },
-  { id: "ministral-8b-2512", name: "Ministral 3 8B" },
-  { id: "ministral-3b-2512", name: "Ministral 3 3B" },
+  { id: "mistral-large-latest", name: "Mistral Large 3" },
+  { id: "mistral-medium-latest", name: "Mistral Medium 3" },
+  { id: "magistral-medium-latest", name: "Magistral Medium" },
+  { id: "magistral-small-latest", name: "Magistral Small" },
+  { id: "mistral-small-latest", name: "Mistral Small 3.1" },
+  { id: "ministral-8b-latest", name: "Ministral 8B" },
+  { id: "open-mistral-nemo", name: "Mistral Nemo" },
+  { id: "codestral-latest", name: "Codestral 2" },
 ];
 
 const COHERE_MODELS: ModelInfo[] = [
@@ -181,12 +197,21 @@ const COHERE_MODELS: ModelInfo[] = [
 const TOGETHER_MODELS: ModelInfo[] = [
   { id: "MiniMaxAI/MiniMax-M2.5", name: "MiniMax M2.5" },
   { id: "Qwen/Qwen3.5-397B-A17B", name: "Qwen3.5 397B A17B" },
+  { id: "Qwen/Qwen3-235B-A22B-FP8", name: "Qwen3 235B" },
   { id: "Qwen/Qwen3.5-9B", name: "Qwen3.5 9B" },
   { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B" },
   { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B" },
   { id: "moonshotai/Kimi-K2.5", name: "Kimi K2.5" },
   { id: "deepseek-ai/DeepSeek-V3.1", name: "DeepSeek V3.1" },
   { id: "deepseek-ai/DeepSeek-R1", name: "DeepSeek R1" },
+  {
+    id: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    name: "Llama 3.3 70B Turbo",
+  },
+  {
+    id: "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+    name: "Llama 3.1 8B Turbo",
+  },
   {
     id: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
     name: "Llama 4 Maverick",
@@ -226,9 +251,9 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     sttSupport: "provider",
     ttsSupport: "provider",
     sttLanguageNote:
-      `whisper-1 is multilingual. OpenAI's published well-supported language set is: ${WHISPER_WELL_SUPPORTED_LANGUAGES}`,
+      `OpenAI currently exposes gpt-4o-transcribe, gpt-4o-mini-transcribe, and whisper-1 for speech-to-text. OpenAI's published well-supported language set is: ${WHISPER_WELL_SUPPORTED_LANGUAGES}`,
     ttsLanguageNote:
-      "tts-1 supports multilingual output. OpenAI does not publish a compact well-supported language list for TTS in the same way it does for STT, and notes that the voices are optimized for English.",
+      "OpenAI currently exposes gpt-4o-mini-tts, tts-1, and tts-1-hd. OpenAI does not publish a compact well-supported language list for TTS in the same way it does for STT, and notes that the voices are optimized for English.",
     models: OPENAI_MODELS,
   },
   anthropic: {
@@ -349,9 +374,62 @@ export const PROVIDER_MODELS: Record<Provider, ModelInfo[]> = Object.fromEntries
   PROVIDER_ORDER.map((provider) => [provider, PROVIDER_CONFIGS[provider].models])
 ) as Record<Provider, ModelInfo[]>;
 
+export const PROVIDER_STT_MODEL_OPTIONS: Partial<Record<Provider, ModelInfo[]>> =
+  {
+    openai: [
+      { id: "gpt-4o-transcribe", name: "GPT-4o Transcribe" },
+      { id: "gpt-4o-mini-transcribe", name: "GPT-4o Mini Transcribe" },
+      { id: "whisper-1", name: "Whisper-1" },
+    ],
+    gemini: [
+      { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview" },
+      {
+        id: "gemini-3.1-flash-lite-preview",
+        name: "Gemini 3.1 Flash-Lite Preview",
+      },
+      { id: "gemini-3-flash-preview", name: "Gemini 3 Flash Preview" },
+      { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
+      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
+      { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite" },
+      { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+      { id: "gemini-2.0-flash-lite", name: "Gemini 2.0 Flash-Lite" },
+    ],
+    groq: [
+      { id: "whisper-large-v3-turbo", name: "Whisper Large v3 Turbo" },
+      { id: "whisper-large-v3", name: "Whisper Large v3" },
+    ],
+    mistral: [{ id: "voxtral-mini-latest", name: "Voxtral Mini Latest" }],
+    together: [
+      { id: "openai/whisper-large-v3", name: "Whisper Large v3" },
+      {
+        id: "mistralai/Voxtral-Mini-3B-2507",
+        name: "Voxtral Mini 3B",
+      },
+    ],
+  };
+
+export const PROVIDER_DEFAULT_STT_MODELS: Partial<Record<Provider, string>> = {
+  openai: "gpt-4o-mini-transcribe",
+  gemini: "gemini-2.5-flash",
+  groq: "whisper-large-v3-turbo",
+  mistral: "voxtral-mini-latest",
+  together: "openai/whisper-large-v3",
+};
+
 export function getProviderModelName(provider: Provider, modelId: string) {
   const match = PROVIDER_MODELS[provider].find((model) => model.id === modelId);
   return match?.name ?? modelId;
+}
+
+export function getProviderSttModelOptions(provider: Provider) {
+  return PROVIDER_STT_MODEL_OPTIONS[provider] ?? [];
+}
+
+export function getSttModelLabel(provider: Provider, modelId: string) {
+  const option = getProviderSttModelOptions(provider).find(
+    (model) => model.id === modelId
+  );
+  return option?.name ?? modelId;
 }
 
 const NATIVE_STT_LANGUAGE_NOTES_BY_LANGUAGE: Record<AppLanguage, string> = {
@@ -423,7 +501,7 @@ const PROVIDER_STT_LANGUAGE_NOTES_BY_LANGUAGE: Partial<
   ) as Partial<Record<Provider, string>>,
   de: {
     openai:
-      `whisper-1 ist mehrsprachig. Der von OpenAI veroeffentlichte Satz gut unterstuetzter Sprachen lautet: ${WHISPER_WELL_SUPPORTED_LANGUAGES}`,
+      `OpenAI bietet aktuell gpt-4o-transcribe, gpt-4o-mini-transcribe und whisper-1 fuer Speech-to-Text an. Der von OpenAI veroeffentlichte Satz gut unterstuetzter Sprachen lautet: ${WHISPER_WELL_SUPPORTED_LANGUAGES}`,
     gemini:
       "Gemini Audio Understanding ist mehrsprachig, aber Google veroeffentlicht fuer diesen Transkriptionspfad keine kompakte Tabelle unterstuetzter Sprachen. Es handelt sich eher um eine breite allgemeine Transkriptionsroute als um eine dedizierte Telephony-STT-API.",
     groq:
@@ -447,7 +525,7 @@ const PROVIDER_TTS_LANGUAGE_NOTES_BY_LANGUAGE: Partial<
   ) as Partial<Record<Provider, string>>,
   de: {
     openai:
-      "tts-1 unterstuetzt mehrsprachige Ausgabe. OpenAI veroeffentlicht fuer TTS keine so kompakte Liste gut unterstuetzter Sprachen wie fuer STT und weist darauf hin, dass die Stimmen fuer Englisch optimiert sind.",
+      "OpenAI bietet aktuell gpt-4o-mini-tts, tts-1 und tts-1-hd fuer Text-to-Speech an. OpenAI veroeffentlicht fuer TTS keine so kompakte Liste gut unterstuetzter Sprachen wie fuer STT und weist darauf hin, dass die Stimmen fuer Englisch optimiert sind.",
     gemini:
       "Gemini TTS unterstuetzt aktuell Arabisch, Bengalisch, Niederlaendisch, Englisch, Franzoesisch, Deutsch, Hindi, Indonesisch, Italienisch, Japanisch, Koreanisch, Mandarin, Polnisch, Portugiesisch, Rumaenisch, Russisch, Spanisch, Tamil, Telugu, Thai, Tuerkisch, Ukrainisch, Urdu und Vietnamesisch.",
     xai:
@@ -515,9 +593,11 @@ export const OPENAI_TTS_VOICES: TtsVoiceOption[] = [
   { id: "alloy", label: "Alloy" },
   { id: "ash", label: "Ash" },
   { id: "ballad", label: "Ballad" },
+  { id: "cedar", label: "Cedar" },
   { id: "coral", label: "Coral" },
   { id: "echo", label: "Echo" },
   { id: "fable", label: "Fable" },
+  { id: "marin", label: "Marin" },
   { id: "onyx", label: "Onyx" },
   { id: "nova", label: "Nova" },
   { id: "sage", label: "Sage" },
@@ -597,6 +677,33 @@ export const PROVIDER_DEFAULT_TTS_VOICES: Partial<Record<Provider, string>> = {
   gemini: "Kore",
   together: "af_alloy",
   xai: "ara",
+};
+
+export const PROVIDER_TTS_MODEL_OPTIONS: Partial<Record<Provider, ModelInfo[]>> =
+  {
+    openai: [
+      { id: "gpt-4o-mini-tts", name: "GPT-4o Mini TTS" },
+      { id: "tts-1", name: "tts-1" },
+      { id: "tts-1-hd", name: "tts-1-hd" },
+    ],
+    gemini: [
+      {
+        id: "gemini-2.5-flash-preview-tts",
+        name: "Gemini 2.5 Flash Preview TTS",
+      },
+      {
+        id: "gemini-2.5-pro-preview-tts",
+        name: "Gemini 2.5 Pro Preview TTS",
+      },
+    ],
+    together: [{ id: "hexgrad/Kokoro-82M", name: "Kokoro 82M" }],
+  };
+
+export const PROVIDER_DEFAULT_TTS_MODELS: Partial<Record<Provider, string>> = {
+  openai: "gpt-4o-mini-tts",
+  gemini: "gemini-2.5-flash-preview-tts",
+  together: "hexgrad/Kokoro-82M",
+  xai: "grok-tts-mini",
 };
 
 export function getNativeSttLanguageNote(language: AppLanguage) {
@@ -685,6 +792,17 @@ export function getProviderTtsVoiceOptions(
     default:
       return PROVIDER_TTS_VOICE_OPTIONS[provider] ?? [];
   }
+}
+
+export function getProviderTtsModelOptions(provider: Provider) {
+  return PROVIDER_TTS_MODEL_OPTIONS[provider] ?? [];
+}
+
+export function getTtsModelLabel(provider: Provider, modelId: string) {
+  const option = getProviderTtsModelOptions(provider).find(
+    (model) => model.id === modelId
+  );
+  return option?.name ?? modelId;
 }
 
 export function getTtsVoiceLabel(

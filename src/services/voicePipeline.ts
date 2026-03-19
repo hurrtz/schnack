@@ -83,9 +83,11 @@ export async function runVoicePipeline(params: {
   sttMode: SttBackendMode;
   sttProvider?: Provider | null;
   sttApiKey?: string;
+  sttModel?: string;
   ttsMode: TtsBackendMode;
   ttsProvider?: Provider | null;
   ttsApiKey?: string;
+  ttsModel?: string;
   ttsVoice: string;
   ttsListenLanguages?: TtsListenLanguage[];
   localTtsVoices?: LocalTtsVoiceSelections;
@@ -109,9 +111,11 @@ export async function runVoicePipeline(params: {
     sttMode,
     sttProvider,
     sttApiKey,
+    sttModel,
     ttsMode,
     ttsProvider,
     ttsApiKey,
+    ttsModel,
     ttsVoice,
     ttsListenLanguages,
     localTtsVoices,
@@ -133,6 +137,7 @@ export async function runVoicePipeline(params: {
           fileUri: audioUri,
           mode: sttMode,
           provider: sttProvider,
+          providerModel: sttModel,
           apiKey: sttApiKey,
           language,
         })
@@ -231,6 +236,7 @@ export async function runVoicePipeline(params: {
           voice: ttsVoice,
           mode: ttsMode,
           provider: ttsProvider,
+          providerModel: ttsModel,
           apiKey: ttsApiKey,
           language,
           listenLanguages: ttsListenLanguages,

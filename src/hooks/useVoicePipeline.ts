@@ -76,6 +76,9 @@ export interface UseVoicePipelineParams {
   /** API key for the selected STT provider. */
   sttApiKey: string;
 
+  /** Selected STT model for the provider. */
+  selectedSttModel: string;
+
   /** TTS mode setting. */
   ttsMode: TtsBackendMode;
 
@@ -84,6 +87,9 @@ export interface UseVoicePipelineParams {
 
   /** API key for the selected TTS provider. */
   ttsApiKey: string;
+
+  /** Selected TTS model for the provider. */
+  selectedTtsModel: string;
 
   /** Selected TTS voice for the provider. */
   selectedTtsVoice: string;
@@ -155,9 +161,11 @@ export function useVoicePipeline(
     sttMode,
     sttProvider,
     sttApiKey,
+    selectedSttModel,
     ttsMode,
     ttsProvider,
     ttsApiKey,
+    selectedTtsModel,
     selectedTtsVoice,
     ttsListenLanguages,
     localTtsVoices,
@@ -235,6 +243,7 @@ export function useVoicePipeline(
           voice: selectedTtsVoice,
           mode: ttsMode,
           provider: ttsProvider,
+          providerModel: selectedTtsModel,
           apiKey: ttsApiKey,
           language,
           listenLanguages: ttsListenLanguages,
@@ -361,9 +370,11 @@ export function useVoicePipeline(
           sttMode,
           sttProvider,
           sttApiKey,
+          sttModel: selectedSttModel,
           ttsMode,
           ttsProvider,
           ttsApiKey,
+          ttsModel: selectedTtsModel,
           ttsVoice: selectedTtsVoice,
           ttsListenLanguages,
           localTtsVoices,
@@ -479,6 +490,7 @@ export function useVoicePipeline(
       provider,
       providerApiKey,
       replyPlayback,
+      selectedTtsModel,
       selectedTtsVoice,
       sttMode,
       ttsMode,
@@ -492,6 +504,7 @@ export function useVoicePipeline(
       showToast,
       sttApiKey,
       sttProvider,
+      selectedSttModel,
       t,
       ttsApiKey,
       ttsProvider,

@@ -43,7 +43,9 @@ export interface ResponseModeRoute {
 }
 export type ProviderApiKeys = Record<Provider, string>;
 export type ProviderModelSelections = Record<Provider, string>;
+export type ProviderSttModelSelections = Record<Provider, string>;
 export type ProviderTtsVoiceSelections = Record<Provider, string>;
+export type ProviderTtsModelSelections = Record<Provider, string>;
 export type LocalTtsVoiceSelections = Record<TtsListenLanguage, string>;
 export type ResponseModeSelections = Record<ResponseMode, ResponseModeRoute>;
 export type UsageEstimateKind = "reply" | "summary";
@@ -81,6 +83,8 @@ export interface Settings {
   activeResponseMode: ResponseMode;
   responseModes: ResponseModeSelections;
   providerModels: ProviderModelSelections;
+  providerSttModels: ProviderSttModelSelections;
+  providerTtsModels: ProviderTtsModelSelections;
   providerTtsVoices: ProviderTtsVoiceSelections;
   language: AppLanguage;
   theme: ThemeMode;
@@ -162,10 +166,34 @@ export const DEFAULT_SETTINGS: Settings = {
     cohere: "command-a-03-2025",
     deepseek: "deepseek-chat",
     groq: "llama-3.3-70b-versatile",
-    mistral: "mistral-medium-2508",
+    mistral: "mistral-medium-latest",
     nvidia: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
     together: "openai/gpt-oss-20b",
     xai: "grok-4",
+  },
+  providerSttModels: {
+    openai: "gpt-4o-mini-transcribe",
+    anthropic: "",
+    gemini: "gemini-2.5-flash",
+    cohere: "",
+    deepseek: "",
+    groq: "whisper-large-v3-turbo",
+    mistral: "voxtral-mini-latest",
+    nvidia: "",
+    together: "openai/whisper-large-v3",
+    xai: "",
+  },
+  providerTtsModels: {
+    openai: "gpt-4o-mini-tts",
+    anthropic: "",
+    gemini: "gemini-2.5-flash-preview-tts",
+    cohere: "",
+    deepseek: "",
+    groq: "",
+    mistral: "",
+    nvidia: "",
+    together: "hexgrad/Kokoro-82M",
+    xai: "grok-tts-mini",
   },
   providerTtsVoices: {
     openai: "alloy",

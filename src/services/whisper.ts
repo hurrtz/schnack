@@ -15,14 +15,14 @@ import {
 type MultipartTranscriptionConfig = {
   kind: "multipart";
   endpoint: string;
-  model: string;
+  defaultModel: string;
   languageHint?: () => string | undefined;
 };
 
 type GeminiTranscriptionConfig = {
   kind: "gemini";
-  endpoint: string;
-  model: string;
+  endpointBase: string;
+  defaultModel: string;
 };
 
 const STT_PROVIDER_CONFIGS: Partial<
@@ -31,29 +31,28 @@ const STT_PROVIDER_CONFIGS: Partial<
   openai: {
     kind: "multipart",
     endpoint: "https://api.openai.com/v1/audio/transcriptions",
-    model: "whisper-1",
+    defaultModel: "gpt-4o-mini-transcribe",
   },
   groq: {
     kind: "multipart",
     endpoint: "https://api.groq.com/openai/v1/audio/transcriptions",
-    model: "whisper-large-v3-turbo",
+    defaultModel: "whisper-large-v3-turbo",
   },
   gemini: {
     kind: "gemini",
-    endpoint:
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-    model: "gemini-2.5-flash",
+    endpointBase: "https://generativelanguage.googleapis.com/v1beta/models",
+    defaultModel: "gemini-2.5-flash",
   },
   mistral: {
     kind: "multipart",
     endpoint: "https://api.mistral.ai/v1/audio/transcriptions",
-    model: "voxtral-mini-latest",
+    defaultModel: "voxtral-mini-latest",
     languageHint: getMistralSttLanguageCode,
   },
   together: {
     kind: "multipart",
     endpoint: "https://api.together.xyz/v1/audio/transcriptions",
-    model: "openai/whisper-large-v3",
+    defaultModel: "openai/whisper-large-v3",
   },
 };
 
@@ -90,10 +89,11 @@ export async function transcribeAudio(params: {
   fileUri: string;
   mode: SttBackendMode;
   provider?: Provider | null;
+  providerModel?: string;
   apiKey?: string;
   language: AppLanguage;
 }): Promise<string | null> {
-  const { fileUri, mode, provider, apiKey, language } = params;
+  const { fileUri, mode, provider, providerModel, apiKey, language } = params;
 
   if (mode === "native") {
     throw new Error(translate(language, "nativeSttHandledInApp"));
@@ -121,33 +121,36 @@ export async function transcribeAudio(params: {
     let response: Awaited<ReturnType<typeof fetch>>;
 
     try {
-      response = await fetch(config.endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": requireProviderKey(provider, apiKey, language),
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `Transcribe this audio exactly. Return only the transcription text in the original spoken language. Do not translate, summarize, or add commentary. Current locale hint: ${getDeviceLocale()}.`,
-                },
-                {
-                  inlineData: {
-                    mimeType: getFileAudioMimeType(fileUri),
-                    data: base64,
-                  },
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0,
+      response = await fetch(
+        `${config.endpointBase}/${providerModel || config.defaultModel}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": requireProviderKey(provider, apiKey, language),
           },
-        }),
-      });
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `Transcribe this audio exactly. Return only the transcription text in the original spoken language. Do not translate, summarize, or add commentary. Current locale hint: ${getDeviceLocale()}.`,
+                  },
+                  {
+                    inlineData: {
+                      mimeType: getFileAudioMimeType(fileUri),
+                      data: base64,
+                    },
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0,
+            },
+          }),
+        }
+      );
     } catch (error) {
       throw normalizeProviderTransportError({
         provider,
@@ -182,7 +185,7 @@ export async function transcribeAudio(params: {
       name: fileUri.split("/").pop() || "recording.m4a",
     } as any
   );
-  formData.append("model", config.model);
+  formData.append("model", providerModel || config.defaultModel);
   const languageHint = config.languageHint?.();
   if (languageHint) {
     formData.append("language", languageHint);

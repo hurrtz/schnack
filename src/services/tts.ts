@@ -4,6 +4,7 @@ import {
   getTtsListenLanguageLabel,
 } from "../constants/localTts";
 import {
+  PROVIDER_DEFAULT_TTS_MODELS,
   PROVIDER_DEFAULT_TTS_VOICES,
   PROVIDER_LABELS,
 } from "../constants/models";
@@ -57,14 +58,14 @@ export class TtsRequestError extends Error {
 type BinaryTtsConfig = {
   kind: "binary";
   endpoint: string;
-  model: string;
+  defaultModel: string;
   voiceFallback: string;
 };
 
 type GeminiTtsConfig = {
   kind: "gemini";
-  endpoint: string;
-  model: string;
+  endpointBase: string;
+  defaultModel: string;
   voiceFallback: string;
 };
 
@@ -74,26 +75,25 @@ const TTS_PROVIDER_CONFIGS: Partial<
   openai: {
     kind: "binary",
     endpoint: "https://api.openai.com/v1/audio/speech",
-    model: "tts-1",
+    defaultModel: "gpt-4o-mini-tts",
     voiceFallback: "alloy",
   },
   gemini: {
     kind: "gemini",
-    endpoint:
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent",
-    model: "gemini-2.5-flash-preview-tts",
+    endpointBase: "https://generativelanguage.googleapis.com/v1beta/models",
+    defaultModel: "gemini-2.5-flash-preview-tts",
     voiceFallback: "alloy",
   },
   together: {
     kind: "binary",
     endpoint: "https://api.together.xyz/v1/audio/speech",
-    model: "hexgrad/Kokoro-82M",
+    defaultModel: "hexgrad/Kokoro-82M",
     voiceFallback: "alloy",
   },
   xai: {
     kind: "binary",
     endpoint: "https://api.x.ai/v1/audio/speech",
-    model: "grok-tts-mini",
+    defaultModel: "grok-tts-mini",
     voiceFallback: "alloy",
   },
 };
@@ -565,6 +565,7 @@ export async function synthesizeSpeech(params: {
   voice: string;
   mode: TtsBackendMode;
   provider?: Provider | null;
+  providerModel?: string;
   apiKey?: string;
   language: AppLanguage;
   listenLanguages?: TtsListenLanguage[];
@@ -577,6 +578,7 @@ export async function synthesizeSpeech(params: {
     voice,
     mode,
     provider,
+    providerModel,
     apiKey,
     language,
     listenLanguages,
@@ -673,6 +675,7 @@ export async function synthesizeSpeech(params: {
         text,
         voice,
         provider,
+        providerModel,
         apiKey,
         language,
       });
@@ -751,6 +754,7 @@ export async function synthesizeSpeech(params: {
       text,
       voice,
       provider,
+      providerModel,
       apiKey,
       language,
     });
@@ -825,6 +829,7 @@ export async function synthesizeSpeechSequence(params: {
   voice: string;
   mode: TtsBackendMode;
   provider?: Provider | null;
+  providerModel?: string;
   apiKey?: string;
   language: AppLanguage;
   listenLanguages?: TtsListenLanguage[];
@@ -879,10 +884,11 @@ async function synthesizeProviderSpeech(params: {
   text: string;
   voice: string;
   provider: Provider;
+  providerModel?: string;
   apiKey?: string;
   language: AppLanguage;
 }) {
-  const { text, voice, provider, apiKey, language } = params;
+  const { text, voice, provider, providerModel, apiKey, language } = params;
   const config = TTS_PROVIDER_CONFIGS[provider];
   const timeoutMs = getProviderTtsTimeoutMs(text);
 
@@ -899,10 +905,14 @@ async function synthesizeProviderSpeech(params: {
     config.voiceFallback ||
     PROVIDER_DEFAULT_TTS_VOICES[provider] ||
     "";
+  const selectedModel =
+    providerModel ||
+    PROVIDER_DEFAULT_TTS_MODELS[provider] ||
+    config.defaultModel;
 
   if (config.kind === "gemini") {
     const response = await fetchWithTimeout(
-      config.endpoint,
+      `${config.endpointBase}/${selectedModel}:generateContent`,
       {
         method: "POST",
         headers: {
@@ -970,7 +980,7 @@ async function synthesizeProviderSpeech(params: {
   const requestBody =
     provider === "together"
       ? {
-          model: config.model,
+          model: selectedModel,
           voice: selectedVoice,
           input: text,
           response_format: "mp3",
@@ -978,7 +988,7 @@ async function synthesizeProviderSpeech(params: {
         }
       : provider === "xai"
         ? {
-            model: config.model,
+            model: selectedModel,
             text,
             voice_id: selectedVoice,
             language: "auto",
@@ -989,7 +999,7 @@ async function synthesizeProviderSpeech(params: {
             },
           }
         : {
-            model: config.model,
+            model: selectedModel,
             voice: selectedVoice,
             input: text,
             response_format: "mp3",

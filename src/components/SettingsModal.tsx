@@ -30,6 +30,7 @@ import {
   TTS_LISTEN_LANGUAGE_OPTIONS,
 } from "../constants/localTts";
 import {
+  PROVIDER_DEFAULT_TTS_MODELS,
   PROVIDER_DEFAULT_TTS_VOICES,
   PROVIDER_API_KEY_URLS,
   PROVIDER_LABELS,
@@ -39,8 +40,10 @@ import {
   getNativeTtsLanguageNote,
   getProviderApiKeyHint,
   getProviderApiKeyPlaceholder,
+  getProviderSttModelOptions,
   getProviderSttLanguageNote,
   getProviderTtsLanguageNote,
+  getProviderTtsModelOptions,
   getProviderTtsVoiceOptions,
 } from "../constants/models";
 import {
@@ -96,6 +99,8 @@ interface SettingsModalProps {
     mode: ResponseMode,
     route: ResponseModeRoute,
   ) => void;
+  onUpdateProviderSttModel: (provider: Provider, model: string) => void;
+  onUpdateProviderTtsModel: (provider: Provider, model: string) => void;
   onUpdateProviderTtsVoice: (provider: Provider, voice: string) => void;
   onUpdateLocalTtsVoice: (
     language: keyof LocalTtsVoiceSelections,
@@ -1845,6 +1850,8 @@ export function SettingsModal({
   focusProvider,
   onUpdate,
   onUpdateResponseModeRoute,
+  onUpdateProviderSttModel,
+  onUpdateProviderTtsModel,
   onUpdateProviderTtsVoice,
   onUpdateLocalTtsVoice,
   onUpdateApiKey,
@@ -1985,6 +1992,78 @@ export function SettingsModal({
     onUpdate,
     settings.ttsMode,
     settings.ttsProvider,
+    visible,
+  ]);
+
+  useEffect(() => {
+    if (!visible || settings.sttMode !== "provider") {
+      return;
+    }
+
+    const nextProviderSttModels = { ...settings.providerSttModels };
+    let hasInvalidSelection = false;
+
+    for (const provider of enabledSttProviders) {
+      const supportedModels = getProviderSttModelOptions(provider);
+      const defaultModel = supportedModels[0]?.id;
+
+      if (!supportedModels.length || !defaultModel) {
+        continue;
+      }
+
+      const currentModel = nextProviderSttModels[provider];
+      const isValid = supportedModels.some((model) => model.id === currentModel);
+
+      if (!isValid) {
+        nextProviderSttModels[provider] = defaultModel;
+        hasInvalidSelection = true;
+      }
+    }
+
+    if (hasInvalidSelection) {
+      onUpdate({ providerSttModels: nextProviderSttModels });
+    }
+  }, [
+    enabledSttProviders,
+    onUpdate,
+    settings.providerSttModels,
+    settings.sttMode,
+    visible,
+  ]);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    const nextProviderTtsModels = { ...settings.providerTtsModels };
+    let hasInvalidSelection = false;
+
+    for (const provider of enabledTtsProviders) {
+      const supportedModels = getProviderTtsModelOptions(provider);
+      const defaultModel =
+        PROVIDER_DEFAULT_TTS_MODELS[provider] || supportedModels[0]?.id;
+
+      if (!supportedModels.length || !defaultModel) {
+        continue;
+      }
+
+      const currentModel = nextProviderTtsModels[provider];
+      const isValid = supportedModels.some((model) => model.id === currentModel);
+
+      if (!isValid) {
+        nextProviderTtsModels[provider] = defaultModel;
+        hasInvalidSelection = true;
+      }
+    }
+
+    if (hasInvalidSelection) {
+      onUpdate({ providerTtsModels: nextProviderTtsModels });
+    }
+  }, [
+    enabledTtsProviders,
+    onUpdate,
+    settings.providerTtsModels,
     visible,
   ]);
 
@@ -2294,6 +2373,18 @@ export function SettingsModal({
     settings.sttMode !== "provider" || enabledSttProviders.length === 0;
   const ttsProviderPickerDisabled =
     settings.ttsMode === "native" || enabledTtsProviders.length === 0;
+  const selectedSttProviderModelOptions =
+    settings.sttProvider &&
+    enabledSttProviders.includes(settings.sttProvider)
+      ? getProviderSttModelOptions(settings.sttProvider)
+      : [];
+  const selectedSttProviderModel =
+    settings.sttProvider &&
+    enabledSttProviders.includes(settings.sttProvider)
+      ? settings.providerSttModels[settings.sttProvider] ||
+        selectedSttProviderModelOptions[0]?.id ||
+        ""
+      : "";
   const sttLanguageNote =
     settings.sttMode === "native"
       ? getNativeSttLanguageNote(language)
@@ -2312,6 +2403,16 @@ export function SettingsModal({
     settings.ttsProvider && enabledTtsProviders.includes(settings.ttsProvider)
       ? settings.ttsProvider
       : null;
+  const selectedPreviewProviderModelOptions = selectedPreviewProvider
+    ? getProviderTtsModelOptions(selectedPreviewProvider)
+    : [];
+  const selectedPreviewProviderModel =
+    selectedPreviewProvider
+      ? settings.providerTtsModels[selectedPreviewProvider] ||
+        PROVIDER_DEFAULT_TTS_MODELS[selectedPreviewProvider] ||
+        selectedPreviewProviderModelOptions[0]?.id ||
+        ""
+      : "";
   const nativeVoiceOptions = nativeVoices.map((voice) => ({
     value: voice.identifier,
     label: getNativeVoiceOptionLabel(voice),
@@ -2504,6 +2605,20 @@ export function SettingsModal({
                     }
                     disabled={providerPickerDisabled}
                   />
+                  {settings.sttProvider &&
+                  selectedSttProviderModelOptions.length > 1 ? (
+                    <Picker
+                      label={t("model")}
+                      value={selectedSttProviderModel}
+                      options={selectedSttProviderModelOptions.map((model) => ({
+                        value: model.id,
+                        label: model.name,
+                      }))}
+                      onChange={(value) =>
+                        onUpdateProviderSttModel(settings.sttProvider!, value)
+                      }
+                    />
+                  ) : null}
                   <Text
                     style={[styles.sectionHint, { color: colors.textMuted }]}
                   >
@@ -2582,6 +2697,25 @@ export function SettingsModal({
                     }
                     disabled={ttsProviderPickerDisabled}
                   />
+                  {selectedPreviewProvider &&
+                  selectedPreviewProviderModelOptions.length > 1 ? (
+                    <Picker
+                      label={t("model")}
+                      value={selectedPreviewProviderModel}
+                      options={selectedPreviewProviderModelOptions.map(
+                        (model) => ({
+                          value: model.id,
+                          label: model.name,
+                        }),
+                      )}
+                      onChange={(value) =>
+                        onUpdateProviderTtsModel(
+                          selectedPreviewProvider,
+                          value,
+                        )
+                      }
+                    />
+                  ) : null}
                   <Text
                     style={[styles.sectionHint, { color: colors.textMuted }]}
                   >
@@ -2616,22 +2750,6 @@ export function SettingsModal({
                     </Text>
                   ) : null}
                 </PickerSection>
-                <LocalPackSection
-                  settings={settings}
-                  packStates={localTtsPackStates}
-                  onUpdateLocalTtsVoice={onUpdateLocalTtsVoice}
-                  onInstallLocalTtsLanguagePack={onInstallLocalTtsLanguagePack}
-                  localPreviewTexts={localPreviewTexts}
-                  activePreview={activePreview}
-                  onSetLocalPreviewText={(selectedLanguage, text) => {
-                    setLocalPreviewTexts((previous) => ({
-                      ...previous,
-                      [selectedLanguage]: text,
-                    }));
-                  }}
-                  onPreviewLocalVoice={handlePreviewLocalVoice}
-                  onTextInputFocus={handleTextInputFocus}
-                />
                 <ProviderVoicePreviewSection
                   provider={selectedPreviewProvider}
                   selectedLanguages={settings.ttsListenLanguages}
@@ -2649,6 +2767,22 @@ export function SettingsModal({
                   }}
                   onPreviewProvider={handlePreviewProviderVoice}
                   onUpdateProviderTtsVoice={onUpdateProviderTtsVoice}
+                  onTextInputFocus={handleTextInputFocus}
+                />
+                <LocalPackSection
+                  settings={settings}
+                  packStates={localTtsPackStates}
+                  onUpdateLocalTtsVoice={onUpdateLocalTtsVoice}
+                  onInstallLocalTtsLanguagePack={onInstallLocalTtsLanguagePack}
+                  localPreviewTexts={localPreviewTexts}
+                  activePreview={activePreview}
+                  onSetLocalPreviewText={(selectedLanguage, text) => {
+                    setLocalPreviewTexts((previous) => ({
+                      ...previous,
+                      [selectedLanguage]: text,
+                    }));
+                  }}
+                  onPreviewLocalVoice={handlePreviewLocalVoice}
                   onTextInputFocus={handleTextInputFocus}
                 />
                 <NativeVoicePreviewSection

@@ -1,12 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
-import { PROVIDER_ORDER } from "../constants/models";
+import {
+  PROVIDER_DEFAULT_STT_MODELS,
+  PROVIDER_DEFAULT_TTS_MODELS,
+  PROVIDER_ORDER,
+  getProviderSttModelOptions,
+  getProviderTtsModelOptions,
+} from "../constants/models";
 import {
   LocalTtsVoiceSelections,
   Provider,
   ProviderApiKeys,
   ProviderModelSelections,
+  ProviderSttModelSelections,
+  ProviderTtsModelSelections,
   ProviderTtsVoiceSelections,
   ReplyPlayback,
   ResponseMode,
@@ -131,6 +139,44 @@ function extractStoredProviderTtsVoices(
   }, {} as Partial<ProviderTtsVoiceSelections>);
 }
 
+function extractStoredProviderTtsModels(
+  storedSettings?: LegacyStoredSettings
+): Partial<ProviderTtsModelSelections> {
+  if (!storedSettings?.providerTtsModels) {
+    return {};
+  }
+
+  return Object.entries(storedSettings.providerTtsModels).reduce(
+    (accumulator, [provider, value]) => {
+      if (typeof value === "string" && value.trim()) {
+        accumulator[provider as Provider] = value.trim();
+      }
+
+      return accumulator;
+    },
+    {} as Partial<ProviderTtsModelSelections>
+  );
+}
+
+function extractStoredProviderSttModels(
+  storedSettings?: LegacyStoredSettings
+): Partial<ProviderSttModelSelections> {
+  if (!storedSettings?.providerSttModels) {
+    return {};
+  }
+
+  return Object.entries(storedSettings.providerSttModels).reduce(
+    (accumulator, [provider, value]) => {
+      if (typeof value === "string" && value.trim()) {
+        accumulator[provider as Provider] = value.trim();
+      }
+
+      return accumulator;
+    },
+    {} as Partial<ProviderSttModelSelections>
+  );
+}
+
 function extractStoredLocalTtsVoices(
   storedSettings?: LegacyStoredSettings
 ): Partial<LocalTtsVoiceSelections> {
@@ -237,6 +283,49 @@ function mergeSettings(
     ...DEFAULT_SETTINGS.providerModels,
     ...extractStoredProviderModels(storedSettings),
   };
+  const mergedProviderSttModels = {
+    ...DEFAULT_SETTINGS.providerSttModels,
+    ...extractStoredProviderSttModels(storedSettings),
+  };
+  const mergedProviderTtsModels = {
+    ...DEFAULT_SETTINGS.providerTtsModels,
+    ...extractStoredProviderTtsModels(storedSettings),
+  };
+
+  for (const provider of PROVIDER_ORDER) {
+    const supportedSttModels = getProviderSttModelOptions(provider);
+
+    if (supportedSttModels.length > 0) {
+      const fallbackSttModel =
+        PROVIDER_DEFAULT_STT_MODELS[provider] ?? supportedSttModels[0]?.id ?? "";
+
+      if (
+        mergedProviderSttModels[provider] &&
+        !supportedSttModels.some(
+          (model) => model.id === mergedProviderSttModels[provider]
+        )
+      ) {
+        mergedProviderSttModels[provider] = fallbackSttModel;
+      }
+    }
+
+    const supportedTtsModels = getProviderTtsModelOptions(provider);
+
+    if (supportedTtsModels.length > 0) {
+      const fallbackTtsModel =
+        PROVIDER_DEFAULT_TTS_MODELS[provider] ?? supportedTtsModels[0]?.id ?? "";
+
+      if (
+        mergedProviderTtsModels[provider] &&
+        !supportedTtsModels.some(
+          (model) => model.id === mergedProviderTtsModels[provider]
+        )
+      ) {
+        mergedProviderTtsModels[provider] = fallbackTtsModel;
+      }
+    }
+  }
+
   const legacyResponseModeRoute = getLegacyResponseModeRoute(
     storedSettings,
     mergedProviderModels,
@@ -283,6 +372,8 @@ function mergeSettings(
               deep: legacyResponseModeRoute,
             },
     providerModels: mergedProviderModels,
+    providerSttModels: mergedProviderSttModels,
+    providerTtsModels: mergedProviderTtsModels,
     providerTtsVoices: {
       ...DEFAULT_SETTINGS.providerTtsVoices,
       ...extractStoredProviderTtsVoices(storedSettings),
@@ -438,6 +529,34 @@ export function useSettings() {
     });
   }, []);
 
+  const updateProviderTtsModel = useCallback((provider: Provider, value: string) => {
+    setSettings((prev) => {
+      const next = {
+        ...prev,
+        providerTtsModels: {
+          ...prev.providerTtsModels,
+          [provider]: value,
+        },
+      };
+      void persistPublicSettings(next);
+      return next;
+    });
+  }, []);
+
+  const updateProviderSttModel = useCallback((provider: Provider, value: string) => {
+    setSettings((prev) => {
+      const next = {
+        ...prev,
+        providerSttModels: {
+          ...prev.providerSttModels,
+          [provider]: value,
+        },
+      };
+      void persistPublicSettings(next);
+      return next;
+    });
+  }, []);
+
   const updateLocalTtsVoice = useCallback(
     (language: keyof LocalTtsVoiceSelections, value: string) => {
       setSettings((prev) => {
@@ -473,6 +592,8 @@ export function useSettings() {
     settings,
     updateSettings,
     updateProviderModel,
+    updateProviderSttModel,
+    updateProviderTtsModel,
     updateResponseModeRoute,
     updateActiveResponseMode,
     updateProviderTtsVoice,

@@ -29,8 +29,14 @@ import { WaveformBar } from "../components/WaveformBar";
 import { WaveformCircle } from "../components/WaveformCircle";
 import { getTtsListenLanguageLabel } from "../constants/localTts";
 import {
+  getProviderSttModelOptions,
+  getProviderTtsModelOptions,
+  getSttModelLabel,
   getTtsVoiceLabel,
+  getTtsModelLabel,
   getProviderModelName,
+  PROVIDER_DEFAULT_STT_MODELS,
+  PROVIDER_DEFAULT_TTS_MODELS,
   PROVIDER_DEFAULT_TTS_VOICES,
   PROVIDER_LABELS,
 } from "../constants/models";
@@ -99,6 +105,8 @@ export function MainScreen() {
     updateSettings,
     updateActiveResponseMode,
     updateResponseModeRoute,
+    updateProviderSttModel,
+    updateProviderTtsModel,
     updateProviderTtsVoice,
     updateLocalTtsVoice,
     updateApiKey,
@@ -169,15 +177,30 @@ export function MainScreen() {
   const ttsProvider = settings.ttsProvider;
   const sttApiKey = sttProvider ? settings.apiKeys[sttProvider].trim() : "";
   const ttsApiKey = ttsProvider ? settings.apiKeys[ttsProvider].trim() : "";
+  const selectedSttModel = sttProvider
+    ? settings.providerSttModels[sttProvider] ||
+      PROVIDER_DEFAULT_STT_MODELS[sttProvider] ||
+      ""
+    : "";
   const sttStatusLabel =
     settings.sttMode === "native"
       ? t("appNative")
       : sttProvider
-        ? PROVIDER_LABELS[sttProvider]
+        ? `${PROVIDER_LABELS[sttProvider]}${
+            getProviderSttModelOptions(sttProvider).length > 1 &&
+            selectedSttModel
+              ? ` · ${getSttModelLabel(sttProvider, selectedSttModel)}`
+              : ""
+          }`
         : t("noProviderYet");
   const selectedTtsVoice = ttsProvider
     ? settings.providerTtsVoices[ttsProvider] ||
       PROVIDER_DEFAULT_TTS_VOICES[ttsProvider] ||
+      ""
+    : "";
+  const selectedTtsModel = ttsProvider
+    ? settings.providerTtsModels[ttsProvider] ||
+      PROVIDER_DEFAULT_TTS_MODELS[ttsProvider] ||
       ""
     : "";
   const providerLabel = PROVIDER_LABELS[provider];
@@ -207,11 +230,12 @@ export function MainScreen() {
             .map((entry) => getTtsListenLanguageLabel(entry, language))
             .join(", ")}`
         : ttsProvider
-          ? `${PROVIDER_LABELS[ttsProvider]} · ${getTtsVoiceLabel(
-              ttsProvider,
-              selectedTtsVoice,
-              language,
-            )}`
+          ? `${PROVIDER_LABELS[ttsProvider]}${
+              getProviderTtsModelOptions(ttsProvider).length > 1 &&
+              selectedTtsModel
+                ? ` · ${getTtsModelLabel(ttsProvider, selectedTtsModel)}`
+                : ""
+            } · ${getTtsVoiceLabel(ttsProvider, selectedTtsVoice, language)}`
           : t("noTtsProvider");
   const readyLocalFallbackLanguages = settings.ttsListenLanguages.filter(
     (entry) =>
@@ -229,11 +253,11 @@ export function MainScreen() {
     ttsProvider &&
     availableTtsProviders.includes(ttsProvider) &&
     ttsApiKey
-      ? `${PROVIDER_LABELS[ttsProvider]} · ${getTtsVoiceLabel(
-          ttsProvider,
-          selectedTtsVoice,
-          language,
-        )}`
+      ? `${PROVIDER_LABELS[ttsProvider]}${
+          getProviderTtsModelOptions(ttsProvider).length > 1 && selectedTtsModel
+            ? ` · ${getTtsModelLabel(ttsProvider, selectedTtsModel)}`
+            : ""
+        } · ${getTtsVoiceLabel(ttsProvider, selectedTtsVoice, language)}`
       : null;
   const fallbackTtsStatusLabel =
     settings.ttsMode === "local"
@@ -285,6 +309,8 @@ export function MainScreen() {
     sttMode: settings.sttMode,
     sttProvider,
     sttApiKey,
+    selectedSttModel,
+    selectedTtsModel,
     ttsMode: settings.ttsMode,
     ttsProvider,
     ttsApiKey,
@@ -1015,6 +1041,10 @@ export function MainScreen() {
             voice: request.voice,
             mode: "provider",
             provider: request.provider,
+            providerModel:
+              settings.providerTtsModels[request.provider] ||
+              PROVIDER_DEFAULT_TTS_MODELS[request.provider] ||
+              "",
             apiKey: providerApiKey,
             language,
             listenLanguages: [request.previewLanguage],
@@ -1053,6 +1083,12 @@ export function MainScreen() {
           text: trimmed,
           voice: request.voice,
           mode: "local",
+          providerModel:
+            ttsProvider && settings.providerTtsModels[ttsProvider]
+              ? settings.providerTtsModels[ttsProvider]
+              : ttsProvider
+                ? PROVIDER_DEFAULT_TTS_MODELS[ttsProvider] || ""
+                : undefined,
           language,
           listenLanguages: [request.localLanguage],
           localVoices: {
@@ -1081,10 +1117,12 @@ export function MainScreen() {
       player,
       settings.apiKeys,
       settings.localTtsVoices,
+      settings.providerTtsModels,
       refreshLocalTtsPackStates,
       showToast,
       t,
       language,
+      ttsProvider,
     ],
   );
 
@@ -2118,6 +2156,8 @@ export function MainScreen() {
         focusProvider={settingsFocusProvider}
         onUpdate={updateSettings}
         onUpdateResponseModeRoute={updateResponseModeRoute}
+        onUpdateProviderSttModel={updateProviderSttModel}
+        onUpdateProviderTtsModel={updateProviderTtsModel}
         onUpdateProviderTtsVoice={updateProviderTtsVoice}
         onUpdateLocalTtsVoice={updateLocalTtsVoice}
         onUpdateApiKey={updateApiKey}

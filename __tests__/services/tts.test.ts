@@ -195,7 +195,7 @@ describe("synthesizeSpeech", () => {
     expect(url).toBe("https://api.openai.com/v1/audio/speech");
     expect(options.method).toBe("POST");
     const body = JSON.parse(options.body);
-    expect(body.model).toBe("tts-1");
+    expect(body.model).toBe("gpt-4o-mini-tts");
     expect(body.voice).toBe("alloy");
     expect(body.input).toBe("Hello world");
   });
