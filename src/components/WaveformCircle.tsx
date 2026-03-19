@@ -8,6 +8,7 @@ import {
   GestureResponderEvent,
   Text,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -183,7 +184,6 @@ export function WaveformCircle({
   onPress,
 }: WaveformCircleProps) {
   const { colors } = useTheme();
-  const { t } = useLocalization();
   const intensity = normalizeMetering(metering);
   const isProcessing = phase === "transcribing" || phase === "thinking";
   const isSpeaking = phase === "speaking";
@@ -264,19 +264,8 @@ export function WaveformCircle({
     );
   }, [phase, pulse, shouldAnimate]);
 
-  const interactionHint =
-    phase === "recording"
-      ? t("listening")
-      : phase === "transcribing"
-        ? t("parsing")
-        : phase === "thinking"
-          ? t("thinking")
-          : phase === "speaking"
-            ? t("speaking")
-            : inputMode === "push-to-talk"
-              ? t("holdToSpeak")
-              : t("tapToSpeak");
   const ringColor = isProcessing ? colors.accentWarm : colors.accent;
+  const showMicIcon = phase === "idle";
   const gradientColors: [string, string, string] = isProcessing
     ? [colors.accentWarm, colors.accentGradientStart, colors.accentGradientEnd]
     : [
@@ -323,10 +312,6 @@ export function WaveformCircle({
       { translateX: interpolate(orbit.value, [0, 1], [-20, 16]) } as const,
       { rotate: `${interpolate(orbit.value, [0, 1], [-8, 8])}deg` } as const,
     ] as any,
-  }));
-
-  const badgeStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: interpolate(orbit.value, [0, 1], [0, -2]) } as const],
   }));
 
   const waveformStyle = useAnimatedStyle(() => ({
@@ -423,21 +408,16 @@ export function WaveformCircle({
                 { borderColor: "rgba(255, 255, 255, 0.22)" },
               ]}
             />
-            <Animated.View
-              style={[
-                styles.innerBadge,
-                { backgroundColor: "rgba(7, 17, 31, 0.18)" },
-                badgeStyle,
-              ]}
-            >
-              <Text style={styles.innerBadgeText}>{interactionHint}</Text>
-            </Animated.View>
             {isProcessing ? (
               <ProcessingIndicator
                 phase={phase}
                 providerLabel={providerLabel}
                 isAnimating={shouldAnimate}
               />
+            ) : showMicIcon ? (
+              <View style={styles.micIconWrap}>
+                <Feather name="mic" size={40} color="rgba(255, 255, 255, 0.96)" />
+              </View>
             ) : (
               <Animated.View style={[styles.waveformWrap, waveformStyle]}>
                 <Waveform
@@ -499,24 +479,14 @@ const styles = StyleSheet.create({
     borderRadius: 80,
     borderWidth: 1,
   },
-  innerBadge: {
-    position: "absolute",
-    top: 26,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  innerBadgeText: {
-    color: "#F6FBFF",
-    fontSize: 11,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    fontFamily: fonts.mono,
-  },
   processingWrap: {
     alignItems: "center",
     justifyContent: "center",
     marginTop: 8,
+  },
+  micIconWrap: {
+    alignItems: "center",
+    justifyContent: "center",
   },
   waveformWrap: {
     marginTop: 18,

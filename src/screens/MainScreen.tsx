@@ -1003,6 +1003,18 @@ export function MainScreen() {
   const messageCountLabel =
     messages.length > 0 ? t("messageCount", { count: messages.length }) : null;
   const routeModelLabel = `${responseModeLabel} · ${providerLabel} · ${modelLabel}`;
+  const actionLabel =
+    visualPhase === "recording"
+      ? t("listening")
+      : visualPhase === "transcribing"
+        ? t("parsing")
+        : visualPhase === "thinking"
+          ? t("thinking")
+          : visualPhase === "speaking"
+            ? t("speaking")
+            : settings.inputMode === "push-to-talk"
+              ? t("holdToSpeak")
+              : t("tapToSpeak");
   const statusTitle =
     visualPhase === "recording"
       ? t("listening")
@@ -1116,12 +1128,6 @@ export function MainScreen() {
     setConversationMenuVisible((previous) => !previous);
   }, []);
 
-  useEffect(() => {
-    if (messages.length === 0 && transcriptVisible) {
-      closeTranscript();
-    }
-  }, [closeTranscript, messages.length, transcriptVisible]);
-
   const renderTopBar = (compact = false) => (
     <View style={styles.topBar}>
       <TouchableOpacity
@@ -1176,7 +1182,7 @@ export function MainScreen() {
     </View>
   );
 
-  const renderConversationMenu = (variant: "preview" | "modal") =>
+  const renderConversationMenu = () =>
     conversationMenuVisible ? (
       <>
         <TouchableOpacity
@@ -1187,9 +1193,7 @@ export function MainScreen() {
         <View
           style={[
             styles.conversationMenu,
-            variant === "modal"
-              ? styles.conversationMenuModal
-              : styles.conversationMenuPreview,
+            styles.conversationMenuModal,
             {
               backgroundColor: colors.surface,
               borderColor: colors.border,
@@ -1405,7 +1409,7 @@ export function MainScreen() {
                   <Text
                     style={[styles.statusStripTitle, { color: colors.text }]}
                   >
-                    {statusTitle}
+                    {actionLabel}
                   </Text>
                 </View>
                 <Text
@@ -1433,77 +1437,36 @@ export function MainScreen() {
             </View>
           </View>
 
-          {messages.length > 0 ? (
-            <View
-              style={[
-                styles.transcriptShell,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  shadowColor: colors.glow,
-                },
-              ]}
-            >
-              {renderConversationMenu("preview")}
-
-              <LinearGradient
-                pointerEvents="none"
-                colors={[
-                  colors.surface,
-                  `${colors.surface}F2`,
-                  `${colors.surface}E0`,
-                  `${colors.surface}80`,
-                  `${colors.surface}00`,
+          <View
+            style={[
+              styles.transcriptShell,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                shadowColor: colors.glow,
+              },
+            ]}
+          >
+            <View style={styles.transcriptHeader}>
+              <TouchableOpacity
+                style={[
+                  styles.expandButton,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
                 ]}
-                locations={[0, 0.2, 0.46, 0.72, 1]}
-                start={{ x: 0.5, y: 0 }}
-                end={{ x: 0.5, y: 1 }}
-                style={styles.transcriptTopFade}
-              />
+                onPress={openTranscript}
+              >
+                <Text
+                  style={[styles.expandButtonText, { color: colors.text }]}
+                >
+                  {t("showTranscript")}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-              <View style={styles.transcriptHeader}>
-                <View style={styles.transcriptTopActions}>
-                  <TouchableOpacity
-                    style={[
-                      styles.expandButton,
-                      {
-                        backgroundColor: colors.surfaceElevated,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                    onPress={openTranscript}
-                  >
-                    <Text
-                      style={[styles.expandButtonText, { color: colors.text }]}
-                    >
-                      {t("show")}
-                    </Text>
-                    <Feather
-                      name="arrow-up-right"
-                      size={15}
-                      color={colors.accent}
-                    />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.menuIconButton,
-                      {
-                        backgroundColor: colors.surfaceElevated,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                    onPress={toggleConversationMenu}
-                    activeOpacity={0.85}
-                  >
-                    <Feather
-                      name="more-horizontal"
-                      size={18}
-                      color={colors.textSecondary}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
+            <View style={styles.transcriptBody}>
               <ChatTranscript
                 messages={messages}
                 emptyTitle={t("noTranscriptYet")}
@@ -1516,7 +1479,7 @@ export function MainScreen() {
                 }}
               />
             </View>
-          ) : null}
+          </View>
         </ScrollView>
       </View>
 
@@ -1779,7 +1742,7 @@ export function MainScreen() {
                   />
                 </TouchableOpacity>
               </View>
-              {renderConversationMenu("modal")}
+              {renderConversationMenu()}
 
               <Text
                 style={[
@@ -2254,6 +2217,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     position: "relative",
     overflow: "hidden",
+    paddingTop: 14,
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.12,
     shadowRadius: 30,
@@ -2273,28 +2237,15 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   transcriptHeader: {
-    position: "absolute",
-    top: 14,
-    right: 16,
-    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
     alignItems: "center",
-    justifyContent: "flex-end",
-    gap: 12,
+    justifyContent: "center",
     zIndex: 2,
   },
-  transcriptTopActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: 8,
-  },
-  transcriptTopFade: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 112,
-    zIndex: 1,
+  transcriptBody: {
+    flex: 1,
+    minHeight: 0,
   },
   menuIconButton: {
     width: 38,
@@ -2321,9 +2272,6 @@ const styles = StyleSheet.create({
   conversationMenuBackdrop: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 4,
-  },
-  conversationMenuPreview: {
-    top: 62,
   },
   conversationMenuModal: {
     top: 52,
@@ -2354,7 +2302,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,
   },
   previewTranscriptContent: {
-    paddingTop: 0,
+    paddingTop: 4,
     paddingHorizontal: 16,
     paddingBottom: 26,
   },
