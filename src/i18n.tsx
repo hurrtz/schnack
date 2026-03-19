@@ -284,6 +284,7 @@ const translations = {
     speechInputRoute: ({ route }) => `Speech in: ${route}`,
     replyModelRoute: ({ route }) => `Reply model: ${route}`,
     voiceOutputRoute: ({ route }) => `Voice out: ${route}`,
+    fallbackVoiceOutputRoute: ({ route }) => `Fallback voice out: ${route}`,
     conversation: "Conversation",
     show: "Show",
     showTranscript: "Show transcript",
@@ -756,6 +757,8 @@ const translations = {
     speechInputRoute: ({ route }) => `Sprache rein: ${route}`,
     replyModelRoute: ({ route }) => `Antwortmodell: ${route}`,
     voiceOutputRoute: ({ route }) => `Stimme raus: ${route}`,
+    fallbackVoiceOutputRoute: ({ route }) =>
+      `Fallback Stimme raus: ${route}`,
     conversation: "Schnack",
     show: "Anzeigen",
     showTranscript: "Schnack anzeigen",

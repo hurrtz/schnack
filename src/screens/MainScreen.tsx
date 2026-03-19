@@ -213,6 +213,34 @@ export function MainScreen() {
               language,
             )}`
           : t("noTtsProvider");
+  const readyLocalFallbackLanguages = settings.ttsListenLanguages.filter(
+    (entry) =>
+      localTtsPackStates[entry]?.supported &&
+      localTtsPackStates[entry]?.downloaded &&
+      localTtsPackStates[entry]?.verified,
+  );
+  const localFallbackStatusLabel =
+    readyLocalFallbackLanguages.length > 0
+      ? `${t("localTts")} · ${readyLocalFallbackLanguages
+          .map((entry) => getTtsListenLanguageLabel(entry, language))
+          .join(", ")}`
+      : null;
+  const providerFallbackStatusLabel =
+    ttsProvider &&
+    availableTtsProviders.includes(ttsProvider) &&
+    ttsApiKey
+      ? `${PROVIDER_LABELS[ttsProvider]} · ${getTtsVoiceLabel(
+          ttsProvider,
+          selectedTtsVoice,
+          language,
+        )}`
+      : null;
+  const fallbackTtsStatusLabel =
+    settings.ttsMode === "local"
+      ? providerFallbackStatusLabel
+      : settings.ttsMode === "provider"
+        ? localFallbackStatusLabel
+        : null;
   const metering = isRecording
     ? recordingMetering
     : player.isPlaying
@@ -1763,6 +1791,28 @@ export function MainScreen() {
                   {t("voiceOutputRoute", { route: ttsStatusLabel })}
                 </Text>
               </View>
+              {fallbackTtsStatusLabel ? (
+                <View
+                  style={[
+                    styles.statusDetailsItem,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusDetailsItemLabel,
+                      { color: colors.textMuted },
+                    ]}
+                  >
+                    {t("fallbackVoiceOutputRoute", {
+                      route: fallbackTtsStatusLabel,
+                    })}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </View>
         </SafeAreaView>
