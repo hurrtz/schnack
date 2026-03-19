@@ -149,6 +149,7 @@ export function MainScreen() {
   } | null>(null);
 
   const recordingStartedRef = useRef<Promise<void> | null>(null);
+  const pendingDrawerDismissActionRef = useRef<null | (() => void)>(null);
   const voiceTurnSessionRef = useRef(0);
   const voiceTurnSnapshotRef = useRef<ReturnType<
     typeof captureActiveConversationSnapshot
@@ -1164,6 +1165,22 @@ export function MainScreen() {
     [activeConversation, getConversationById, showToast, t],
   );
 
+  const runAfterDrawerDismiss = useCallback((action: () => void) => {
+    if (!drawerVisible) {
+      action();
+      return;
+    }
+
+    pendingDrawerDismissActionRef.current = action;
+    setDrawerVisible(false);
+  }, [drawerVisible]);
+
+  const handleDrawerDismiss = useCallback(() => {
+    const pendingAction = pendingDrawerDismissActionRef.current;
+    pendingDrawerDismissActionRef.current = null;
+    pendingAction?.();
+  }, []);
+
   const closeMemory = useCallback(() => {
     setMemoryVisible(false);
     setMemoryConversation(null);
@@ -2077,10 +2094,14 @@ export function MainScreen() {
           void handleCopyThread(id);
         }}
         onShareThread={(id) => {
-          void handleShareThread(id);
+          runAfterDrawerDismiss(() => {
+            void handleShareThread(id);
+          });
         }}
         onManageMemory={(id) => {
-          void openMemory(id);
+          runAfterDrawerDismiss(() => {
+            void openMemory(id);
+          });
         }}
         onRenameThread={(id, title) => {
           void handleRenameThread(id, title);
@@ -2089,6 +2110,7 @@ export function MainScreen() {
         onNewSession={handleStartNewSession}
         onDelete={deleteConversation}
         onClose={() => setDrawerVisible(false)}
+        onDismiss={handleDrawerDismiss}
       />
     </SafeAreaView>
   );

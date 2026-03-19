@@ -239,7 +239,11 @@ export interface Conversation {
 export interface ConversationMeta {
   id: string;
   title: string;
+  createdAt: string;
   updatedAt: string;
+  messageCount: number;
+  providers: Provider[];
+  providerModels: Partial<Record<Provider, string[]>>;
   lastModel: string | null;
   lastProvider: Provider | null;
   pinned: boolean;

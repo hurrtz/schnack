@@ -12,7 +12,6 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Swipeable } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { PROVIDER_LABELS } from "../constants/models";
 import { useLocalization } from "../i18n";
 import { ConversationMeta } from "../types";
 import { useTheme } from "../theme/ThemeContext";
@@ -33,6 +32,7 @@ interface ConversationDrawerProps {
   onNewSession: () => Promise<void> | void;
   onDelete: (id: string) => void;
   onClose: () => void;
+  onDismiss?: () => void;
 }
 
 export function ConversationDrawer({
@@ -49,6 +49,7 @@ export function ConversationDrawer({
   onNewSession,
   onDelete,
   onClose,
+  onDismiss,
 }: ConversationDrawerProps) {
   const { colors } = useTheme();
   const { t, locale } = useLocalization();
@@ -56,16 +57,33 @@ export function ConversationDrawer({
   const [editingConversationId, setEditingConversationId] = React.useState<
     string | null
   >(null);
+  const [actionConversationId, setActionConversationId] = React.useState<
+    string | null
+  >(null);
   const [editingTitle, setEditingTitle] = React.useState("");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filteredConversations, setFilteredConversations] = React.useState<
     ConversationMeta[]
   >(conversations);
+  const visibleConversations = searchQuery.trim()
+    ? filteredConversations
+    : conversations;
+  const actionConversation = React.useMemo(
+    () =>
+      actionConversationId
+        ? conversations.find((conversation) => conversation.id === actionConversationId) ??
+          null
+        : null,
+    [actionConversationId, conversations],
+  );
 
   React.useEffect(() => {
     if (!visible) {
       setSearchQuery("");
       setFilteredConversations(conversations);
+      setActionConversationId(null);
+      setEditingConversationId(null);
+      setEditingTitle("");
       return;
     }
 
@@ -99,29 +117,27 @@ export function ConversationDrawer({
     </TouchableOpacity>
   );
 
-  const formatDate = (iso: string) => {
+  const formatDateTime = (iso: string) => {
     const date = new Date(iso);
     const now = new Date();
-    const diffDays = Math.floor(
-      (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
-    );
+    const includeYear = date.getFullYear() !== now.getFullYear();
 
-    if (diffDays === 0) {
-      return date.toLocaleTimeString(locale, {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    }
-    if (diffDays === 1) {
-      return t("yesterday");
-    }
-
-    return date.toLocaleDateString(locale, { month: "short", day: "numeric" });
+    return date.toLocaleString(locale, {
+      day: "2-digit",
+      month: "short",
+      ...(includeYear ? { year: "numeric" } : {}),
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const closeRenameModal = () => {
     setEditingConversationId(null);
     setEditingTitle("");
+  };
+
+  const closeActionModal = () => {
+    setActionConversationId(null);
   };
 
   const submitRename = () => {
@@ -135,7 +151,12 @@ export function ConversationDrawer({
 
   return (
     <>
-      <Modal visible={visible} transparent animationType="fade">
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        onDismiss={onDismiss}
+      >
         <View style={styles.container}>
           <View
             style={[
@@ -235,7 +256,7 @@ export function ConversationDrawer({
           </View>
 
             <FlatList
-              data={searchQuery.trim() ? filteredConversations : conversations}
+              data={visibleConversations}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.list}
               ListEmptyComponent={
@@ -272,20 +293,40 @@ export function ConversationDrawer({
               }
               renderItem={({ item }) => {
                 const active = item.id === activeId;
-
-                return (
-                  <Swipeable renderRightActions={() => renderRightActions(item.id)}>
+                const providers =
+                  item.providers && item.providers.length > 0
+                    ? item.providers
+                    : item.lastProvider
+                      ? [item.lastProvider]
+                      : [];
+                const providerModelEntries = providers.map((provider) => ({
+                  provider,
+                  models: item.providerModels?.[provider] ?? [],
+                }));
+                const cardBody = (
+                  <>
                     <TouchableOpacity
                       style={[
-                        styles.item,
+                        styles.itemMenuButton,
+                        styles.itemMenuButtonFloating,
                         {
-                          borderColor: active ? colors.borderStrong : colors.border,
-                          backgroundColor: active
-                            ? colors.surfaceElevated
-                            : colors.surface,
-                          shadowColor: active ? colors.glow : "transparent",
+                          backgroundColor: colors.surfaceAlt,
+                          borderColor: colors.border,
                         },
                       ]}
+                      onPress={() => {
+                        setActionConversationId(item.id);
+                      }}
+                      activeOpacity={0.88}
+                    >
+                      <Feather
+                        name="more-horizontal"
+                        size={16}
+                        color={colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.itemPressArea}
                       onPress={() => {
                         void (async () => {
                           await onSelect(item.id);
@@ -294,227 +335,203 @@ export function ConversationDrawer({
                       }}
                       activeOpacity={0.9}
                     >
+                      <View style={styles.itemHeader}>
+                        <View style={styles.itemTitleRow}>
+                          {item.pinned ? (
+                            <View
+                              style={[
+                                styles.pinnedBadge,
+                                {
+                                  backgroundColor: colors.accentSoft,
+                                  borderColor: colors.borderStrong,
+                                },
+                              ]}
+                            >
+                              <Feather
+                                name="bookmark"
+                                size={12}
+                                color={colors.accent}
+                              />
+                              <Text
+                                style={[
+                                  styles.pinnedBadgeText,
+                                  { color: colors.accent },
+                                ]}
+                              >
+                                {t("pinned")}
+                              </Text>
+                            </View>
+                          ) : null}
+                          <Text
+                            style={[styles.itemTitle, { color: colors.text }]}
+                            numberOfLines={1}
+                          >
+                            {item.title}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.itemMeta}>
+                        <View style={styles.itemMetaCopy}>
+                          <View style={styles.itemModelList}>
+                            {providerModelEntries.length > 0 ? (
+                              providerModelEntries.map(({ provider, models }) => (
+                                <View
+                                  key={`${item.id}-${provider}-models`}
+                                  style={styles.itemModelRow}
+                                >
+                                  <View
+                                    style={[
+                                      styles.itemModelIconWrap,
+                                      {
+                                        backgroundColor: active
+                                          ? colors.accentSoft
+                                          : colors.surfaceAlt,
+                                        borderColor: colors.border,
+                                      },
+                                    ]}
+                                  >
+                                    <ProviderIcon
+                                      provider={provider}
+                                      color={
+                                        active ? colors.accent : colors.textSecondary
+                                      }
+                                    />
+                                  </View>
+                                  <Text
+                                    style={[
+                                      styles.itemModelText,
+                                      { color: colors.textSecondary },
+                                    ]}
+                                    numberOfLines={2}
+                                  >
+                                    {models.length > 0
+                                      ? models.join(" · ")
+                                      : t("noModelYet")}
+                                  </Text>
+                                </View>
+                              ))
+                            ) : (
+                              <Text
+                                style={[
+                                  styles.itemModelText,
+                                  { color: colors.textMuted },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {t("noProviderYet")}
+                              </Text>
+                            )}
+                          </View>
+                          <View style={styles.itemStatsRow}>
+                            <View
+                              style={[
+                                styles.itemStatChip,
+                                {
+                                  backgroundColor: colors.surfaceAlt,
+                                  borderColor: colors.border,
+                                },
+                              ]}
+                            >
+                              <Feather
+                                name="message-square"
+                                size={13}
+                                color={active ? colors.accent : colors.textSecondary}
+                              />
+                              <Text
+                                style={[
+                                  styles.itemStatChipText,
+                                  {
+                                    color: active
+                                      ? colors.accent
+                                      : colors.textSecondary,
+                                  },
+                                ]}
+                              >
+                                {t("messageCount", {
+                                  count: item.messageCount ?? 0,
+                                })}
+                              </Text>
+                            </View>
+                          </View>
+                          <View style={styles.itemTimelineRow}>
+                            <View style={styles.itemTimelineBlock}>
+                              <Text
+                                style={[
+                                  styles.itemTimelineLabel,
+                                  { color: colors.textMuted },
+                                ]}
+                              >
+                                {t("startedAt")}
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.itemTimelineValue,
+                                  { color: colors.textSecondary },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {formatDateTime(item.createdAt ?? item.updatedAt)}
+                              </Text>
+                            </View>
+                            <View style={styles.itemTimelineBlock}>
+                              <Text
+                                style={[
+                                  styles.itemTimelineLabel,
+                                  { color: colors.textMuted },
+                                ]}
+                              >
+                                {t("endedAt")}
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.itemTimelineValue,
+                                  { color: colors.textSecondary },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {formatDateTime(item.updatedAt)}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  </>
+                );
+
+                return (
+                  <Swipeable renderRightActions={() => renderRightActions(item.id)}>
                     {active ? (
                       <LinearGradient
                         colors={[colors.accentGradientStart, colors.accentGradientEnd]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
-                        style={styles.activeRail}
-                      />
-                    ) : null}
-                    <View style={styles.itemHeader}>
-                      <View style={styles.itemTitleRow}>
-                        {item.pinned ? (
-                          <View
-                            style={[
-                              styles.pinnedBadge,
-                              {
-                                backgroundColor: colors.accentSoft,
-                                borderColor: colors.borderStrong,
-                              },
-                            ]}
-                          >
-                            <Feather
-                              name="bookmark"
-                              size={12}
-                              color={colors.accent}
-                            />
-                            <Text
-                              style={[
-                                styles.pinnedBadgeText,
-                                { color: colors.accent },
-                              ]}
-                            >
-                              {t("pinned")}
-                            </Text>
-                          </View>
-                        ) : null}
-                        <Text
-                          style={[styles.itemTitle, { color: colors.text }]}
-                          numberOfLines={1}
-                        >
-                          {item.title}
-                        </Text>
-                      </View>
-                      <Text
-                        style={[styles.itemDate, { color: colors.textMuted }]}
+                        style={[styles.itemFrame, { shadowColor: colors.glow }]}
                       >
-                        {formatDate(item.updatedAt)}
-                      </Text>
-                    </View>
-                    <View style={styles.itemMeta}>
-                      <View style={styles.itemMetaCopy}>
-                        <View style={styles.itemProviderRow}>
-                          {item.lastProvider ? (
-                            <ProviderIcon
-                              provider={item.lastProvider}
-                              color={active ? colors.accent : colors.textSecondary}
-                            />
-                          ) : (
-                            <Feather
-                              name="cpu"
-                              size={16}
-                              color={colors.textMuted}
-                            />
-                          )}
-                          <Text
-                            style={[
-                              styles.itemProviderLabel,
-                              {
-                                color: item.lastProvider
-                                  ? active
-                                    ? colors.accent
-                                    : colors.textSecondary
-                                  : colors.textMuted,
-                              },
-                            ]}
-                          >
-                            {item.lastProvider
-                              ? PROVIDER_LABELS[item.lastProvider]
-                              : t("noProviderYet")}
-                          </Text>
+                        <View
+                          style={[
+                            styles.item,
+                            { backgroundColor: colors.surfaceElevated },
+                          ]}
+                        >
+                          {cardBody}
                         </View>
-                        <View style={styles.itemFooter}>
-                          <Text
-                            style={[styles.itemModel, { color: colors.textSecondary }]}
-                            numberOfLines={1}
-                          >
-                            {item.lastModel || t("noModelYet")}
-                          </Text>
-                          <View style={styles.itemFooterActions}>
-                            <TouchableOpacity
-                              style={[
-                                styles.threadAction,
-                                {
-                                  backgroundColor: colors.surfaceAlt,
-                                  borderColor: colors.border,
-                                },
-                              ]}
-                              onPress={() => onTogglePinned(item.id)}
-                              activeOpacity={0.88}
-                            >
-                              <Feather
-                                name="bookmark"
-                                size={13}
-                                color={colors.textSecondary}
-                              />
-                              <Text
-                                style={[
-                                  styles.copyActionText,
-                                  { color: colors.textSecondary },
-                                ]}
-                              >
-                                {item.pinned ? t("unpin") : t("pin")}
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[
-                                styles.threadAction,
-                                {
-                                  backgroundColor: colors.surfaceAlt,
-                                  borderColor: colors.border,
-                                },
-                              ]}
-                              onPress={() => {
-                                setEditingConversationId(item.id);
-                                setEditingTitle(item.title);
-                              }}
-                              activeOpacity={0.88}
-                            >
-                              <Feather
-                                name="edit-3"
-                                size={13}
-                                color={colors.textSecondary}
-                              />
-                              <Text
-                                style={[
-                                  styles.copyActionText,
-                                  { color: colors.textSecondary },
-                                ]}
-                              >
-                                {t("rename")}
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[
-                                styles.threadAction,
-                                {
-                                  backgroundColor: colors.surfaceAlt,
-                                  borderColor: colors.border,
-                                },
-                              ]}
-                              onPress={() => onManageMemory(item.id)}
-                              activeOpacity={0.88}
-                            >
-                              <Feather
-                                name="archive"
-                                size={13}
-                                color={colors.textSecondary}
-                              />
-                              <Text
-                                style={[
-                                  styles.copyActionText,
-                                  { color: colors.textSecondary },
-                                ]}
-                              >
-                                {t("memory")}
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[
-                                styles.threadAction,
-                                {
-                                  backgroundColor: colors.surfaceAlt,
-                                  borderColor: colors.border,
-                                },
-                              ]}
-                              onPress={() => onShareThread(item.id)}
-                              activeOpacity={0.88}
-                            >
-                              <Feather
-                                name="share"
-                                size={13}
-                                color={colors.textSecondary}
-                              />
-                              <Text
-                                style={[
-                                  styles.copyActionText,
-                                  { color: colors.textSecondary },
-                                ]}
-                              >
-                                {t("share")}
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[
-                                styles.threadAction,
-                                {
-                                  backgroundColor: colors.surfaceAlt,
-                                  borderColor: colors.border,
-                                },
-                              ]}
-                              onPress={() => onCopyThread(item.id)}
-                              activeOpacity={0.88}
-                            >
-                              <Feather
-                                name="copy"
-                                size={13}
-                                color={colors.textSecondary}
-                              />
-                              <Text
-                                style={[
-                                  styles.copyActionText,
-                                  { color: colors.textSecondary },
-                                ]}
-                              >
-                                {t("copy")}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
+                      </LinearGradient>
+                    ) : (
+                      <View
+                        style={[
+                          styles.itemFrame,
+                          styles.itemFrameInactive,
+                          {
+                            borderColor: colors.border,
+                            backgroundColor: colors.surface,
+                            shadowColor: "transparent",
+                          },
+                        ]}
+                      >
+                        <View style={styles.item}>{cardBody}</View>
                       </View>
-                    </View>
-                    </TouchableOpacity>
+                    )}
                   </Swipeable>
                 );
               }}
@@ -526,95 +543,302 @@ export function ConversationDrawer({
             activeOpacity={1}
             onPress={onClose}
           />
-        </View>
-      </Modal>
-
-      <Modal
-        visible={!!editingConversationId}
-        transparent
-        animationType="fade"
-        onRequestClose={closeRenameModal}
-      >
-        <View style={styles.renameOverlay}>
-          <TouchableOpacity
-            style={[styles.renameBackdrop, { backgroundColor: colors.overlay }]}
-            activeOpacity={1}
-            onPress={closeRenameModal}
-          />
-          <View
-            style={[
-              styles.renameCard,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                shadowColor: colors.glow,
-              },
-            ]}
-          >
-            <Text style={[styles.renameTitle, { color: colors.text }]}>
-              {t("renameThread")}
-            </Text>
-            <Text style={[styles.renameHint, { color: colors.textSecondary }]}>
-              {t("renameThreadHint")}
-            </Text>
-            <TextInput
-              value={editingTitle}
-              onChangeText={setEditingTitle}
-              autoFocus
-              placeholder={t("threadTitle")}
-              placeholderTextColor={colors.textMuted}
-              selectionColor={colors.accent}
-              style={[
-                styles.renameInput,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.border,
-                  color: colors.text,
-                },
-              ]}
-            />
-            <View style={styles.renameActions}>
+          {actionConversation ? (
+            <View style={styles.inlineActionOverlay} pointerEvents="box-none">
               <TouchableOpacity
                 style={[
-                  styles.renameAction,
+                  styles.inlineActionBackdrop,
+                  { backgroundColor: colors.overlay },
+                ]}
+                activeOpacity={1}
+                onPress={closeActionModal}
+              />
+              <View
+                style={[
+                  styles.actionSheet,
                   {
-                    backgroundColor: colors.surfaceElevated,
+                    backgroundColor: colors.surface,
                     borderColor: colors.border,
+                    shadowColor: colors.glow,
                   },
                 ]}
-                onPress={closeRenameModal}
-                activeOpacity={0.88}
               >
+                <Text style={[styles.actionSheetTitle, { color: colors.text }]}>
+                  {actionConversation.title}
+                </Text>
                 <Text
                   style={[
-                    styles.renameActionText,
+                    styles.actionSheetMeta,
                     { color: colors.textSecondary },
                   ]}
                 >
-                  {t("cancel")}
+                  {t("messageCount", {
+                    count: actionConversation.messageCount ?? 0,
+                  })}
                 </Text>
-              </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.actionSheetRow,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    onTogglePinned(actionConversation.id);
+                    closeActionModal();
+                  }}
+                  activeOpacity={0.88}
+                >
+                  <Feather
+                    name="bookmark"
+                    size={16}
+                    color={colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.actionSheetRowText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {actionConversation.pinned ? t("unpin") : t("pin")}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.actionSheetRow,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    setEditingConversationId(actionConversation.id);
+                    setEditingTitle(actionConversation.title);
+                    closeActionModal();
+                  }}
+                  activeOpacity={0.88}
+                >
+                  <Feather
+                    name="edit-3"
+                    size={16}
+                    color={colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.actionSheetRowText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {t("rename")}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.actionSheetRow,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    onManageMemory(actionConversation.id);
+                    closeActionModal();
+                  }}
+                  activeOpacity={0.88}
+                >
+                  <Feather
+                    name="archive"
+                    size={16}
+                    color={colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.actionSheetRowText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {t("memory")}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.actionSheetRow,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    onShareThread(actionConversation.id);
+                    closeActionModal();
+                  }}
+                  activeOpacity={0.88}
+                >
+                  <Feather
+                    name="share"
+                    size={16}
+                    color={colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.actionSheetRowText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {t("share")}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.actionSheetRow,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    onCopyThread(actionConversation.id);
+                    closeActionModal();
+                  }}
+                  activeOpacity={0.88}
+                >
+                  <Feather
+                    name="copy"
+                    size={16}
+                    color={colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.actionSheetRowText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {t("copy")}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.actionSheetRow,
+                    styles.actionSheetDeleteRow,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    onDelete(actionConversation.id);
+                    closeActionModal();
+                  }}
+                  activeOpacity={0.88}
+                >
+                  <Feather name="trash-2" size={16} color={colors.danger} />
+                  <Text
+                    style={[
+                      styles.actionSheetRowText,
+                      { color: colors.danger },
+                    ]}
+                  >
+                    {t("delete")}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
+          {editingConversationId ? (
+            <View style={styles.inlineRenameOverlay} pointerEvents="box-none">
               <TouchableOpacity
                 style={[
-                  styles.renameAction,
+                  styles.inlineRenameBackdrop,
+                  { backgroundColor: colors.overlay },
+                ]}
+                activeOpacity={1}
+                onPress={closeRenameModal}
+              />
+              <View
+                style={[
+                  styles.renameCard,
                   {
-                    backgroundColor: colors.accentSoft,
-                    borderColor: colors.borderStrong,
-                    opacity: editingTitle.trim() ? 1 : 0.5,
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    shadowColor: colors.glow,
                   },
                 ]}
-                onPress={submitRename}
-                activeOpacity={0.88}
-                disabled={!editingTitle.trim()}
               >
-                <Text
-                  style={[styles.renameActionText, { color: colors.accent }]}
-                >
-                  {t("save")}
+                <Text style={[styles.renameTitle, { color: colors.text }]}>
+                  {t("renameThread")}
                 </Text>
-              </TouchableOpacity>
+                <Text
+                  style={[styles.renameHint, { color: colors.textSecondary }]}
+                >
+                  {t("renameThreadHint")}
+                </Text>
+                <TextInput
+                  value={editingTitle}
+                  onChangeText={setEditingTitle}
+                  autoFocus
+                  placeholder={t("threadTitle")}
+                  placeholderTextColor={colors.textMuted}
+                  selectionColor={colors.accent}
+                  style={[
+                    styles.renameInput,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                      color: colors.text,
+                    },
+                  ]}
+                />
+                <View style={styles.renameActions}>
+                  <TouchableOpacity
+                    style={[
+                      styles.renameAction,
+                      {
+                        backgroundColor: colors.surfaceElevated,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                    onPress={closeRenameModal}
+                    activeOpacity={0.88}
+                  >
+                    <Text
+                      style={[
+                        styles.renameActionText,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {t("cancel")}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.renameAction,
+                      {
+                        backgroundColor: colors.accentSoft,
+                        borderColor: colors.borderStrong,
+                        opacity: editingTitle.trim() ? 1 : 0.5,
+                      },
+                    ]}
+                    onPress={submitRename}
+                    activeOpacity={0.88}
+                    disabled={!editingTitle.trim()}
+                  >
+                    <Text
+                      style={[styles.renameActionText, { color: colors.accent }]}
+                    >
+                      {t("save")}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-          </View>
+          ) : null}
         </View>
       </Modal>
     </>
@@ -636,12 +860,60 @@ const styles = StyleSheet.create({
     height: 180,
   },
   backdrop: { flex: 1 },
-  renameOverlay: {
-    flex: 1,
+  inlineActionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "flex-end",
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    zIndex: 10,
+  },
+  inlineActionBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  actionSheet: {
+    borderRadius: 28,
+    borderWidth: 1,
+    padding: 18,
+    gap: 10,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.16,
+    shadowRadius: 30,
+    elevation: 10,
+  },
+  actionSheetTitle: {
+    fontSize: 18,
+    lineHeight: 22,
+    fontFamily: fonts.display,
+  },
+  actionSheetMeta: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fonts.body,
+    marginBottom: 4,
+  },
+  actionSheetRow: {
+    minHeight: 46,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  actionSheetDeleteRow: {
+    marginTop: 4,
+  },
+  actionSheetRowText: {
+    fontSize: 14,
+    fontFamily: fonts.display,
+  },
+  inlineRenameOverlay: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     paddingHorizontal: 20,
+    zIndex: 12,
   },
-  renameBackdrop: {
+  inlineRenameBackdrop: {
     ...StyleSheet.absoluteFillObject,
   },
   renameCard: {
@@ -807,31 +1079,28 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: fonts.body,
   },
-  item: {
+  itemFrame: {
     borderRadius: 24,
-    borderWidth: 1,
-    padding: 16,
-    overflow: "hidden",
+    padding: 1.5,
     shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.14,
     shadowRadius: 24,
     elevation: 6,
     marginBottom: 10,
   },
-  activeRail: {
-    position: "absolute",
-    top: 14,
-    bottom: 14,
-    left: 0,
-    width: 4,
-    borderTopRightRadius: 3,
-    borderBottomRightRadius: 3,
+  itemFrameInactive: {
+    borderWidth: 1,
+  },
+  item: {
+    position: "relative",
+    borderRadius: 22.5,
+    padding: 16,
+    overflow: "hidden",
+  },
+  itemPressArea: {
+    paddingRight: 44,
   },
   itemHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 10,
     marginBottom: 12,
   },
   itemTitleRow: {
@@ -841,6 +1110,20 @@ const styles = StyleSheet.create({
   itemTitle: {
     fontSize: 16,
     fontFamily: fonts.display,
+  },
+  itemMenuButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  itemMenuButtonFloating: {
+    position: "absolute",
+    top: 14,
+    right: 14,
+    zIndex: 2,
   },
   pinnedBadge: {
     alignSelf: "flex-start",
@@ -858,59 +1141,72 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     fontFamily: fonts.mono,
   },
-  itemDate: {
-    fontSize: 11,
-    fontFamily: fonts.mono,
-  },
   itemMeta: {
     gap: 10,
   },
   itemMetaCopy: {
+    gap: 10,
+  },
+  itemModelList: {
     gap: 8,
   },
-  itemProviderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  itemProviderLabel: {
-    fontSize: 12,
-    fontFamily: fonts.mono,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-  },
-  itemFooter: {
+  itemModelRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
+    gap: 10,
   },
-  itemFooterActions: {
-    flexDirection: "row",
+  itemModelIconWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
     alignItems: "center",
-    justifyContent: "flex-end",
-    flexWrap: "wrap",
-    gap: 8,
+    justifyContent: "center",
   },
-  itemModel: {
+  itemModelText: {
     flex: 1,
     fontSize: 13,
+    lineHeight: 19,
     fontFamily: fonts.body,
   },
-  threadAction: {
+  itemStatsRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+  },
+  itemStatChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     borderWidth: 1,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  copyActionText: {
+  itemStatChipText: {
     fontSize: 11,
-    letterSpacing: 0.6,
+    letterSpacing: 0.5,
     textTransform: "uppercase",
     fontFamily: fonts.mono,
+  },
+  itemTimelineRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+  },
+  itemTimelineBlock: {
+    flex: 1,
+    gap: 4,
+  },
+  itemTimelineLabel: {
+    fontSize: 11,
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+    fontFamily: fonts.mono,
+  },
+  itemTimelineValue: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fonts.body,
   },
   deleteAction: {
     width: 96,

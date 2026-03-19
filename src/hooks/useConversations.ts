@@ -20,9 +20,32 @@ function truncateTitle(text: string, max = 40): string {
   return (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated) + "...";
 }
 
-function inferLastAssistantState(messages: Message[]) {
+function inferConversationState(messages: Message[]) {
   let lastModel: string | null = null;
   let lastProvider: Provider | null = null;
+  const providers: Provider[] = [];
+  const seenProviders = new Set<Provider>();
+  const providerModels: Partial<Record<Provider, string[]>> = {};
+  const seenProviderModels = new Map<Provider, Set<string>>();
+
+  for (const message of messages) {
+    if (message.provider && !seenProviders.has(message.provider)) {
+      seenProviders.add(message.provider);
+      providers.push(message.provider);
+    }
+
+    if (message.provider && message.model) {
+      const seenModels = seenProviderModels.get(message.provider) ?? new Set<string>();
+      if (!seenModels.has(message.model)) {
+        seenModels.add(message.model);
+        seenProviderModels.set(message.provider, seenModels);
+        providerModels[message.provider] = [
+          ...(providerModels[message.provider] ?? []),
+          message.model,
+        ];
+      }
+    }
+  }
 
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const candidate = messages[index];
@@ -40,7 +63,13 @@ function inferLastAssistantState(messages: Message[]) {
     }
   }
 
-  return { lastModel, lastProvider };
+  return {
+    lastModel,
+    lastProvider,
+    providers,
+    providerModels,
+    messageCount: messages.length,
+  };
 }
 
 function compareConversationMeta(
@@ -60,12 +89,32 @@ function sortConversationMeta(conversations: ConversationMeta[]) {
   return [...conversations].sort(compareConversationMeta);
 }
 
-function normalizeConversationMeta(meta: ConversationMeta) {
+function normalizeConversationMeta(meta: Partial<ConversationMeta>) {
   return {
     ...meta,
+    id: meta.id ?? "",
+    title: meta.title ?? "",
+    createdAt: meta.createdAt ?? meta.updatedAt ?? new Date(0).toISOString(),
+    updatedAt: meta.updatedAt ?? new Date(0).toISOString(),
+    messageCount: meta.messageCount ?? 0,
+    providers:
+      meta.providers ??
+      (meta.lastProvider ? [meta.lastProvider] : []),
+    providerModels: meta.providerModels ?? {},
+    lastModel: meta.lastModel ?? null,
     lastProvider: meta.lastProvider ?? null,
     pinned: meta.pinned ?? false,
   };
+}
+
+function conversationMetaNeedsHydration(meta: Partial<ConversationMeta>) {
+  return (
+    !meta.createdAt ||
+    typeof meta.messageCount !== "number" ||
+    !Array.isArray(meta.providers) ||
+    typeof meta.providerModels !== "object" ||
+    meta.providerModels === null
+  );
 }
 
 function normalizeConversationTitle(title: string, fallback: string) {
@@ -82,12 +131,22 @@ function buildConversationMetaFromConversation(
   conversation: Conversation,
   existingMeta?: ConversationMeta | null,
 ): ConversationMeta {
-  const inferredState = inferLastAssistantState(conversation.messages);
+  const inferredState = inferConversationState(conversation.messages);
 
   return normalizeConversationMeta({
     id: conversation.id,
     title: conversation.title,
+    createdAt: conversation.createdAt,
     updatedAt: conversation.updatedAt,
+    messageCount: inferredState.messageCount,
+    providers:
+      inferredState.providers.length > 0
+        ? inferredState.providers
+        : existingMeta?.providers ?? [],
+    providerModels:
+      Object.keys(inferredState.providerModels).length > 0
+        ? inferredState.providerModels
+        : existingMeta?.providerModels ?? {},
     lastModel: inferredState.lastModel ?? existingMeta?.lastModel ?? null,
     lastProvider: inferredState.lastProvider ?? existingMeta?.lastProvider ?? null,
     pinned: existingMeta?.pinned ?? false,
@@ -112,6 +171,40 @@ export function useConversations() {
     [],
   );
 
+  const hydrateConversationMetas = useCallback(
+    async (metas: ConversationMeta[]) => {
+      return Promise.all(
+        metas.map(async (meta) => {
+          const shouldHydrate =
+            !meta.createdAt ||
+            meta.messageCount === 0 ||
+            meta.providers.length === 0 ||
+            Object.keys(meta.providerModels ?? {}).length === 0;
+
+          if (!shouldHydrate) {
+            return meta;
+          }
+
+          const conversationRaw = await AsyncStorage.getItem(
+            conversationKey(meta.id),
+          );
+
+          if (!conversationRaw) {
+            return meta;
+          }
+
+          try {
+            const conversation = JSON.parse(conversationRaw) as Conversation;
+            return buildConversationMetaFromConversation(conversation, meta);
+          } catch {
+            return meta;
+          }
+        }),
+      );
+    },
+    [],
+  );
+
   useEffect(() => {
     let cancelled = false;
 
@@ -131,9 +224,10 @@ export function useConversations() {
       }
       const normalizedMetas = await Promise.all(
         storedMetas.map(async (meta) => {
+          const needsHydration = conversationMetaNeedsHydration(meta);
           const normalizedMeta = normalizeConversationMeta(meta);
 
-          if (normalizedMeta.lastModel && normalizedMeta.lastProvider) {
+          if (!needsHydration) {
             return normalizedMeta;
           }
 
@@ -153,27 +247,20 @@ export function useConversations() {
             return normalizedMeta;
           }
 
-          const inferredState = inferLastAssistantState(conversation.messages);
-
-          if (!inferredState.lastModel && !inferredState.lastProvider) {
-            return normalizedMeta;
-          }
-
-          return {
-            ...normalizedMeta,
-            updatedAt: conversation.updatedAt,
-            lastModel: inferredState.lastModel ?? normalizedMeta.lastModel,
-            lastProvider:
-              inferredState.lastProvider ?? normalizedMeta.lastProvider,
-          };
+          return buildConversationMetaFromConversation(
+            conversation,
+            normalizedMeta,
+          );
         }),
       );
+
+      const hydratedMetas = await hydrateConversationMetas(normalizedMetas);
 
       if (cancelled) {
         return;
       }
 
-      const sortedMetas = sortConversationMeta(normalizedMetas);
+      const sortedMetas = sortConversationMeta(hydratedMetas);
       setConversations(sortedMetas);
 
       if (JSON.stringify(sortedMetas) !== JSON.stringify(storedMetas)) {
@@ -186,7 +273,7 @@ export function useConversations() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hydrateConversationMetas]);
 
   useEffect(() => {
     if (!activeConversation || conversations.length === 0) {
@@ -214,6 +301,38 @@ export function useConversations() {
     return sortedMetas;
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    if (
+      conversations.length === 0 ||
+      !conversations.some(
+        (conversation) =>
+          conversation.messageCount === 0 || conversation.providers.length === 0,
+      )
+    ) {
+      return;
+    }
+
+    void (async () => {
+      const hydratedMetas = await hydrateConversationMetas(conversations);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (JSON.stringify(hydratedMetas) === JSON.stringify(conversations)) {
+        return;
+      }
+
+      setConversations(persistConversationMeta(hydratedMetas));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [conversations, hydrateConversationMetas, persistConversationMeta]);
+
   const createConversation = useCallback(
     (
       firstMessage: string,
@@ -231,7 +350,14 @@ export function useConversations() {
       const meta: ConversationMeta = {
         id: conv.id,
         title: conv.title,
+        createdAt: now,
         updatedAt: now,
+        messageCount: 0,
+        providers: initialProvider ? [initialProvider] : [],
+        providerModels:
+          initialProvider && initialModel
+            ? { [initialProvider]: [initialModel] }
+            : {},
         lastModel: initialModel,
         lastProvider: initialProvider,
         pinned: false,
@@ -289,7 +415,24 @@ export function useConversations() {
           m.id === updated.id
             ? {
                 ...m,
+                createdAt: updated.createdAt,
                 updatedAt: updated.updatedAt,
+                messageCount: updated.messages.length,
+                providers:
+                  msg.provider && !m.providers.includes(msg.provider)
+                    ? [...m.providers, msg.provider]
+                    : m.providers,
+                providerModels:
+                  msg.provider && msg.model
+                    ? {
+                        ...m.providerModels,
+                        [msg.provider]: (
+                          m.providerModels[msg.provider] ?? []
+                        ).includes(msg.model)
+                          ? m.providerModels[msg.provider]
+                          : [...(m.providerModels[msg.provider] ?? []), msg.model],
+                      }
+                    : m.providerModels,
                 ...(lastModel !== undefined ? { lastModel } : {}),
                 ...(lastProvider !== undefined ? { lastProvider } : {}),
               }
@@ -474,13 +617,18 @@ export function useConversations() {
 
       const matches = await Promise.all(
         conversations.map(async (conversationMeta) => {
-          const providerLabel = conversationMeta.lastProvider
+          const providerLabels = (conversationMeta.providers ?? [])
+            .map((provider) => PROVIDER_LABELS[provider])
+            .join(" ");
+          const lastProviderLabel = conversationMeta.lastProvider
             ? PROVIDER_LABELS[conversationMeta.lastProvider]
             : "";
           const metadataHaystack = [
             conversationMeta.title,
             conversationMeta.lastModel ?? "",
-            providerLabel,
+            lastProviderLabel,
+            providerLabels,
+            ...Object.values(conversationMeta.providerModels ?? {}).flat(),
           ]
             .join(" ")
             .toLowerCase();
