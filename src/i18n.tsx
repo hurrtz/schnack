@@ -155,7 +155,7 @@ const translations = {
     localVoiceForLanguage: ({ languageLabel }) => `Voice for ${languageLabel}`,
     providerVoicePreviews: "Provider Voice Previews",
     providerVoicePreviewsHint:
-      "Each enabled TTS provider can be tested here with its own voice and sample text, without changing the active reply route.",
+      "Test the currently selected TTS provider here with its own voice and a separate preview text for each reply language.",
     nativeVoicePreviewSection: "Native Voice Preview",
     nativeVoicePreviewSectionHint:
       "This speaks directly through the phone's built-in speech synthesizer so you can compare it against local and cloud voices.",
@@ -194,6 +194,7 @@ const translations = {
       "Uses the currently selected reply voice backend without sending anything to the language model.",
     previewVoice: "Preview Voice",
     generatingPreview: "Generating Preview...",
+    playingPreview: "Playing Preview...",
     systemVoice: "System voice",
     noTtsProvider: "No TTS provider",
     nothingToCopyYet: "Nothing to copy yet.",
@@ -577,7 +578,7 @@ const translations = {
     localVoiceForLanguage: ({ languageLabel }) => `Stimme für ${languageLabel}`,
     providerVoicePreviews: "Anbieter-Stimmvorschau",
     providerVoicePreviewsHint:
-      "Jeder aktivierte TTS-Anbieter kann hier mit eigener Stimme und eigenem Beispieltext getestet werden, ohne die aktive Antwort-Route zu ändern.",
+      "Teste hier den aktuell ausgewählten TTS-Anbieter mit eigener Stimme und einem separaten Vorschautext pro Antwortsprache.",
     nativeVoicePreviewSection: "Native Stimmvorschau",
     nativeVoicePreviewSectionHint:
       "Nutzt direkt die eingebaute Sprachsynthese des Geräts, damit du sie mit lokalen und Cloud-Stimmen vergleichen kannst.",
@@ -616,6 +617,7 @@ const translations = {
       "Verwendet das aktuell gewählte Sprach-Backend, ohne etwas an das Sprachmodell zu senden.",
     previewVoice: "Stimme testen",
     generatingPreview: "Vorschau wird erzeugt…",
+    playingPreview: "Vorschau wird abgespielt…",
     systemVoice: "Systemstimme",
     noTtsProvider: "Kein TTS-Anbieter",
     nothingToCopyYet: "Noch nichts zum Kopieren.",

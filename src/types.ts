@@ -58,6 +58,7 @@ export type VoicePreviewRequest =
       mode: "provider";
       provider: Provider;
       voice: string;
+      previewLanguage: TtsListenLanguage;
     }
   | {
       text: string;

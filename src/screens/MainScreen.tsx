@@ -964,7 +964,12 @@ export function MainScreen() {
   );
 
   const handlePreviewVoice = useCallback(
-    async (request: VoicePreviewRequest) => {
+    async (
+      request: VoicePreviewRequest,
+      callbacks?: {
+        onPlaybackStarted?: () => void;
+      },
+    ) => {
       if (isRecording || isBusy) {
         showToast(t("stopSessionBeforePreview"));
         return;
@@ -991,6 +996,7 @@ export function MainScreen() {
             voice: request.nativeVoice,
             diagnostics: speechDiagnostics,
           });
+          callbacks?.onPlaybackStarted?.();
           await player.waitForDrain();
           return;
         }
@@ -1011,10 +1017,12 @@ export function MainScreen() {
             provider: request.provider,
             apiKey: providerApiKey,
             language,
+            listenLanguages: [request.previewLanguage],
             diagnostics: speechDiagnostics,
           });
 
           player.enqueueAudio(audioUri, speechDiagnostics);
+          callbacks?.onPlaybackStarted?.();
           await player.waitForDrain();
           return;
         }
@@ -1056,6 +1064,7 @@ export function MainScreen() {
         });
 
         player.enqueueAudio(audioUri, speechDiagnostics);
+        callbacks?.onPlaybackStarted?.();
         await player.waitForDrain();
       } catch (error) {
         if (request.mode === "local") {

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Keyboard,
   Linking,
   Modal,
@@ -116,7 +117,12 @@ interface SettingsModalProps {
     >
   >;
   onInstallLocalTtsLanguagePack: (language: TtsListenLanguage) => Promise<void>;
-  onPreviewVoice: (request: VoicePreviewRequest) => Promise<void>;
+  onPreviewVoice: (
+    request: VoicePreviewRequest,
+    callbacks?: {
+      onPlaybackStarted?: () => void;
+    },
+  ) => Promise<void>;
   onValidateProvider: (provider: Provider) => Promise<void>;
   onClose: () => void;
 }
@@ -131,6 +137,7 @@ type ProviderValidationState = {
   apiKey?: string;
   model?: string;
 };
+type PreviewButtonPhase = "idle" | "generating" | "playing";
 
 const TABS: SettingsTab[] = ["instructions", "providers", "stt", "tts", "ui"];
 
@@ -155,8 +162,20 @@ type NativeSpeechVoice = Awaited<
   ReturnType<typeof Speech.getAvailableVoicesAsync>
 >[number];
 
-const PROVIDER_PREVIEW_SAMPLE_TEXT =
-  "Hello. This is a longer voice preview for SchnackAI, spoken at a calm and steady pace so you can judge clarity, tone, and whether this voice feels pleasant enough for full replies. If you listen for a few seconds, you should get a realistic sense of how this provider voice will sound during everyday conversations.";
+const PROVIDER_PREVIEW_SAMPLE_TEXT_BY_LANGUAGE: Record<
+  TtsListenLanguage,
+  string
+> = {
+  en: "Hello. This is a longer voice preview for SchnackAI, spoken at a calm and steady pace so you can judge clarity, tone, and whether this voice feels pleasant enough for full replies. If you listen for a few seconds, you should get a realistic sense of how this provider voice will sound during everyday conversations.",
+  de: "Hallo. Dies ist eine laengere Stimmprobe fuer SchnackAI, damit du hoeren kannst, wie klar die Aussprache ist und ob die Stimme auch ueber mehrere Saetze hinweg angenehm klingt. Wenn sie hier ruhig und natuerlich wirkt, passt sie in der Regel auch gut fuer laengere Antworten im Alltag.",
+  zh: "你好。这是一段较长的语音预览，用来帮助你判断这条声音是否清晰、自然，并且适合在日常对话里连续收听更长的回答。如果这两句话听起来稳定又舒服，那么它通常也适合让应用朗读完整回复。",
+  es: "Hola. Esta es una muestra de voz mas larga para que puedas escuchar con calma si la pronunciacion es clara y si el ritmo suena natural durante varias frases seguidas. Si esta voz te parece agradable en estas dos oraciones, normalmente tambien funcionara bien para respuestas mas largas dentro de la aplicacion.",
+  pt: "Ola. Esta e uma amostra de voz mais longa para que voce possa perceber com calma se a pronuncia esta clara e se o ritmo parece natural ao longo de varias frases. Se esta voz soar agradavel nestas duas frases, normalmente tambem sera uma boa escolha para respostas mais longas no aplicativo.",
+  hi: "नमस्ते। यह आवाज़ का थोड़ा लंबा पूर्वावलोकन है, ताकि आप सुन सकें कि उच्चारण कितना साफ़ है और क्या यह आवाज़ कई वाक्यों तक स्वाभाविक और आरामदायक लगती है। अगर यह आवाज़ इन दो वाक्यों में संतुलित और सुखद लगे, तो आम तौर पर यह ऐप के लंबे उत्तर सुनने के लिए भी अच्छी रहेगी।",
+  fr: "Bonjour. Voici un apercu de voix un peu plus long afin que vous puissiez entendre si la prononciation reste claire et si le rythme parait naturel sur plusieurs phrases d'affilee. Si cette voix vous semble agreable sur ces deux phrases, elle conviendra en general aussi pour des reponses plus longues dans l'application.",
+  it: "Ciao. Questa e una prova della voce un po' piu lunga, cosi puoi capire se la pronuncia e chiara e se il ritmo rimane naturale anche per piu frasi consecutive. Se questa voce ti sembra piacevole in queste due frasi, di solito sara una buona scelta anche per risposte piu lunghe nell'app.",
+  ja: "こんにちは。これは少し長めの音声プレビューで、発音の明瞭さや、複数の文を続けて聞いたときに自然に感じられるかどうかを確かめるためのものです。ここで落ち着いて聞こえる声であれば、アプリが長めの返答を読み上げる場合にもたいてい快適に使えます。",
+};
 
 const LOCAL_PREVIEW_SAMPLE_TEXT_BY_LANGUAGE: Record<TtsListenLanguage, string> =
   {
@@ -300,6 +319,10 @@ function getResponseModeDescription(
 
 function getLocalPreviewSampleText(language: TtsListenLanguage) {
   return LOCAL_PREVIEW_SAMPLE_TEXT_BY_LANGUAGE[language];
+}
+
+function getProviderPreviewSampleText(language: TtsListenLanguage) {
+  return PROVIDER_PREVIEW_SAMPLE_TEXT_BY_LANGUAGE[language];
 }
 
 function getNativePreviewSampleText(language: AppLanguage) {
@@ -1128,18 +1151,21 @@ function AssistantResponseSection({
 function PreviewComposer({
   text,
   setText,
-  loading,
+  phase,
   onPreview,
   onTextInputFocus,
 }: {
   text: string;
   setText: (text: string) => void;
-  loading: boolean;
+  phase: PreviewButtonPhase;
   onPreview: () => Promise<void>;
   onTextInputFocus: TextInputFocusHandler;
 }) {
   const { colors } = useTheme();
   const { t } = useLocalization();
+  const isGenerating = phase === "generating";
+  const isPlaying = phase === "playing";
+  const isBusy = isGenerating || isPlaying;
 
   return (
     <>
@@ -1171,7 +1197,7 @@ function PreviewComposer({
         onPress={() => {
           void onPreview();
         }}
-        disabled={loading || !text.trim()}
+        disabled={isBusy || !text.trim()}
       >
         <LinearGradient
           colors={[colors.accentGradientStart, colors.accentGradientEnd]}
@@ -1179,16 +1205,21 @@ function PreviewComposer({
           end={{ x: 1, y: 1 }}
           style={[
             styles.previewButton,
-            !text.trim() || loading ? styles.previewButtonDisabled : null,
+            !text.trim() ? styles.previewButtonDisabled : null,
+            isGenerating ? styles.previewButtonBusy : null,
           ]}
         >
-          <Feather
-            name={loading ? "loader" : "volume-2"}
-            size={16}
-            color="#F4F8FF"
-          />
+          {isGenerating ? (
+            <ActivityIndicator size="small" color="#F4F8FF" />
+          ) : (
+            <Feather name="volume-2" size={16} color="#F4F8FF" />
+          )}
           <Text style={styles.previewButtonText}>
-            {loading ? t("generatingPreview") : t("previewVoice")}
+            {isGenerating
+              ? t("generatingPreview")
+              : isPlaying
+                ? t("playingPreview")
+                : t("previewVoice")}
           </Text>
         </LinearGradient>
       </TouchableOpacity>
@@ -1197,30 +1228,51 @@ function PreviewComposer({
 }
 
 function ProviderVoicePreviewSection({
-  providers,
+  provider,
+  selectedLanguages,
   settings,
   previewTexts,
-  activePreviewId,
+  activePreview,
   onSetPreviewText,
   onPreviewProvider,
   onUpdateProviderTtsVoice,
   onTextInputFocus,
 }: {
-  providers: Provider[];
+  provider: Provider | null;
+  selectedLanguages: TtsListenLanguage[];
   settings: Settings;
-  previewTexts: Record<Provider, string>;
-  activePreviewId: string | null;
-  onSetPreviewText: (provider: Provider, text: string) => void;
-  onPreviewProvider: (provider: Provider) => Promise<void>;
+  previewTexts: Record<Provider, Record<TtsListenLanguage, string>>;
+  activePreview: { id: string; phase: PreviewButtonPhase } | null;
+  onSetPreviewText: (
+    provider: Provider,
+    previewLanguage: TtsListenLanguage,
+    text: string,
+  ) => void;
+  onPreviewProvider: (
+    provider: Provider,
+    previewLanguage: TtsListenLanguage,
+  ) => Promise<void>;
   onUpdateProviderTtsVoice: (provider: Provider, voice: string) => void;
   onTextInputFocus: TextInputFocusHandler;
 }) {
   const { colors } = useTheme();
   const { t, language } = useLocalization();
 
-  if (providers.length === 0) {
+  if (!provider) {
     return null;
   }
+
+  const voiceOptions = getProviderTtsVoiceOptions(provider, language).map(
+    (voice) => ({
+      value: voice.id,
+      label: voice.label,
+    }),
+  );
+  const selectedVoice =
+    settings.providerTtsVoices[provider] ||
+    PROVIDER_DEFAULT_TTS_VOICES[provider] ||
+    voiceOptions[0]?.value ||
+    "";
 
   return (
     <PickerSection>
@@ -1231,63 +1283,72 @@ function ProviderVoicePreviewSection({
         {t("providerVoicePreviewsHint")}
       </Text>
 
-      {providers.map((provider) => {
-        const voiceOptions = getProviderTtsVoiceOptions(provider, language).map(
-          (voice) => ({
-            value: voice.id,
-            label: voice.label,
-          }),
-        );
-        const selectedVoice =
-          settings.providerTtsVoices[provider] ||
-          PROVIDER_DEFAULT_TTS_VOICES[provider] ||
-          voiceOptions[0]?.value ||
-          "";
-        const previewId = `provider:${provider}`;
-
-        return (
-          <View
-            key={provider}
+      <View
+        style={[
+          styles.localPackCard,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <Text style={[styles.previewLabel, { color: colors.textSecondary }]}>
+          {PROVIDER_LABELS[provider]}
+        </Text>
+        {voiceOptions.length > 0 ? (
+          <Picker
+            label={t("ttsVoice")}
+            value={selectedVoice}
+            options={voiceOptions}
+            onChange={(value) => onUpdateProviderTtsVoice(provider, value)}
+          />
+        ) : (
+          <Text
             style={[
-              styles.localPackCard,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-              },
+              styles.previewHint,
+              { color: colors.textMuted, marginTop: 0 },
             ]}
           >
-            <Text
-              style={[styles.previewLabel, { color: colors.textSecondary }]}
+            {t("providerDefaultVoiceHint")}
+          </Text>
+        )}
+
+        {selectedLanguages.map((entry, index) => {
+          const previewId = `provider:${provider}:${entry}`;
+
+          return (
+            <View
+              key={`${provider}:${entry}`}
+              style={[
+                styles.previewLanguageBlock,
+                index > 0
+                  ? {
+                      borderTopWidth: 1,
+                      borderTopColor: colors.border,
+                    }
+                  : null,
+              ]}
             >
-              {PROVIDER_LABELS[provider]}
-            </Text>
-            {voiceOptions.length > 0 ? (
-              <Picker
-                label={t("ttsVoice")}
-                value={selectedVoice}
-                options={voiceOptions}
-                onChange={(value) => onUpdateProviderTtsVoice(provider, value)}
-              />
-            ) : (
               <Text
-                style={[
-                  styles.previewHint,
-                  { color: colors.textMuted, marginTop: 0 },
-                ]}
+                style={[styles.previewLabel, { color: colors.textSecondary }]}
               >
-                {t("providerDefaultVoiceHint")}
+                {getTtsListenLanguageLabel(entry, language)}
               </Text>
-            )}
-            <PreviewComposer
-              text={previewTexts[provider]}
-              setText={(text) => onSetPreviewText(provider, text)}
-              loading={activePreviewId === previewId}
-              onPreview={() => onPreviewProvider(provider)}
-              onTextInputFocus={onTextInputFocus}
-            />
-          </View>
-        );
-      })}
+              <PreviewComposer
+                text={previewTexts[provider][entry]}
+                setText={(text) => onSetPreviewText(provider, entry, text)}
+                phase={
+                  activePreview?.id === previewId
+                    ? activePreview.phase
+                    : "idle"
+                }
+                onPreview={() => onPreviewProvider(provider, entry)}
+                onTextInputFocus={onTextInputFocus}
+              />
+            </View>
+          );
+        })}
+      </View>
     </PickerSection>
   );
 }
@@ -1296,7 +1357,7 @@ function NativeVoicePreviewSection({
   voiceOptions,
   selectedVoice,
   previewText,
-  activePreviewId,
+  activePreview,
   onSelectVoice,
   onSetPreviewText,
   onPreview,
@@ -1305,7 +1366,7 @@ function NativeVoicePreviewSection({
   voiceOptions: { value: string; label: string }[];
   selectedVoice: string;
   previewText: string;
-  activePreviewId: string | null;
+  activePreview: { id: string; phase: PreviewButtonPhase } | null;
   onSelectVoice: (voiceId: string) => void;
   onSetPreviewText: (text: string) => void;
   onPreview: () => Promise<void>;
@@ -1343,7 +1404,11 @@ function NativeVoicePreviewSection({
             <PreviewComposer
               text={previewText}
               setText={onSetPreviewText}
-              loading={activePreviewId === "native"}
+              phase={
+                activePreview?.id === "native"
+                  ? activePreview.phase
+                  : "idle"
+              }
               onPreview={onPreview}
               onTextInputFocus={onTextInputFocus}
             />
@@ -1421,7 +1486,7 @@ function LocalPackSection({
   onUpdateLocalTtsVoice,
   onInstallLocalTtsLanguagePack,
   localPreviewTexts,
-  activePreviewId,
+  activePreview,
   onSetLocalPreviewText,
   onPreviewLocalVoice,
   onTextInputFocus,
@@ -1447,7 +1512,7 @@ function LocalPackSection({
   ) => void;
   onInstallLocalTtsLanguagePack: (language: TtsListenLanguage) => Promise<void>;
   localPreviewTexts: Record<TtsListenLanguage, string>;
-  activePreviewId: string | null;
+  activePreview: { id: string; phase: PreviewButtonPhase } | null;
   onSetLocalPreviewText: (language: TtsListenLanguage, text: string) => void;
   onPreviewLocalVoice: (language: TtsListenLanguage) => Promise<void>;
   onTextInputFocus: TextInputFocusHandler;
@@ -1579,7 +1644,11 @@ function LocalPackSection({
                 <PreviewComposer
                   text={localPreviewTexts[entry]}
                   setText={(text) => onSetLocalPreviewText(entry, text)}
-                  loading={activePreviewId === `local:${entry}`}
+                  phase={
+                    activePreview?.id === `local:${entry}`
+                      ? activePreview.phase
+                      : "idle"
+                  }
                   onPreview={() => onPreviewLocalVoice(entry)}
                   onTextInputFocus={onTextInputFocus}
                 />
@@ -1791,14 +1860,20 @@ export function SettingsModal({
   const contentScrollRef = useRef<ScrollView>(null);
   const [activeTab, setActiveTab] = useState<SettingsTab>("instructions");
   const [providerPreviewTexts, setProviderPreviewTexts] = useState<
-    Record<Provider, string>
+    Record<Provider, Record<TtsListenLanguage, string>>
   >(() =>
     PROVIDER_ORDER.reduce(
       (accumulator, provider) => ({
         ...accumulator,
-        [provider]: PROVIDER_PREVIEW_SAMPLE_TEXT,
+        [provider]: TTS_LISTEN_LANGUAGE_OPTIONS.reduce(
+          (languageAccumulator, entry) => ({
+            ...languageAccumulator,
+            [entry]: getProviderPreviewSampleText(entry),
+          }),
+          {} as Record<TtsListenLanguage, string>,
+        ),
       }),
-      {} as Record<Provider, string>,
+      {} as Record<Provider, Record<TtsListenLanguage, string>>,
     ),
   );
   const [localPreviewTexts, setLocalPreviewTexts] = useState<
@@ -1817,7 +1892,10 @@ export function SettingsModal({
   );
   const [nativeVoices, setNativeVoices] = useState<NativeSpeechVoice[]>([]);
   const [selectedNativeVoice, setSelectedNativeVoice] = useState("");
-  const [activePreviewId, setActivePreviewId] = useState<string | null>(null);
+  const [activePreview, setActivePreview] = useState<{
+    id: string;
+    phase: PreviewButtonPhase;
+  } | null>(null);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const speechDiagnostics = useSpeechDiagnostics(6);
 
@@ -1839,7 +1917,7 @@ export function SettingsModal({
       scale.value = 0.96;
       translateY.value = 16;
       opacity.value = 0;
-      setActivePreviewId(null);
+      setActivePreview(null);
       return;
     }
 
@@ -2141,18 +2219,31 @@ export function SettingsModal({
   ) => {
     const trimmed = request.text.trim();
 
-    if (!trimmed || activePreviewId) {
+    if (!trimmed || activePreview) {
       return;
     }
 
-    setActivePreviewId(previewId);
+    setActivePreview({ id: previewId, phase: "generating" });
     try {
-      await onPreviewVoice({
-        ...request,
-        text: trimmed,
-      });
+      await onPreviewVoice(
+        {
+          ...request,
+          text: trimmed,
+        },
+        {
+          onPlaybackStarted: () => {
+            setActivePreview((current) =>
+              current?.id === previewId
+                ? { id: previewId, phase: "playing" }
+                : current,
+            );
+          },
+        },
+      );
     } finally {
-      setActivePreviewId(null);
+      setActivePreview((current) =>
+        current?.id === previewId ? null : current,
+      );
     }
   };
 
@@ -2172,18 +2263,22 @@ export function SettingsModal({
     });
   };
 
-  const handlePreviewProviderVoice = async (provider: Provider) => {
+  const handlePreviewProviderVoice = async (
+    provider: Provider,
+    previewLanguage: TtsListenLanguage,
+  ) => {
     const selectedVoice =
       settings.providerTtsVoices[provider] ||
       PROVIDER_DEFAULT_TTS_VOICES[provider] ||
       getProviderTtsVoiceOptions(provider, language)[0]?.id ||
       "";
 
-    await handleExactPreview(`provider:${provider}`, {
-      text: providerPreviewTexts[provider],
+    await handleExactPreview(`provider:${provider}:${previewLanguage}`, {
+      text: providerPreviewTexts[provider][previewLanguage],
       mode: "provider",
       provider,
       voice: selectedVoice,
+      previewLanguage,
     });
   };
 
@@ -2213,6 +2308,10 @@ export function SettingsModal({
         : settings.ttsProvider
           ? getProviderTtsLanguageNote(settings.ttsProvider, language)
           : null;
+  const selectedPreviewProvider =
+    settings.ttsProvider && enabledTtsProviders.includes(settings.ttsProvider)
+      ? settings.ttsProvider
+      : null;
   const nativeVoiceOptions = nativeVoices.map((voice) => ({
     value: voice.identifier,
     label: getNativeVoiceOptionLabel(voice),
@@ -2468,6 +2567,11 @@ export function SettingsModal({
                   onChange={(value) => onUpdate({ ttsMode: value })}
                 />
 
+                <ListenLanguageSelector
+                  selectedLanguages={settings.ttsListenLanguages}
+                  onToggleLanguage={toggleListenLanguage}
+                />
+
                 <PickerSection>
                   <Picker
                     label={t("ttsProvider")}
@@ -2512,18 +2616,13 @@ export function SettingsModal({
                     </Text>
                   ) : null}
                 </PickerSection>
-
-                <ListenLanguageSelector
-                  selectedLanguages={settings.ttsListenLanguages}
-                  onToggleLanguage={toggleListenLanguage}
-                />
                 <LocalPackSection
                   settings={settings}
                   packStates={localTtsPackStates}
                   onUpdateLocalTtsVoice={onUpdateLocalTtsVoice}
                   onInstallLocalTtsLanguagePack={onInstallLocalTtsLanguagePack}
                   localPreviewTexts={localPreviewTexts}
-                  activePreviewId={activePreviewId}
+                  activePreview={activePreview}
                   onSetLocalPreviewText={(selectedLanguage, text) => {
                     setLocalPreviewTexts((previous) => ({
                       ...previous,
@@ -2534,14 +2633,18 @@ export function SettingsModal({
                   onTextInputFocus={handleTextInputFocus}
                 />
                 <ProviderVoicePreviewSection
-                  providers={enabledTtsProviders}
+                  provider={selectedPreviewProvider}
+                  selectedLanguages={settings.ttsListenLanguages}
                   settings={settings}
                   previewTexts={providerPreviewTexts}
-                  activePreviewId={activePreviewId}
-                  onSetPreviewText={(provider, text) => {
+                  activePreview={activePreview}
+                  onSetPreviewText={(provider, previewLanguage, text) => {
                     setProviderPreviewTexts((previous) => ({
                       ...previous,
-                      [provider]: text,
+                      [provider]: {
+                        ...previous[provider],
+                        [previewLanguage]: text,
+                      },
                     }));
                   }}
                   onPreviewProvider={handlePreviewProviderVoice}
@@ -2552,7 +2655,7 @@ export function SettingsModal({
                   voiceOptions={nativeVoiceOptions}
                   selectedVoice={selectedNativeVoice}
                   previewText={nativePreviewText}
-                  activePreviewId={activePreviewId}
+                  activePreview={activePreview}
                   onSelectVoice={setSelectedNativeVoice}
                   onSetPreviewText={setNativePreviewText}
                   onPreview={handlePreviewNativeVoice}
@@ -3040,6 +3143,9 @@ const styles = StyleSheet.create({
   previewButtonDisabled: {
     opacity: 0.55,
   },
+  previewButtonBusy: {
+    opacity: 0.82,
+  },
   previewButtonText: {
     color: "#F4F8FF",
     fontSize: 14,
@@ -3075,6 +3181,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 14,
     marginTop: 10,
+  },
+  previewLanguageBlock: {
+    marginTop: 14,
+    paddingTop: 14,
   },
   localPackHeader: {
     flexDirection: "row",
