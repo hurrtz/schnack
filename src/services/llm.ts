@@ -56,6 +56,9 @@ const RESPONSE_TONE_INSTRUCTIONS: Record<AssistantResponseTone, string> = {
   eli5: "Explain everything as simply as possible. Use analogies, everyday language, zero jargon. Assume no prior knowledge on any topic.",
 };
 
+const RESPONSE_LANGUAGE_INSTRUCTION =
+  "Match the language of the user's latest message by default. Only switch languages if the user explicitly asks you to, or if earlier system instructions explicitly require a different reply language. Do not automatically translate the conversation into the app language.";
+
 const CONTEXT_SUMMARIZER_PROMPT =
   "You maintain a compact internal memory for an ongoing voice conversation. Update or create a concise summary of what matters from earlier turns. Keep stable facts, user preferences, goals, decisions, constraints, names, unresolved questions, and requested follow-ups. Omit filler, small talk, and wording details. Keep the summary under 180 words. Write plain text only.";
 
@@ -79,6 +82,7 @@ export function buildSystemPrompt(params: {
 
   return [
     instructions,
+    RESPONSE_LANGUAGE_INSTRUCTION,
     RESPONSE_LENGTH_INSTRUCTIONS[params.responseLength],
     RESPONSE_TONE_INSTRUCTIONS[params.responseTone],
     summary

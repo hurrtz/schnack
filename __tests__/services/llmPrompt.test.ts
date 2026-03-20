@@ -7,9 +7,13 @@ describe("buildSystemPrompt", () => {
       assistantInstructions: "   ",
       responseLength: "normal",
       responseTone: "professional",
+      language: "en",
     });
 
     expect(prompt).toContain(DEFAULT_ASSISTANT_INSTRUCTIONS);
+    expect(prompt).toContain(
+      "Match the language of the user's latest message by default."
+    );
     expect(prompt).toContain(
       "Aim for a balanced response length. Cover the important points without dragging the answer out."
     );
@@ -23,6 +27,7 @@ describe("buildSystemPrompt", () => {
       assistantInstructions: "Answer like a historian with a strong sense of chronology.",
       responseLength: "thorough",
       responseTone: "nerdy",
+      language: "en",
     });
 
     expect(prompt).toContain(
@@ -41,6 +46,7 @@ describe("buildSystemPrompt", () => {
       assistantInstructions: "Keep the reply grounded in prior user preferences.",
       responseLength: "brief",
       responseTone: "concise",
+      language: "en",
       conversationSummary:
         "User prefers answers in German and is evaluating providers mainly on latency and cost.",
     });

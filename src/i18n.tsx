@@ -404,6 +404,8 @@ const translations = {
     ttsTimeout: ({ provider }) => `${provider} speech output took too long.`,
     sttTimeout: ({ provider }) =>
       `${provider} speech transcription took too long.`,
+    voiceInputCaptureIncomplete:
+      "Voice input could not be captured cleanly. Please try again.",
     ttsDidNotReturnAudio: ({ provider }) =>
       `${provider} TTS did not return audio.`,
     nativeSttHandledInApp: "Native STT is handled directly in the app.",
@@ -838,6 +840,8 @@ const translations = {
       `Die Sprachausgabe bei ${provider} hat zu lange gedauert.`,
     sttTimeout: ({ provider }) =>
       `Die Sprachtranskription bei ${provider} hat zu lange gedauert.`,
+    voiceInputCaptureIncomplete:
+      "Die Spracheingabe konnte nicht sauber aufgenommen werden. Bitte versuch es noch einmal.",
     ttsDidNotReturnAudio: ({ provider }) =>
       `${provider} hat kein Audio zurückgegeben.`,
     nativeSttHandledInApp: "Native STT wird direkt in der App verarbeitet.",

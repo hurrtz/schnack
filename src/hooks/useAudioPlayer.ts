@@ -44,7 +44,7 @@ import { supportsNativeOutputWaveformPlayback } from "../services/nativeWaveform
 const PLAYER_STATUS_INTERVAL_MS = 250;
 const VISUAL_UPDATE_INTERVAL_MS = 150;
 const OSCILLOSCOPE_TICK_INTERVAL_MS = 16;
-const PLAYBACK_ROUTE_SETTLE_MS = 220;
+const PLAYBACK_ROUTE_SETTLE_MS = 650;
 
 export interface PlayerState {
   isPlaying: boolean;

@@ -4,6 +4,12 @@ global.fetch = jest.fn();
 
 jest.mock("expo-file-system/legacy", () => ({
   readAsStringAsync: jest.fn(() => Promise.resolve("ZmFrZQ==")),
+  getInfoAsync: jest.fn(() =>
+    Promise.resolve({
+      exists: true,
+      size: 8192,
+    })
+  ),
 }));
 
 describe("transcribeAudio", () => {

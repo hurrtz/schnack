@@ -26,6 +26,9 @@ type GeminiTranscriptionConfig = {
 };
 
 const STT_TIMEOUT_MS = 30000;
+const RECORDED_FILE_READY_POLL_MS = 90;
+const RECORDED_FILE_READY_ATTEMPTS = 12;
+const RECORDED_FILE_MIN_BYTES = 4096;
 
 const STT_PROVIDER_CONFIGS: Partial<
   Record<Provider, MultipartTranscriptionConfig | GeminiTranscriptionConfig>
@@ -98,6 +101,54 @@ function createSttTimeoutError(params: {
   );
 }
 
+function createRecordedFileNotReadyError(language: AppLanguage) {
+  return new Error(translate(language, "voiceInputCaptureIncomplete"));
+}
+
+async function waitForRecordedFileReady(
+  fileUri: string,
+  language: AppLanguage
+) {
+  let lastStableSize = -1;
+
+  const getFileSize = async () => {
+    const info = await FileSystem.getInfoAsync(fileUri);
+    const size =
+      "size" in info && typeof info.size === "number" ? info.size : 0;
+
+    return {
+      exists: info.exists,
+      size,
+    };
+  };
+
+  for (let attempt = 0; attempt < RECORDED_FILE_READY_ATTEMPTS; attempt += 1) {
+    const info = await getFileSize();
+
+    if (
+      info.exists &&
+      info.size >= RECORDED_FILE_MIN_BYTES &&
+      info.size === lastStableSize
+    ) {
+      return;
+    }
+
+    lastStableSize = info.size;
+
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, RECORDED_FILE_READY_POLL_MS);
+    });
+  }
+
+  const info = await getFileSize();
+
+  if (info.exists && info.size >= RECORDED_FILE_MIN_BYTES) {
+    return;
+  }
+
+  throw createRecordedFileNotReadyError(language);
+}
+
 async function fetchWithTimeout(
   input: RequestInfo | URL,
   init: RequestInit,
@@ -154,6 +205,8 @@ export async function transcribeAudio(params: {
   if (!provider) {
     throw new Error(translate(language, "chooseSpeechToTextProviderInSettings"));
   }
+
+  await waitForRecordedFileReady(fileUri, language);
 
   const config = STT_PROVIDER_CONFIGS[provider];
 
