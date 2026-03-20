@@ -163,6 +163,8 @@ export function MainScreen() {
     typeof captureActiveConversationSnapshot
   > | null>(null);
   const cancelableVoiceTurnSessionRef = useRef<number | null>(null);
+  const previewSessionRef = useRef(0);
+  const previewAbortRef = useRef<AbortController | null>(null);
 
   const activeResponseMode = settings.activeResponseMode;
   const activeResponseRoute = settings.responseModes[activeResponseMode];
@@ -777,6 +779,8 @@ export function MainScreen() {
     }
 
     try {
+      await player.waitForPlaybackRouteSettle();
+
       const startPromise =
         settings.sttMode === "native"
           ? nativeStt.startRecognition()
@@ -881,6 +885,8 @@ export function MainScreen() {
       return;
     }
     try {
+      await player.waitForPlaybackRouteSettle();
+
       if (settings.sttMode === "native") {
         await nativeStt.startRecognition();
         return;
@@ -1007,10 +1013,27 @@ export function MainScreen() {
         return;
       }
 
+      const previewSessionId = previewSessionRef.current + 1;
+      previewSessionRef.current = previewSessionId;
+      previewAbortRef.current?.abort();
+      const previewAbortController = new AbortController();
+      previewAbortRef.current = previewAbortController;
+      const ensurePreviewActive = () => {
+        if (
+          previewAbortController.signal.aborted ||
+          previewSessionRef.current !== previewSessionId
+        ) {
+          const abortError = new Error("Voice preview cancelled.");
+          abortError.name = "AbortError";
+          throw abortError;
+        }
+      };
+
       try {
         if (player.isPlaying) {
           await player.stopPlayback();
         }
+        ensurePreviewActive();
         player.resetCancellation();
         const speechDiagnostics = {
           requestId: createSpeechRequestId("preview"),
@@ -1018,6 +1041,7 @@ export function MainScreen() {
         };
 
         if (request.mode === "native") {
+          ensurePreviewActive();
           player.speakText(trimmed, {
             voice: request.nativeVoice,
             diagnostics: speechDiagnostics,
@@ -1049,8 +1073,10 @@ export function MainScreen() {
             language,
             listenLanguages: [request.previewLanguage],
             diagnostics: speechDiagnostics,
+            abortSignal: previewAbortController.signal,
           });
 
+          ensurePreviewActive();
           player.enqueueAudio(audioUri, speechDiagnostics);
           callbacks?.onPlaybackStarted?.();
           await player.waitForDrain();
@@ -1097,18 +1123,27 @@ export function MainScreen() {
           },
           diagnostics: speechDiagnostics,
           strictLocalVoice: true,
+          abortSignal: previewAbortController.signal,
         });
 
+        ensurePreviewActive();
         player.enqueueAudio(audioUri, speechDiagnostics);
         callbacks?.onPlaybackStarted?.();
         await player.waitForDrain();
       } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
         if (request.mode === "local") {
           await refreshLocalTtsPackStates();
         }
         const message =
           error instanceof Error ? error.message : t("couldntPreviewVoice");
         showToast(message);
+      } finally {
+        if (previewAbortRef.current === previewAbortController) {
+          previewAbortRef.current = null;
+        }
       }
     },
     [
@@ -1125,6 +1160,13 @@ export function MainScreen() {
       ttsProvider,
     ],
   );
+
+  const stopPreviewVoice = useCallback(async () => {
+    previewSessionRef.current += 1;
+    previewAbortRef.current?.abort();
+    previewAbortRef.current = null;
+    await player.stopPlayback();
+  }, [player]);
 
   const handleValidateProvider = useCallback(
     async (nextProvider: Provider) => {
@@ -2164,6 +2206,7 @@ export function MainScreen() {
         localTtsPackStates={localTtsPackStates}
         onInstallLocalTtsLanguagePack={handleInstallLocalTtsLanguage}
         onPreviewVoice={handlePreviewVoice}
+        onStopPreviewVoice={stopPreviewVoice}
         onValidateProvider={handleValidateProvider}
         onClose={closeSettings}
       />

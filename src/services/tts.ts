@@ -526,9 +526,21 @@ async function fetchWithTimeout(
   init: RequestInit,
   timeoutMs: number,
   onTimeout: () => Error,
+  abortSignal?: AbortSignal,
 ) {
   const controller = new AbortController();
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const handleCallerAbort = () => {
+    controller.abort();
+  };
+
+  if (abortSignal) {
+    if (abortSignal.aborted) {
+      controller.abort();
+    } else {
+      abortSignal.addEventListener("abort", handleCallerAbort);
+    }
+  }
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
       controller.abort();
@@ -545,6 +557,11 @@ async function fetchWithTimeout(
       (error.name === "AbortError" ||
         error.message.toLowerCase().includes("aborted"))
     ) {
+      if (abortSignal?.aborted) {
+        const abortError = new Error("TTS request aborted.");
+        abortError.name = "AbortError";
+        throw abortError;
+      }
       throw onTimeout();
     }
 
@@ -557,6 +574,7 @@ async function fetchWithTimeout(
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
+    abortSignal?.removeEventListener("abort", handleCallerAbort);
   }
 }
 
@@ -572,6 +590,7 @@ export async function synthesizeSpeech(params: {
   localVoices?: LocalTtsVoiceSelections;
   diagnostics?: SpeechDiagnosticsContext;
   strictLocalVoice?: boolean;
+  abortSignal?: AbortSignal;
 }): Promise<string> {
   const {
     text,
@@ -585,6 +604,7 @@ export async function synthesizeSpeech(params: {
     localVoices,
     diagnostics,
     strictLocalVoice,
+    abortSignal,
   } = params;
   const requestId = diagnostics?.requestId ?? createSpeechRequestId("tts");
 
@@ -678,6 +698,7 @@ export async function synthesizeSpeech(params: {
         providerModel,
         apiKey,
         language,
+        abortSignal,
       });
       recordSpeechDiagnostic({
         requestId,
@@ -757,6 +778,7 @@ export async function synthesizeSpeech(params: {
       providerModel,
       apiKey,
       language,
+      abortSignal,
     });
     recordSpeechDiagnostic({
       requestId,
@@ -835,6 +857,7 @@ export async function synthesizeSpeechSequence(params: {
   listenLanguages?: TtsListenLanguage[];
   localVoices?: LocalTtsVoiceSelections;
   diagnostics?: SpeechDiagnosticsContext;
+  abortSignal?: AbortSignal;
 }) {
   if (params.mode !== "provider") {
     const maxChars =
@@ -887,8 +910,17 @@ async function synthesizeProviderSpeech(params: {
   providerModel?: string;
   apiKey?: string;
   language: AppLanguage;
+  abortSignal?: AbortSignal;
 }) {
-  const { text, voice, provider, providerModel, apiKey, language } = params;
+  const {
+    text,
+    voice,
+    provider,
+    providerModel,
+    apiKey,
+    language,
+    abortSignal,
+  } = params;
   const config = TTS_PROVIDER_CONFIGS[provider];
   const timeoutMs = getProviderTtsTimeoutMs(text);
 
@@ -943,6 +975,7 @@ async function synthesizeProviderSpeech(params: {
       },
       timeoutMs,
       () => createTtsTimeoutError({ provider, language }),
+      abortSignal,
     );
 
     if (!response.ok) {
@@ -1017,6 +1050,7 @@ async function synthesizeProviderSpeech(params: {
     },
     timeoutMs,
     () => createTtsTimeoutError({ provider, language }),
+    abortSignal,
   );
 
   if (!response.ok) {

@@ -402,6 +402,8 @@ const translations = {
     ttsReplyTooLong: ({ provider }) =>
       `${provider} speech output rejected the reply because it was too long.`,
     ttsTimeout: ({ provider }) => `${provider} speech output took too long.`,
+    sttTimeout: ({ provider }) =>
+      `${provider} speech transcription took too long.`,
     ttsDidNotReturnAudio: ({ provider }) =>
       `${provider} TTS did not return audio.`,
     nativeSttHandledInApp: "Native STT is handled directly in the app.",
@@ -834,6 +836,8 @@ const translations = {
       `${provider} hat die Sprachausgabe abgelehnt, weil die Antwort zu lang war.`,
     ttsTimeout: ({ provider }) =>
       `Die Sprachausgabe bei ${provider} hat zu lange gedauert.`,
+    sttTimeout: ({ provider }) =>
+      `Die Sprachtranskription bei ${provider} hat zu lange gedauert.`,
     ttsDidNotReturnAudio: ({ provider }) =>
       `${provider} hat kein Audio zurückgegeben.`,
     nativeSttHandledInApp: "Native STT wird direkt in der App verarbeitet.",

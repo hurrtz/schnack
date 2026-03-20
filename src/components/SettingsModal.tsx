@@ -76,6 +76,7 @@ import {
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import {
+  getEnabledProviders,
   getEnabledSttProviders,
   getEnabledTtsProviders,
 } from "../utils/providerCapabilities";
@@ -128,6 +129,7 @@ interface SettingsModalProps {
       onPlaybackStarted?: () => void;
     },
   ) => Promise<void>;
+  onStopPreviewVoice: () => Promise<void>;
   onValidateProvider: (provider: Provider) => Promise<void>;
   onClose: () => void;
 }
@@ -590,9 +592,11 @@ function UsagePricingReferenceSection() {
 
 function ResponseModesSection({
   settings,
+  enabledProviders,
   onUpdateResponseModeRoute,
 }: {
   settings: Settings;
+  enabledProviders: Provider[];
   onUpdateResponseModeRoute: (
     mode: ResponseMode,
     route: ResponseModeRoute,
@@ -650,7 +654,8 @@ function ResponseModesSection({
                 hideLabel
                 containerStyle={styles.responseModePicker}
                 value={route.provider}
-                options={renderProviderPickerOptions(PROVIDER_ORDER)}
+                options={renderProviderPickerOptions(enabledProviders)}
+                disabled={enabledProviders.length === 0}
                 onChange={(value) => {
                   const nextProvider = value as Provider;
                   const preferredModel = settings.providerModels[nextProvider];
@@ -713,6 +718,7 @@ function ProviderSection({
 }) {
   const { colors } = useTheme();
   const { t, language } = useLocalization();
+  const enabledProviders = useMemo(() => getEnabledProviders(settings), [settings]);
   const [selectedProvider, setSelectedProvider] = useState<Provider>(
     focusProvider ?? settings.lastProvider,
   );
@@ -794,6 +800,7 @@ function ProviderSection({
     <>
       <ResponseModesSection
         settings={settings}
+        enabledProviders={enabledProviders}
         onUpdateResponseModeRoute={onUpdateResponseModeRoute}
       />
 
@@ -1157,13 +1164,17 @@ function PreviewComposer({
   text,
   setText,
   phase,
+  interactionDisabled,
   onPreview,
+  onStop,
   onTextInputFocus,
 }: {
   text: string;
   setText: (text: string) => void;
   phase: PreviewButtonPhase;
+  interactionDisabled: boolean;
   onPreview: () => Promise<void>;
+  onStop: () => Promise<void>;
   onTextInputFocus: TextInputFocusHandler;
 }) {
   const { colors } = useTheme();
@@ -1200,9 +1211,9 @@ function PreviewComposer({
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={() => {
-          void onPreview();
+          void (isBusy ? onStop() : onPreview());
         }}
-        disabled={isBusy || !text.trim()}
+        disabled={interactionDisabled || (!isBusy && !text.trim())}
       >
         <LinearGradient
           colors={[colors.accentGradientStart, colors.accentGradientEnd]}
@@ -1216,14 +1227,16 @@ function PreviewComposer({
         >
           {isGenerating ? (
             <ActivityIndicator size="small" color="#F4F8FF" />
+          ) : isPlaying ? (
+            <Feather name="square" size={14} color="#F4F8FF" />
           ) : (
             <Feather name="volume-2" size={16} color="#F4F8FF" />
           )}
           <Text style={styles.previewButtonText}>
             {isGenerating
-              ? t("generatingPreview")
+              ? t("stop")
               : isPlaying
-                ? t("playingPreview")
+                ? t("stop")
                 : t("previewVoice")}
           </Text>
         </LinearGradient>
@@ -1240,6 +1253,7 @@ function ProviderVoicePreviewSection({
   activePreview,
   onSetPreviewText,
   onPreviewProvider,
+  onStopPreview,
   onUpdateProviderTtsVoice,
   onTextInputFocus,
 }: {
@@ -1257,6 +1271,7 @@ function ProviderVoicePreviewSection({
     provider: Provider,
     previewLanguage: TtsListenLanguage,
   ) => Promise<void>;
+  onStopPreview: () => Promise<void>;
   onUpdateProviderTtsVoice: (provider: Provider, voice: string) => void;
   onTextInputFocus: TextInputFocusHandler;
 }) {
@@ -1347,7 +1362,11 @@ function ProviderVoicePreviewSection({
                     ? activePreview.phase
                     : "idle"
                 }
+                interactionDisabled={
+                  activePreview !== null && activePreview.id !== previewId
+                }
                 onPreview={() => onPreviewProvider(provider, entry)}
+                onStop={onStopPreview}
                 onTextInputFocus={onTextInputFocus}
               />
             </View>
@@ -1366,6 +1385,7 @@ function NativeVoicePreviewSection({
   onSelectVoice,
   onSetPreviewText,
   onPreview,
+  onStopPreview,
   onTextInputFocus,
 }: {
   voiceOptions: { value: string; label: string }[];
@@ -1375,6 +1395,7 @@ function NativeVoicePreviewSection({
   onSelectVoice: (voiceId: string) => void;
   onSetPreviewText: (text: string) => void;
   onPreview: () => Promise<void>;
+  onStopPreview: () => Promise<void>;
   onTextInputFocus: TextInputFocusHandler;
 }) {
   const { colors } = useTheme();
@@ -1414,7 +1435,11 @@ function NativeVoicePreviewSection({
                   ? activePreview.phase
                   : "idle"
               }
+              interactionDisabled={
+                activePreview !== null && activePreview.id !== "native"
+              }
               onPreview={onPreview}
+              onStop={onStopPreview}
               onTextInputFocus={onTextInputFocus}
             />
           </>
@@ -1494,6 +1519,7 @@ function LocalPackSection({
   activePreview,
   onSetLocalPreviewText,
   onPreviewLocalVoice,
+  onStopPreview,
   onTextInputFocus,
 }: {
   settings: Settings;
@@ -1520,6 +1546,7 @@ function LocalPackSection({
   activePreview: { id: string; phase: PreviewButtonPhase } | null;
   onSetLocalPreviewText: (language: TtsListenLanguage, text: string) => void;
   onPreviewLocalVoice: (language: TtsListenLanguage) => Promise<void>;
+  onStopPreview: () => Promise<void>;
   onTextInputFocus: TextInputFocusHandler;
 }) {
   const { colors } = useTheme();
@@ -1654,7 +1681,12 @@ function LocalPackSection({
                       ? activePreview.phase
                       : "idle"
                   }
+                  interactionDisabled={
+                    activePreview !== null &&
+                    activePreview.id !== `local:${entry}`
+                  }
                   onPreview={() => onPreviewLocalVoice(entry)}
+                  onStop={onStopPreview}
                   onTextInputFocus={onTextInputFocus}
                 />
               </View>
@@ -1858,6 +1890,7 @@ export function SettingsModal({
   localTtsPackStates,
   onInstallLocalTtsLanguagePack,
   onPreviewVoice,
+  onStopPreviewVoice,
   onValidateProvider,
   onClose,
 }: SettingsModalProps) {
@@ -1906,6 +1939,7 @@ export function SettingsModal({
   const [keyboardInset, setKeyboardInset] = useState(0);
   const speechDiagnostics = useSpeechDiagnostics(6);
 
+  const enabledProviders = useMemo(() => getEnabledProviders(settings), [settings]);
   const enabledSttProviders = useMemo(
     () => getEnabledSttProviders(settings),
     [settings],
@@ -1971,6 +2005,45 @@ export function SettingsModal({
     onUpdate,
     settings.sttMode,
     settings.sttProvider,
+    visible,
+  ]);
+
+  useEffect(() => {
+    if (!visible || enabledProviders.length === 0) {
+      return;
+    }
+
+    let hasInvalidRoute = false;
+    const nextResponseModes = { ...settings.responseModes };
+
+    for (const mode of RESPONSE_MODE_ORDER) {
+      const currentRoute = settings.responseModes[mode];
+
+      if (enabledProviders.includes(currentRoute.provider)) {
+        continue;
+      }
+
+      const nextProvider = enabledProviders[0];
+      const preferredModel = settings.providerModels[nextProvider];
+      const nextModel = isValidModelForProvider(nextProvider, preferredModel)
+        ? preferredModel
+        : getDefaultModelForProvider(nextProvider);
+
+      nextResponseModes[mode] = {
+        provider: nextProvider,
+        model: nextModel,
+      };
+      hasInvalidRoute = true;
+    }
+
+    if (hasInvalidRoute) {
+      onUpdate({ responseModes: nextResponseModes });
+    }
+  }, [
+    enabledProviders,
+    onUpdate,
+    settings.providerModels,
+    settings.responseModes,
     visible,
   ]);
 
@@ -2298,7 +2371,17 @@ export function SettingsModal({
   ) => {
     const trimmed = request.text.trim();
 
-    if (!trimmed || activePreview) {
+    if (!trimmed) {
+      return;
+    }
+
+    if (activePreview?.id === previewId) {
+      setActivePreview(null);
+      await onStopPreviewVoice();
+      return;
+    }
+
+    if (activePreview) {
       return;
     }
 
@@ -2766,6 +2849,7 @@ export function SettingsModal({
                     }));
                   }}
                   onPreviewProvider={handlePreviewProviderVoice}
+                  onStopPreview={onStopPreviewVoice}
                   onUpdateProviderTtsVoice={onUpdateProviderTtsVoice}
                   onTextInputFocus={handleTextInputFocus}
                 />
@@ -2783,6 +2867,7 @@ export function SettingsModal({
                     }));
                   }}
                   onPreviewLocalVoice={handlePreviewLocalVoice}
+                  onStopPreview={onStopPreviewVoice}
                   onTextInputFocus={handleTextInputFocus}
                 />
                 <NativeVoicePreviewSection
@@ -2793,6 +2878,7 @@ export function SettingsModal({
                   onSelectVoice={setSelectedNativeVoice}
                   onSetPreviewText={setNativePreviewText}
                   onPreview={handlePreviewNativeVoice}
+                  onStopPreview={onStopPreviewVoice}
                   onTextInputFocus={handleTextInputFocus}
                 />
                 <SpeechDiagnosticsSection summaries={speechDiagnostics} />

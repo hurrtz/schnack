@@ -156,6 +156,19 @@ RCT_EXPORT_MODULE();
   [self emitEvent:@{ @"type": @"drained" }];
 }
 
+- (void)deactivateAudioSessionIfIdle
+{
+  if (_player != nil && (_player.currentItem != nil || _player.items.count > 0)) {
+    return;
+  }
+
+  AVAudioSession *session = [AVAudioSession sharedInstance];
+  NSError *error = nil;
+  [session setActive:NO
+         withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation
+               error:&error];
+}
+
 - (void)removeObserversForItem:(AVPlayerItem *)item
 {
   [[NSNotificationCenter defaultCenter] removeObserver:self
@@ -310,6 +323,7 @@ RCT_REMAP_METHOD(stop,
     [_startedItemKeys removeAllObjects];
     _currentItemKey = nil;
     [self emitDrainedIfNeeded];
+    [self deactivateAudioSessionIfIdle];
     resolve(@YES);
   } @catch (NSException *exception) {
     reject(@"audio_queue_stop_error", exception.reason, nil);
@@ -340,6 +354,7 @@ RCT_REMAP_METHOD(stop,
   dispatch_async(dispatch_get_main_queue(), ^{
     [self emitStartedForCurrentItemIfNeeded];
     [self emitDrainedIfNeeded];
+    [self deactivateAudioSessionIfIdle];
   });
 }
 
@@ -370,6 +385,7 @@ RCT_REMAP_METHOD(stop,
   dispatch_async(dispatch_get_main_queue(), ^{
     [self emitStartedForCurrentItemIfNeeded];
     [self emitDrainedIfNeeded];
+    [self deactivateAudioSessionIfIdle];
   });
 }
 
@@ -398,6 +414,7 @@ RCT_REMAP_METHOD(stop,
   [self detachPlayerObserversIfNeeded];
   [_player pause];
   [_player removeAllItems];
+  [self deactivateAudioSessionIfIdle];
   _player = nil;
   [_contextsByItemKey removeAllObjects];
   [_startedItemKeys removeAllObjects];

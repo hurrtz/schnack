@@ -25,6 +25,8 @@ type GeminiTranscriptionConfig = {
   defaultModel: string;
 };
 
+const STT_TIMEOUT_MS = 30000;
+
 const STT_PROVIDER_CONFIGS: Partial<
   Record<Provider, MultipartTranscriptionConfig | GeminiTranscriptionConfig>
 > = {
@@ -85,6 +87,56 @@ function extractTextFromGeminiResponse(data: any) {
     .trim();
 }
 
+function createSttTimeoutError(params: {
+  provider: Provider;
+  language: AppLanguage;
+}) {
+  return new Error(
+    translate(params.language, "sttTimeout", {
+      provider: PROVIDER_LABELS[params.provider],
+    })
+  );
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs: number,
+  onTimeout: () => Error
+) {
+  const controller = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      controller.abort();
+      reject(onTimeout());
+    }, timeoutMs);
+  });
+
+  const fetchPromise = fetch(input, {
+    ...init,
+    signal: controller.signal,
+  }).catch((error) => {
+    if (
+      error instanceof Error &&
+      (error.name === "AbortError" ||
+        error.message.toLowerCase().includes("aborted"))
+    ) {
+      throw onTimeout();
+    }
+
+    throw error;
+  });
+
+  try {
+    return await Promise.race([fetchPromise, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
 export async function transcribeAudio(params: {
   fileUri: string;
   mode: SttBackendMode;
@@ -121,7 +173,7 @@ export async function transcribeAudio(params: {
     let response: Awaited<ReturnType<typeof fetch>>;
 
     try {
-      response = await fetch(
+      response = await fetchWithTimeout(
         `${config.endpointBase}/${providerModel || config.defaultModel}:generateContent`,
         {
           method: "POST",
@@ -149,7 +201,9 @@ export async function transcribeAudio(params: {
               temperature: 0,
             },
           }),
-        }
+        },
+        STT_TIMEOUT_MS,
+        () => createSttTimeoutError({ provider, language })
       );
     } catch (error) {
       throw normalizeProviderTransportError({
@@ -194,13 +248,18 @@ export async function transcribeAudio(params: {
   let response: Awaited<ReturnType<typeof fetch>>;
 
   try {
-    response = await fetch(config.endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${requireProviderKey(provider, apiKey, language)}`,
+    response = await fetchWithTimeout(
+      config.endpoint,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${requireProviderKey(provider, apiKey, language)}`,
+        },
+        body: formData,
       },
-      body: formData,
-    });
+      STT_TIMEOUT_MS,
+      () => createSttTimeoutError({ provider, language })
+    );
   } catch (error) {
     throw normalizeProviderTransportError({
       provider,
