@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   AppState,
   type AppStateStatus,
@@ -21,6 +21,7 @@ import Animated, {
   Easing,
   interpolate,
   cancelAnimation,
+  runOnJS,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalization } from "../i18n";
@@ -200,13 +201,11 @@ export function WaveformCircle({
     phase === "thinking" ||
     phase === "synthesizing";
   const isSpeaking = phase === "speaking";
-  const showsNeutralBusyState = isBlockingPhase || isSpeaking;
   const showsStaticControlState =
     phase === "idle" || isRecording || isBlockingPhase;
   const showsOutputBars = isSpeaking && waveformVariant === "oscilloscope";
   const usesPreciseWaveform =
     waveformVariant === "oscilloscope" &&
-    !showsNeutralBusyState &&
     !showsStaticControlState &&
     !showsOutputBars;
   const nativeWaveformChannel =
@@ -219,10 +218,17 @@ export function WaveformCircle({
           : null
       : null;
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
+  const [previousGradientColors, setPreviousGradientColors] = useState<
+    [string, string, string] | null
+  >(null);
+  const previousGradientKeyRef = useRef<string | null>(null);
+  const previousGradientColorsRef = useRef<[string, string, string] | null>(null);
+  const gradientTransitionTokenRef = useRef(0);
   const pulse = useSharedValue(0);
   const orbit = useSharedValue(0);
   const spin = useSharedValue(0);
   const energy = useSharedValue(intensity);
+  const backgroundGradientFade = useSharedValue(0);
   const shouldAnimate = appState === "active" && isActive;
 
   useEffect(() => {
@@ -258,13 +264,13 @@ export function WaveformCircle({
 
     spin.value = withRepeat(
       withTiming(1, {
-        duration: isRecording ? 3000 : 5200,
+        duration: isRecording ? 2800 : isSpeaking ? 3600 : 4400,
         easing: Easing.linear,
       }),
       -1,
       false,
     );
-  }, [isRecording, shouldAnimate, spin]);
+  }, [isRecording, isSpeaking, shouldAnimate, spin]);
 
   useEffect(() => {
     energy.value = withTiming(shouldAnimate ? intensity : 0, {
@@ -313,77 +319,189 @@ export function WaveformCircle({
     );
   }, [phase, pulse, shouldAnimate]);
 
-  const neutralGradientColors: [string, string, string] = isDark
-    ? ["#6E7D91", "#475568", "#2B3747"]
-    : ["#D7DEE7", "#C1CAD6", "#ABB7C7"];
+  const processingGradientColors: [string, string, string] = isDark
+    ? ["#FFD27D", "#F39A58", "#E06A5C"]
+    : ["#FFE4A6", "#F5AF70", "#E88A74"];
+  const speakingGradientColors: [string, string, string] = isDark
+    ? ["#9AF4B8", "#42C97B", "#247E5D"]
+    : ["#BDF7CB", "#63D88D", "#2D9B6F"];
+  const activityOverlayColors: [string, string, string, string, string] =
+    isRecording
+      ? [
+          "rgba(255,255,255,0)",
+          "rgba(255, 235, 229, 0.16)",
+          "rgba(255, 198, 182, 0.34)",
+          "rgba(255, 235, 229, 0.12)",
+          "rgba(255,255,255,0)",
+        ]
+      : isSpeaking
+        ? [
+            "rgba(255,255,255,0)",
+            "rgba(228, 255, 236, 0.14)",
+            "rgba(122, 233, 165, 0.28)",
+            "rgba(94, 201, 138, 0.18)",
+            "rgba(255,255,255,0)",
+          ]
+        : [
+            "rgba(255,255,255,0)",
+            "rgba(255, 243, 209, 0.14)",
+            "rgba(255, 194, 121, 0.28)",
+            "rgba(255, 166, 104, 0.18)",
+            "rgba(255,255,255,0)",
+          ];
   const ringColor = isRecording
     ? colors.danger
-    : showsNeutralBusyState
-      ? colors.textMuted
+    : isSpeaking
+      ? "#54D685"
+    : isBlockingPhase
+      ? "#F1A457"
       : colors.accent;
   const gradientColors: [string, string, string] = isRecording
     ? isDark
       ? ["#FF978C", colors.danger, "#D74C5A"]
       : ["#F29186", colors.danger, "#C94756"]
-    : showsNeutralBusyState
-      ? neutralGradientColors
+    : isSpeaking
+      ? speakingGradientColors
+    : isBlockingPhase
+      ? processingGradientColors
       : [
         colors.accentGradientStart,
         colors.accentGradientEnd,
         colors.accentGradientEnd,
       ];
+  const gradientColorKey = gradientColors.join("|");
   const ringBorderColor = isRecording
     ? "rgba(255, 122, 112, 0.2)"
-    : showsNeutralBusyState
+    : isSpeaking
       ? isDark
-        ? "rgba(185, 198, 214, 0.14)"
-        : "rgba(76, 94, 119, 0.14)"
+        ? "rgba(132, 236, 170, 0.24)"
+        : "rgba(84, 214, 133, 0.22)"
     : isBlockingPhase
-      ? colors.borderStrong
+      ? isDark
+        ? "rgba(255, 196, 124, 0.22)"
+        : "rgba(241, 164, 87, 0.2)"
       : colors.border;
   const innerRingBorderColor = isRecording
     ? "rgba(255, 122, 112, 0.28)"
-    : showsNeutralBusyState
+    : isSpeaking
       ? isDark
-        ? "rgba(185, 198, 214, 0.2)"
-        : "rgba(76, 94, 119, 0.2)"
-      : isBlockingPhase
-        ? colors.accentSoft
+        ? "rgba(162, 244, 190, 0.28)"
+        : "rgba(84, 214, 133, 0.26)"
+    : isBlockingPhase
+      ? isDark
+        ? "rgba(255, 212, 146, 0.28)"
+        : "rgba(241, 164, 87, 0.24)"
       : colors.borderStrong;
   const innerFrameBorderColor = isRecording
     ? "rgba(255, 255, 255, 0.28)"
-    : showsNeutralBusyState
+    : isSpeaking
       ? isDark
-        ? "rgba(255, 255, 255, 0.18)"
-        : "rgba(255, 255, 255, 0.24)"
+        ? "rgba(255, 255, 255, 0.24)"
+        : "rgba(255, 255, 255, 0.28)"
+    : isBlockingPhase
+      ? isDark
+        ? "rgba(255, 244, 224, 0.22)"
+        : "rgba(255, 250, 240, 0.3)"
     : "rgba(255, 255, 255, 0.22)";
   const shellShadowColor = isRecording
     ? isDark
       ? "rgba(255, 122, 112, 0.42)"
       : "rgba(231, 104, 91, 0.34)"
-    : showsNeutralBusyState
+    : isSpeaking
       ? isDark
-        ? "rgba(60, 76, 97, 0.18)"
-        : "rgba(106, 121, 143, 0.18)"
+        ? "rgba(66, 201, 123, 0.36)"
+        : "rgba(76, 194, 120, 0.28)"
+    : isBlockingPhase
+      ? isDark
+        ? "rgba(241, 164, 87, 0.34)"
+        : "rgba(235, 153, 74, 0.26)"
     : colors.glowStrong;
+  const controlIconName: React.ComponentProps<typeof Feather>["name"] =
+    phase === "idle"
+      ? "mic"
+      : phase === "recording"
+        ? "square"
+        : phase === "transcribing"
+          ? "type"
+          : phase === "thinking"
+            ? "cpu"
+            : "volume-2";
+  const controlIconSize =
+    phase === "idle"
+      ? 40
+      : phase === "thinking"
+        ? 24
+        : phase === "transcribing"
+          ? 26
+          : phase === "synthesizing"
+            ? 24
+          : 28;
+
+  const clearPreviousGradient = (token: number) => {
+    if (gradientTransitionTokenRef.current !== token) return;
+    setPreviousGradientColors(null);
+  };
+
+  useEffect(() => {
+    if (!previousGradientKeyRef.current || !previousGradientColorsRef.current) {
+      previousGradientKeyRef.current = gradientColorKey;
+      previousGradientColorsRef.current = gradientColors;
+      return;
+    }
+
+    if (previousGradientKeyRef.current === gradientColorKey) return;
+
+    const outgoingColors = previousGradientColorsRef.current;
+    previousGradientKeyRef.current = gradientColorKey;
+    previousGradientColorsRef.current = gradientColors;
+
+    if (!outgoingColors) return;
+
+    gradientTransitionTokenRef.current += 1;
+    const token = gradientTransitionTokenRef.current;
+    setPreviousGradientColors(outgoingColors);
+    backgroundGradientFade.value = 1;
+    backgroundGradientFade.value = withTiming(
+      0,
+      {
+        duration: 420,
+        easing: Easing.inOut(Easing.ease),
+      },
+      (finished) => {
+        if (finished) {
+          runOnJS(clearPreviousGradient)(token);
+        }
+      },
+    );
+  }, [
+    backgroundGradientFade,
+    gradientColorKey,
+    gradientColors,
+    previousGradientColorsRef,
+    previousGradientKeyRef,
+  ]);
 
   const outerRingStyle = useAnimatedStyle(() => ({
     opacity: usesPreciseWaveform
       ? 0.34
-      : showsNeutralBusyState
-        ? 0.3
+      : phase === "idle"
+        ? 0.38 + pulse.value * 0.15
       : isRecording
         ? 0.4 + pulse.value * 0.18 + energy.value * 0.08
-        : 0.38 + pulse.value * 0.15,
+      : isSpeaking
+        ? 0.34 + pulse.value * 0.14 + energy.value * 0.08
+      : 0.32 + pulse.value * 0.12,
     transform: [
       {
         scale: usesPreciseWaveform
           ? 1
-          : showsNeutralBusyState
-            ? 1
+          : phase === "idle"
+            ? 0.98 + pulse.value * 0.03 + energy.value * 0.03
           : isRecording
             ? 0.975 + pulse.value * 0.04 + energy.value * 0.055
-            : 0.98 + pulse.value * 0.03 + energy.value * 0.03,
+          : isSpeaking
+            ? 0.982 + pulse.value * 0.03 + energy.value * 0.04
+          : 0.986 + pulse.value * 0.025,
       } as const,
     ],
   }));
@@ -391,20 +509,24 @@ export function WaveformCircle({
   const innerRingStyle = useAnimatedStyle(() => ({
     opacity: usesPreciseWaveform
       ? 0.46
-      : showsNeutralBusyState
-        ? 0.38
+      : phase === "idle"
+        ? 0.52 + pulse.value * 0.12
       : isRecording
         ? 0.56 + pulse.value * 0.12 + energy.value * 0.1
-        : 0.52 + pulse.value * 0.12,
+      : isSpeaking
+        ? 0.46 + pulse.value * 0.1 + energy.value * 0.08
+      : 0.44 + pulse.value * 0.1,
     transform: [
       {
         scale: usesPreciseWaveform
           ? 1
-          : showsNeutralBusyState
-            ? 1
+          : phase === "idle"
+            ? 0.995 + pulse.value * 0.025 + energy.value * 0.02
           : isRecording
             ? 0.99 + pulse.value * 0.03 + energy.value * 0.045
-            : 0.995 + pulse.value * 0.025 + energy.value * 0.02,
+          : isSpeaking
+            ? 0.992 + pulse.value * 0.028 + energy.value * 0.03
+          : 0.994 + pulse.value * 0.02,
       } as const,
     ],
   }));
@@ -414,26 +536,59 @@ export function WaveformCircle({
       {
         scale: usesPreciseWaveform
           ? 1
-          : showsNeutralBusyState
-            ? 1
+          : phase === "idle"
+            ? 0.992 + pulse.value * 0.028 + energy.value * 0.025
           : isRecording
             ? 0.992 + pulse.value * 0.032 + energy.value * 0.075
-            : 0.992 + pulse.value * 0.028 + energy.value * 0.025,
+          : isSpeaking
+            ? 0.994 + pulse.value * 0.026 + energy.value * 0.04
+          : 0.994 + pulse.value * 0.018,
       } as const,
     ],
   }));
 
-  const recordingGradientOverlayStyle = useAnimatedStyle(() => ({
+  const backgroundGradientStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        rotate:
+          phase !== "idle" && shouldAnimate ? `${spin.value * 360}deg` : "0deg",
+      } as const,
+      {
+        scale:
+          phase !== "idle" && shouldAnimate
+            ? isRecording
+              ? 1.18 + pulse.value * 0.03 + energy.value * 0.03
+              : isSpeaking
+                ? 1.16 + pulse.value * 0.025 + energy.value * 0.025
+                : 1.15 + pulse.value * 0.02
+            : 1.08,
+      } as const,
+    ],
+  }));
+
+  const previousBackgroundGradientStyle = useAnimatedStyle(() => ({
+    opacity: backgroundGradientFade.value,
+  }));
+
+  const activityGradientOverlayStyle = useAnimatedStyle(() => ({
     opacity:
-      isRecording && shouldAnimate
-        ? 0.26 + pulse.value * 0.08 + energy.value * 0.14
+      phase !== "idle" && shouldAnimate
+        ? isRecording
+          ? 0.24 + pulse.value * 0.08 + energy.value * 0.14
+          : isSpeaking
+            ? 0.2 + pulse.value * 0.06 + energy.value * 0.08
+            : 0.18 + pulse.value * 0.06
         : 0,
     transform: [
       { rotate: `${spin.value * 360}deg` } as const,
       {
         scale:
-          isRecording && shouldAnimate
-            ? 1.02 + pulse.value * 0.02 + energy.value * 0.03
+          phase !== "idle" && shouldAnimate
+            ? isRecording
+              ? 1.02 + pulse.value * 0.02 + energy.value * 0.03
+              : isSpeaking
+                ? 1.015 + pulse.value * 0.018 + energy.value * 0.02
+                : 1.014 + pulse.value * 0.016
             : 1,
       } as const,
     ],
@@ -441,75 +596,83 @@ export function WaveformCircle({
 
   const topAuraStyle = useAnimatedStyle(() => ({
     opacity:
-      usesPreciseWaveform || showsNeutralBusyState
+      usesPreciseWaveform
         ? 0.08
-        : 0.16 + pulse.value * 0.14 + energy.value * 0.12,
+      : phase === "idle"
+        ? 0.16 + pulse.value * 0.14 + energy.value * 0.12
+      : isSpeaking
+        ? 0.14 + pulse.value * 0.1 + energy.value * 0.1
+      : isRecording
+        ? 0.16 + pulse.value * 0.14 + energy.value * 0.12
+      : 0.12 + pulse.value * 0.08,
     transform: [
       {
-        translateX:
-          usesPreciseWaveform || showsNeutralBusyState
-            ? 0
-            : interpolate(orbit.value, [0, 1], [-12, 12]),
+        translateX: usesPreciseWaveform
+          ? 0
+          : interpolate(orbit.value, [0, 1], [-12, 12]),
       } as const,
       {
-        translateY:
-          usesPreciseWaveform || showsNeutralBusyState
-            ? 0
-            : interpolate(orbit.value, [0, 1], [6, -8]),
+        translateY: usesPreciseWaveform
+          ? 0
+          : interpolate(orbit.value, [0, 1], [6, -8]),
       } as const,
       {
-        scale:
-          usesPreciseWaveform || showsNeutralBusyState
-            ? 1
-            : 1 + pulse.value * 0.08 + energy.value * 0.08,
+        scale: usesPreciseWaveform
+          ? 1
+          : 1 + pulse.value * 0.06 + energy.value * 0.06,
       } as const,
     ] as any,
   }));
 
   const bottomAuraStyle = useAnimatedStyle(() => ({
     opacity:
-      usesPreciseWaveform || showsNeutralBusyState
+      usesPreciseWaveform
         ? 0.1
-        : 0.18 + pulse.value * 0.1 + energy.value * 0.12,
+      : phase === "idle"
+        ? 0.18 + pulse.value * 0.1 + energy.value * 0.12
+      : isSpeaking
+        ? 0.15 + pulse.value * 0.08 + energy.value * 0.1
+      : isRecording
+        ? 0.18 + pulse.value * 0.1 + energy.value * 0.12
+      : 0.13 + pulse.value * 0.07,
     transform: [
       {
-        translateX:
-          usesPreciseWaveform || showsNeutralBusyState
-            ? 0
-            : interpolate(orbit.value, [0, 1], [10, -10]),
+        translateX: usesPreciseWaveform
+          ? 0
+          : interpolate(orbit.value, [0, 1], [10, -10]),
       } as const,
       {
-        translateY:
-          usesPreciseWaveform || showsNeutralBusyState
-            ? 0
-            : interpolate(orbit.value, [0, 1], [-8, 10]),
+        translateY: usesPreciseWaveform
+          ? 0
+          : interpolate(orbit.value, [0, 1], [-8, 10]),
       } as const,
       {
-        scale:
-          usesPreciseWaveform || showsNeutralBusyState
-            ? 1
-            : 1.04 + pulse.value * 0.06 + energy.value * 0.06,
+        scale: usesPreciseWaveform
+          ? 1
+          : 1.03 + pulse.value * 0.05 + energy.value * 0.05,
       } as const,
     ] as any,
   }));
 
   const sheenStyle = useAnimatedStyle(() => ({
     opacity:
-      usesPreciseWaveform || showsNeutralBusyState
+      usesPreciseWaveform
         ? 0.06
-        : 0.16 + pulse.value * 0.08,
+      : phase === "idle"
+        ? 0.16 + pulse.value * 0.08
+      : isSpeaking
+        ? 0.13 + pulse.value * 0.06
+      : 0.11 + pulse.value * 0.05,
     transform: [
       {
-        translateX:
-          usesPreciseWaveform || showsNeutralBusyState
-            ? 0
-            : interpolate(orbit.value, [0, 1], [-20, 16]),
+        translateX: usesPreciseWaveform
+          ? 0
+          : interpolate(orbit.value, [0, 1], [-20, 16]),
       } as const,
       {
-        rotate:
-          usesPreciseWaveform || showsNeutralBusyState
-            ? "0deg"
-            : `${interpolate(orbit.value, [0, 1], [-8, 8])}deg`,
+        rotate: usesPreciseWaveform
+          ? "0deg"
+          : `${interpolate(orbit.value, [0, 1], [-8, 8])}deg`,
       } as const,
     ] as any,
   }));
@@ -524,7 +687,7 @@ export function WaveformCircle({
   }));
 
   const controlIconStyle = useAnimatedStyle(() => ({
-    opacity: showsNeutralBusyState ? 0.9 : 0.96,
+    opacity: phase === "idle" ? 0.96 : 0.92,
     transform: [
       {
         scale:
@@ -539,7 +702,7 @@ export function WaveformCircle({
             : 0,
       } as const,
     ],
-  }), [showsNeutralBusyState]);
+  }), [phase]);
 
   return (
     <View style={styles.container}>
@@ -562,19 +725,19 @@ export function WaveformCircle({
       <RippleRing
         delay={0}
         color={ringColor}
-        isActive={shouldAnimate && !showsNeutralBusyState}
+        isActive={shouldAnimate && isRecording}
         intensity={intensity}
       />
       <RippleRing
         delay={500}
         color={ringColor}
-        isActive={shouldAnimate && !showsNeutralBusyState}
+        isActive={shouldAnimate && isRecording}
         intensity={intensity}
       />
       <RippleRing
         delay={1000}
         color={ringColor}
-        isActive={shouldAnimate && !showsNeutralBusyState}
+        isActive={shouldAnimate && isRecording}
         intensity={intensity}
       />
       <Animated.View style={circleShellStyle}>
@@ -584,11 +747,7 @@ export function WaveformCircle({
           onPressOut={inputMode === "push-to-talk" ? onPressOut : undefined}
           onPress={inputMode === "toggle-to-talk" ? onPress : undefined}
         >
-          <LinearGradient
-            colors={gradientColors}
-            locations={[0, 0.58, 1]}
-            start={{ x: 0.12, y: 0 }}
-            end={{ x: 0.88, y: 1 }}
+          <View
             style={[
               styles.circle,
               {
@@ -600,6 +759,36 @@ export function WaveformCircle({
               },
             ]}
           >
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.backgroundGradient, backgroundGradientStyle]}
+            >
+              <LinearGradient
+                colors={gradientColors}
+                locations={[0, 0.58, 1]}
+                start={{ x: 0.12, y: 0 }}
+                end={{ x: 0.88, y: 1 }}
+                style={styles.backgroundGradientFill}
+              />
+            </Animated.View>
+            {previousGradientColors ? (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.backgroundGradient,
+                  backgroundGradientStyle,
+                  previousBackgroundGradientStyle,
+                ]}
+              >
+                <LinearGradient
+                  colors={previousGradientColors}
+                  locations={[0, 0.58, 1]}
+                  start={{ x: 0.12, y: 0 }}
+                  end={{ x: 0.88, y: 1 }}
+                  style={styles.backgroundGradientFill}
+                />
+              </Animated.View>
+            ) : null}
             <Animated.View style={[styles.coreAura, styles.coreAuraTop, topAuraStyle]}>
               <LinearGradient
                 colors={["rgba(255,255,255,0.34)", "rgba(255,255,255,0)"]}
@@ -624,22 +813,16 @@ export function WaveformCircle({
                 style={styles.auraFill}
               />
             </Animated.View>
-            {isRecording ? (
+            {phase !== "idle" ? (
               <Animated.View
                 pointerEvents="none"
                 style={[
                   styles.recordingGradientOverlay,
-                  recordingGradientOverlayStyle,
+                  activityGradientOverlayStyle,
                 ]}
               >
                 <LinearGradient
-                  colors={[
-                    "rgba(255,255,255,0)",
-                    "rgba(255, 233, 227, 0.22)",
-                    "rgba(255,255,255,0)",
-                    "rgba(255, 205, 193, 0.34)",
-                    "rgba(255,255,255,0)",
-                  ]}
+                  colors={activityOverlayColors}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.recordingGradientOverlayFill}
@@ -655,8 +838,8 @@ export function WaveformCircle({
             {showsStaticControlState ? (
               <Animated.View style={[styles.micIconWrap, controlIconStyle]}>
                 <Feather
-                  name={phase === "idle" ? "mic" : "square"}
-                  size={phase === "idle" ? 40 : 28}
+                  name={controlIconName}
+                  size={controlIconSize}
                   color="rgba(255, 255, 255, 0.96)"
                 />
               </Animated.View>
@@ -729,7 +912,7 @@ export function WaveformCircle({
                 )}
               </Animated.View>
             )}
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -800,6 +983,16 @@ const styles = StyleSheet.create({
   nativeWaveformOutput: {
     width: 156,
     height: 32,
+  },
+  backgroundGradient: {
+    position: "absolute",
+    width: 248,
+    height: 248,
+    borderRadius: 124,
+    overflow: "hidden",
+  },
+  backgroundGradientFill: {
+    flex: 1,
   },
   coreAura: {
     position: "absolute",
