@@ -163,6 +163,20 @@ export function useNativeSpeechRecognizer() {
 
     return subscribeToNativeWaveform((event) => {
       if (
+        event.type === "error" &&
+        nativeSessionIdRef.current &&
+        event.sessionId === nativeSessionIdRef.current
+      ) {
+        const sessionId = nativeSessionIdRef.current;
+        nativeSessionIdRef.current = null;
+        void cancelNativeWaveformRecording(sessionId).catch(() => {
+          // The native module may have already cleaned up after the failure.
+        });
+        rejectPendingStop(new Error(event.message));
+        return;
+      }
+
+      if (
         event.type !== "levels" ||
         !nativeSessionIdRef.current ||
         event.sessionId !== nativeSessionIdRef.current
@@ -181,7 +195,7 @@ export function useNativeSpeechRecognizer() {
         levelToMetering(averageSampleMagnitude(samples))
       );
     });
-  }, [usingNativeRecorder]);
+  }, [rejectPendingStop, usingNativeRecorder]);
 
   useEffect(() => {
     if (usingNativeRecorder) {

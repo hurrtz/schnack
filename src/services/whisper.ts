@@ -105,9 +105,53 @@ function createRecordedFileNotReadyError(language: AppLanguage) {
   return new Error(translate(language, "voiceInputCaptureIncomplete"));
 }
 
+function createAbortError(reason?: unknown) {
+  const error =
+    reason instanceof Error
+      ? reason
+      : new Error(typeof reason === "string" ? reason : "Aborted");
+  error.name = "AbortError";
+  return error;
+}
+
+function throwIfAborted(signal?: AbortSignal) {
+  if (!signal?.aborted) {
+    return;
+  }
+
+  throw createAbortError(signal.reason);
+}
+
+async function waitForDelayOrAbort(durationMs: number, signal?: AbortSignal) {
+  if (!signal) {
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, durationMs);
+    });
+    return;
+  }
+
+  throwIfAborted(signal);
+
+  await new Promise<void>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      signal.removeEventListener("abort", handleAbort);
+      resolve();
+    }, durationMs);
+
+    const handleAbort = () => {
+      clearTimeout(timeoutId);
+      signal.removeEventListener("abort", handleAbort);
+      reject(createAbortError(signal.reason));
+    };
+
+    signal.addEventListener("abort", handleAbort, { once: true });
+  });
+}
+
 async function waitForRecordedFileReady(
   fileUri: string,
-  language: AppLanguage
+  language: AppLanguage,
+  abortSignal?: AbortSignal
 ) {
   let lastStableSize = -1;
 
@@ -123,6 +167,7 @@ async function waitForRecordedFileReady(
   };
 
   for (let attempt = 0; attempt < RECORDED_FILE_READY_ATTEMPTS; attempt += 1) {
+    throwIfAborted(abortSignal);
     const info = await getFileSize();
 
     if (
@@ -135,11 +180,10 @@ async function waitForRecordedFileReady(
 
     lastStableSize = info.size;
 
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, RECORDED_FILE_READY_POLL_MS);
-    });
+    await waitForDelayOrAbort(RECORDED_FILE_READY_POLL_MS, abortSignal);
   }
 
+  throwIfAborted(abortSignal);
   const info = await getFileSize();
 
   if (info.exists && info.size >= RECORDED_FILE_MIN_BYTES) {
@@ -153,16 +197,25 @@ async function fetchWithTimeout(
   input: RequestInfo | URL,
   init: RequestInit,
   timeoutMs: number,
-  onTimeout: () => Error
+  onTimeout: () => Error,
+  abortSignal?: AbortSignal
 ) {
   const controller = new AbortController();
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let timedOut = false;
+  const handleAbort = () => {
+    controller.abort(abortSignal?.reason);
+  };
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
+      timedOut = true;
       controller.abort();
       reject(onTimeout());
     }, timeoutMs);
   });
+
+  throwIfAborted(abortSignal);
+  abortSignal?.addEventListener("abort", handleAbort, { once: true });
 
   const fetchPromise = fetch(input, {
     ...init,
@@ -173,6 +226,14 @@ async function fetchWithTimeout(
       (error.name === "AbortError" ||
         error.message.toLowerCase().includes("aborted"))
     ) {
+      if (timedOut) {
+        throw onTimeout();
+      }
+
+      if (abortSignal?.aborted) {
+        throw createAbortError(abortSignal.reason);
+      }
+
       throw onTimeout();
     }
 
@@ -182,6 +243,7 @@ async function fetchWithTimeout(
   try {
     return await Promise.race([fetchPromise, timeoutPromise]);
   } finally {
+    abortSignal?.removeEventListener("abort", handleAbort);
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
@@ -195,8 +257,17 @@ export async function transcribeAudio(params: {
   providerModel?: string;
   apiKey?: string;
   language: AppLanguage;
+  abortSignal?: AbortSignal;
 }): Promise<string | null> {
-  const { fileUri, mode, provider, providerModel, apiKey, language } = params;
+  const {
+    fileUri,
+    mode,
+    provider,
+    providerModel,
+    apiKey,
+    language,
+    abortSignal,
+  } = params;
 
   if (mode === "native") {
     throw new Error(translate(language, "nativeSttHandledInApp"));
@@ -206,7 +277,7 @@ export async function transcribeAudio(params: {
     throw new Error(translate(language, "chooseSpeechToTextProviderInSettings"));
   }
 
-  await waitForRecordedFileReady(fileUri, language);
+  await waitForRecordedFileReady(fileUri, language, abortSignal);
 
   const config = STT_PROVIDER_CONFIGS[provider];
 
@@ -256,7 +327,8 @@ export async function transcribeAudio(params: {
           }),
         },
         STT_TIMEOUT_MS,
-        () => createSttTimeoutError({ provider, language })
+        () => createSttTimeoutError({ provider, language }),
+        abortSignal
       );
     } catch (error) {
       throw normalizeProviderTransportError({
@@ -311,7 +383,8 @@ export async function transcribeAudio(params: {
         body: formData,
       },
       STT_TIMEOUT_MS,
-      () => createSttTimeoutError({ provider, language })
+      () => createSttTimeoutError({ provider, language }),
+      abortSignal
     );
   } catch (error) {
     throw normalizeProviderTransportError({

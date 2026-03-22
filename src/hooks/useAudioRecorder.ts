@@ -31,6 +31,8 @@ export interface RecorderState {
   meteringData: number;
   waveformData: number[];
   waveformVariant: WaveformVisualizationVariant;
+  lastError: string | null;
+  clearLastError: () => void;
 }
 
 const RECORDING_OPTIONS = {
@@ -51,6 +53,7 @@ export function useAudioRecorder() {
   const inputReferenceLevelRef = useRef(INPUT_WAVEFORM_REFERENCE_FLOOR);
   const [nativeRecording, setNativeRecording] = useState(false);
   const [nativeMeteringData, setNativeMeteringData] = useState(-160);
+  const [lastError, setLastError] = useState<string | null>(null);
   const [waveformData, setWaveformData] = useState(
     usingNativeRecorder ? EMPTY_OSCILLOSCOPE_SAMPLES : EMPTY_VISUAL_LEVELS
   );
@@ -61,6 +64,24 @@ export function useAudioRecorder() {
     }
 
     return subscribeToNativeWaveform((event) => {
+      if (
+        event.type === "error" &&
+        nativeSessionIdRef.current &&
+        event.sessionId === nativeSessionIdRef.current
+      ) {
+        const sessionId = nativeSessionIdRef.current;
+        nativeSessionIdRef.current = null;
+        inputReferenceLevelRef.current = INPUT_WAVEFORM_REFERENCE_FLOOR;
+        setNativeRecording(false);
+        setNativeMeteringData(-160);
+        setWaveformData(EMPTY_OSCILLOSCOPE_SAMPLES);
+        setLastError(event.message);
+        void cancelNativeWaveformRecording(sessionId).catch(() => {
+          // The native module may have already cleaned up after the failure.
+        });
+        return;
+      }
+
       if (
         event.type !== "levels" ||
         !nativeSessionIdRef.current ||
@@ -118,6 +139,7 @@ export function useAudioRecorder() {
         throw new Error(t("microphonePermissionNotGranted"));
       }
 
+      setLastError(null);
       const sessionId = `native-recorder-${Date.now()}-${Math.random()
         .toString(36)
         .slice(2, 8)}`;
@@ -148,6 +170,7 @@ export function useAudioRecorder() {
       throw new Error(t("microphonePermissionNotGranted"));
     }
 
+    setLastError(null);
     await recorder.prepareToRecordAsync(RECORDING_OPTIONS);
     recorder.record();
     startTimeRef.current = Date.now();
@@ -209,6 +232,10 @@ export function useAudioRecorder() {
     usingNativeRecorder,
   ]);
 
+  const clearLastError = useCallback(() => {
+    setLastError(null);
+  }, []);
+
   return {
     isRecording: usingNativeRecorder ? nativeRecording : recorderState.isRecording,
     meteringData: usingNativeRecorder
@@ -216,6 +243,8 @@ export function useAudioRecorder() {
       : recorderState.metering ?? -160,
     waveformData,
     waveformVariant: usingNativeRecorder ? "oscilloscope" : "bars",
+    lastError,
+    clearLastError,
     startRecording,
     stopRecording,
   };

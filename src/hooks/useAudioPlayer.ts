@@ -3,6 +3,7 @@ import { Platform } from "react-native";
 import * as Speech from "expo-speech";
 import {
   setAudioModeAsync,
+  setIsAudioActiveAsync,
   useAudioPlayer as useExpoAudioPlayer,
   useAudioSampleListener,
   useAudioPlayerStatus,
@@ -65,7 +66,7 @@ export function useAudioPlayer() {
     supportsNativeOutputWaveformPlayback();
   const player = useExpoAudioPlayer(null, {
     updateInterval: PLAYER_STATUS_INTERVAL_MS,
-    keepAudioSessionActive: true,
+    keepAudioSessionActive: false,
   });
   const status = useAudioPlayerStatus(player);
   const [meteringData, setMeteringData] = useState(-160);
@@ -170,6 +171,7 @@ export function useAudioPlayer() {
     nativeAudioQueueContextsRef.current.clear();
     nativeAudioQueuePendingCountRef.current = 0;
     nativeAudioQueuePlayingRef.current = false;
+    waveformAnalysisCacheRef.current.clear();
     setNativeAudioQueuePlaying(false);
     stopNativeOutputWaveform();
   }, [stopNativeOutputWaveform]);
@@ -311,6 +313,9 @@ export function useAudioPlayer() {
   const resetPlaybackSession = useCallback(() => {
     audioSessionReadyRef.current = false;
     audioSessionPromiseRef.current = null;
+    void setIsAudioActiveAsync(false).catch(() => {
+      // Ignore audio-session teardown failures; the next playback attempt will re-prime it.
+    });
   }, []);
 
   const markPlaybackEnded = useCallback(() => {
@@ -343,10 +348,13 @@ export function useAudioPlayer() {
     }
 
     if (!audioSessionPromiseRef.current) {
-      audioSessionPromiseRef.current = setAudioModeAsync({
-        allowsRecording: false,
-        playsInSilentMode: true,
-      })
+      audioSessionPromiseRef.current = setIsAudioActiveAsync(true)
+        .then(() =>
+          setAudioModeAsync({
+            allowsRecording: false,
+            playsInSilentMode: true,
+          })
+        )
         .then(() => {
           audioSessionReadyRef.current = true;
         })

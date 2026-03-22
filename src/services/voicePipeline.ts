@@ -1,3 +1,4 @@
+import * as FileSystem from "expo-file-system/legacy";
 import { transcribeAudio } from "./whisper";
 import { streamChat, summarizeConversationContext } from "./llm";
 import {
@@ -25,6 +26,20 @@ import {
   TtsListenLanguage,
   UsageEstimate,
 } from "../types";
+
+async function cleanupCapturedAudio(fileUri?: string) {
+  if (!fileUri) {
+    return;
+  }
+
+  try {
+    await FileSystem.deleteAsync(fileUri, {
+      idempotent: true,
+    });
+  } catch {
+    // Ignore temp-file cleanup failures.
+  }
+}
 
 function extractCompleteSentences(text: string): {
   completeSentences: string[];
@@ -130,205 +145,218 @@ export async function runVoicePipeline(params: {
     abortSignal,
   } = params;
 
-  const transcription =
-    transcriptionOverride?.trim() ||
-    (audioUri
-      ? await transcribeAudio({
-          fileUri: audioUri,
-          mode: sttMode,
-          provider: sttProvider,
-          providerModel: sttModel,
-          apiKey: sttApiKey,
-          language,
-        })
-      : null);
+  let transcription: string | null = null;
 
-  if (!transcription) return null;
-  callbacks.onTranscription(transcription);
-  if (abortSignal?.aborted) return transcription;
+  try {
+    if (abortSignal?.aborted) {
+      return null;
+    }
 
-  const contextPlan = buildConversationContextPlan({
-    messages,
-    contextSummary,
-    summarizedMessageCount,
-  });
-  let effectiveSummary = contextSummary?.trim() ?? "";
-  let contextualMessages = contextPlan.recentMessages;
+    transcription =
+      transcriptionOverride?.trim() ||
+      (audioUri
+        ? await transcribeAudio({
+            fileUri: audioUri,
+            mode: sttMode,
+            provider: sttProvider,
+            providerModel: sttModel,
+            apiKey: sttApiKey,
+            language,
+            abortSignal,
+          })
+        : null);
 
-  if (contextPlan.needsSummaryUpdate) {
-    try {
-      const { summary: updatedSummary, usage } =
-        await summarizeConversationContext({
-          existingSummary: effectiveSummary,
-          messages: contextPlan.messagesToSummarize,
-          model,
-          provider,
-          apiKey: providerApiKey,
-          language,
-          abortSignal,
-        });
+    if (!transcription) return null;
+    if (abortSignal?.aborted) return transcription;
 
-      if (abortSignal?.aborted) {
-        return transcription;
-      }
+    callbacks.onTranscription(transcription);
+    if (abortSignal?.aborted) return transcription;
 
-      if (updatedSummary) {
-        effectiveSummary = updatedSummary;
-        callbacks.onContextSummary?.(
-          updatedSummary,
-          contextPlan.targetSummarizedCount,
-          usage,
-        );
-      } else if (!effectiveSummary) {
+    const contextPlan = buildConversationContextPlan({
+      messages,
+      contextSummary,
+      summarizedMessageCount,
+    });
+    let effectiveSummary = contextSummary?.trim() ?? "";
+    let contextualMessages = contextPlan.recentMessages;
+
+    if (contextPlan.needsSummaryUpdate) {
+      try {
+        const { summary: updatedSummary, usage } =
+          await summarizeConversationContext({
+            existingSummary: effectiveSummary,
+            messages: contextPlan.messagesToSummarize,
+            model,
+            provider,
+            apiKey: providerApiKey,
+            language,
+            abortSignal,
+          });
+
+        if (abortSignal?.aborted) {
+          return transcription;
+        }
+
+        if (updatedSummary) {
+          effectiveSummary = updatedSummary;
+          callbacks.onContextSummary?.(
+            updatedSummary,
+            contextPlan.targetSummarizedCount,
+            usage,
+          );
+        } else if (!effectiveSummary) {
+          contextualMessages = contextPlan.fallbackRecentMessages;
+        }
+      } catch {
+        if (abortSignal?.aborted) {
+          return transcription;
+        }
+
         contextualMessages = contextPlan.fallbackRecentMessages;
       }
-    } catch {
-      if (abortSignal?.aborted) {
-        return transcription;
-      }
-
-      contextualMessages = contextPlan.fallbackRecentMessages;
-    }
-  }
-
-  const allMessages: Message[] = [
-    ...contextualMessages,
-    {
-      id: "pending",
-      role: "user",
-      content: transcription,
-      model: null,
-      provider: null,
-      timestamp: new Date().toISOString(),
-    },
-  ];
-
-  let sentenceBuffer = "";
-  let ttsChain = Promise.resolve();
-  const ttsQueue: Promise<void>[] = [];
-  const effectiveReplyPlayback = ttsMode === "local" ? "wait" : replyPlayback;
-  const speechRequestId = createSpeechRequestId("conversation");
-  const speechDiagnostics = {
-    requestId: speechRequestId,
-    source: "conversation" as const,
-  };
-
-  const enqueueTtsChunk = (text: string) => {
-    const trimmed = text.trim();
-
-    if (!trimmed) {
-      return;
     }
 
-    const task = ttsChain.then(async () => {
-      if (abortSignal?.aborted) {
+    const allMessages: Message[] = [
+      ...contextualMessages,
+      {
+        id: "pending",
+        role: "user",
+        content: transcription,
+        model: null,
+        provider: null,
+        timestamp: new Date().toISOString(),
+      },
+    ];
+
+    let sentenceBuffer = "";
+    let ttsChain = Promise.resolve();
+    const ttsQueue: Promise<void>[] = [];
+    const effectiveReplyPlayback = ttsMode === "local" ? "wait" : replyPlayback;
+    const speechRequestId = createSpeechRequestId("conversation");
+    const speechDiagnostics = {
+      requestId: speechRequestId,
+      source: "conversation" as const,
+    };
+
+    const enqueueTtsChunk = (text: string) => {
+      const trimmed = text.trim();
+
+      if (!trimmed) {
         return;
       }
 
-      if (ttsMode === "native") {
-        callbacks.onSpeechTextReady(trimmed, undefined, speechDiagnostics);
-        return;
-      }
-
-      try {
-        const audio = await synthesizeSpeech({
-          text: trimmed,
-          voice: ttsVoice,
-          mode: ttsMode,
-          provider: ttsProvider,
-          providerModel: ttsModel,
-          apiKey: ttsApiKey,
-          language,
-          listenLanguages: ttsListenLanguages,
-          localVoices: localTtsVoices,
-          diagnostics: speechDiagnostics,
-        });
-
-        if (!abortSignal?.aborted) {
-          callbacks.onAudioReady(audio, speechDiagnostics);
+      const task = ttsChain.then(async () => {
+        if (abortSignal?.aborted) {
+          return;
         }
-      } catch (error) {
-        const normalizedError =
-          error instanceof Error ? error : new Error(String(error));
 
-        callbacks.onTtsFallback?.(normalizedError);
-
-        if (!abortSignal?.aborted) {
+        if (ttsMode === "native") {
           callbacks.onSpeechTextReady(trimmed, undefined, speechDiagnostics);
+          return;
         }
-      }
-    });
 
-    ttsChain = task.catch((error) => {
-      callbacks.onError(
-        error instanceof Error ? error : new Error(String(error)),
+        try {
+          const audio = await synthesizeSpeech({
+            text: trimmed,
+            voice: ttsVoice,
+            mode: ttsMode,
+            provider: ttsProvider,
+            providerModel: ttsModel,
+            apiKey: ttsApiKey,
+            language,
+            listenLanguages: ttsListenLanguages,
+            localVoices: localTtsVoices,
+            diagnostics: speechDiagnostics,
+          });
+
+          if (!abortSignal?.aborted) {
+            callbacks.onAudioReady(audio, speechDiagnostics);
+          }
+        } catch (error) {
+          const normalizedError =
+            error instanceof Error ? error : new Error(String(error));
+
+          callbacks.onTtsFallback?.(normalizedError);
+
+          if (!abortSignal?.aborted) {
+            callbacks.onSpeechTextReady(trimmed, undefined, speechDiagnostics);
+          }
+        }
+      });
+
+      ttsChain = task.catch((error) => {
+        callbacks.onError(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+      });
+      ttsQueue.push(task.catch(() => undefined));
+    };
+
+    const enqueueTts = (text: string) => {
+      if (ttsMode === "native") {
+        enqueueTtsChunk(text);
+        return;
+      }
+
+      const segments = splitTextForTts(
+        text,
+        ttsMode === "local"
+          ? LOCAL_TTS_MAX_INPUT_CHARS
+          : PROVIDER_TTS_MAX_INPUT_CHARS,
       );
+
+      if (segments.length === 0) {
+        return;
+      }
+
+      segments.forEach(enqueueTtsChunk);
+    };
+
+    const enqueueStreamPlayback = (sentence: string) => {
+      enqueueTts(sentence);
+    };
+
+    await streamChat({
+      messages: allMessages,
+      model,
+      provider,
+      apiKey: providerApiKey,
+      assistantInstructions,
+      responseLength,
+      responseTone,
+      language,
+      conversationSummary: effectiveSummary || undefined,
+      abortSignal,
+      onChunk: (text) => {
+        if (abortSignal?.aborted) return;
+        callbacks.onChunk(text);
+        if (effectiveReplyPlayback === "stream") {
+          sentenceBuffer += text;
+          const { completeSentences, remainder } =
+            extractCompleteSentences(sentenceBuffer);
+          for (const sentence of completeSentences) {
+            enqueueStreamPlayback(sentence);
+          }
+          sentenceBuffer = remainder;
+        }
+      },
+      onDone: async (fullText, usage) => {
+        if (abortSignal?.aborted) return;
+        callbacks.onResponseDone(fullText, usage);
+        if (effectiveReplyPlayback === "stream") {
+          if (sentenceBuffer.trim()) {
+            enqueueStreamPlayback(sentenceBuffer);
+          }
+        } else {
+          enqueueTts(fullText);
+        }
+      },
+      onError: callbacks.onError,
     });
-    ttsQueue.push(task.catch(() => undefined));
-  };
 
-  const enqueueTts = (text: string) => {
-    if (ttsMode === "native") {
-      enqueueTtsChunk(text);
-      return;
-    }
-
-    const segments = splitTextForTts(
-      text,
-      ttsMode === "local"
-        ? LOCAL_TTS_MAX_INPUT_CHARS
-        : PROVIDER_TTS_MAX_INPUT_CHARS,
-    );
-
-    if (segments.length === 0) {
-      return;
-    }
-
-    segments.forEach(enqueueTtsChunk);
-  };
-
-  const enqueueStreamPlayback = (sentence: string) => {
-    enqueueTts(sentence);
-  };
-
-  await streamChat({
-    messages: allMessages,
-    model,
-    provider,
-    apiKey: providerApiKey,
-    assistantInstructions,
-    responseLength,
-    responseTone,
-    language,
-    conversationSummary: effectiveSummary || undefined,
-    abortSignal,
-    onChunk: (text) => {
-      if (abortSignal?.aborted) return;
-      callbacks.onChunk(text);
-      if (effectiveReplyPlayback === "stream") {
-        sentenceBuffer += text;
-        const { completeSentences, remainder } =
-          extractCompleteSentences(sentenceBuffer);
-        for (const sentence of completeSentences) {
-          enqueueStreamPlayback(sentence);
-        }
-        sentenceBuffer = remainder;
-      }
-    },
-    onDone: async (fullText, usage) => {
-      if (abortSignal?.aborted) return;
-      callbacks.onResponseDone(fullText, usage);
-      if (effectiveReplyPlayback === "stream") {
-        if (sentenceBuffer.trim()) {
-          enqueueStreamPlayback(sentenceBuffer);
-        }
-      } else {
-        enqueueTts(fullText);
-      }
-    },
-    onError: callbacks.onError,
-  });
-
-  await Promise.all(ttsQueue);
-  return transcription;
+    await Promise.all(ttsQueue);
+    return transcription;
+  } finally {
+    await cleanupCapturedAudio(audioUri);
+  }
 }

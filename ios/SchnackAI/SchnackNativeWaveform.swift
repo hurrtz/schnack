@@ -8,7 +8,7 @@ final class SchnackNativeWaveform: RCTEventEmitter {
   private static let rollingSampleCount = 192
   private static let inputSampleChunkCount = 6
   private static let inputTapBufferSize: AVAudioFrameCount = 256
-  private static let emitIntervalMs = 16
+  private static let emitIntervalMs = 33
   private static let inputReferenceFloor: Float = 0.11
 
   private let stateLock = NSLock()
@@ -27,6 +27,7 @@ final class SchnackNativeWaveform: RCTEventEmitter {
   private var inputReferenceLevel = SchnackNativeWaveform.inputReferenceFloor
   private var inputVisualGain: Float = 1
   private var inputEnvelopeLevel: Float = 0
+  private var pendingRecordingErrorSessionId: String?
 
   override static func requiresMainQueueSetup() -> Bool {
     true
@@ -139,11 +140,11 @@ final class SchnackNativeWaveform: RCTEventEmitter {
           do {
             try file.write(from: buffer)
           } catch {
-            self.emitEvent([
-              "type": "error",
-              "sessionId": sessionId,
-              "message": error.localizedDescription,
-            ])
+            self.handleRecordingWriteError(
+              sessionId: sessionId,
+              message: error.localizedDescription
+            )
+            return
           }
 
           self.appendRollingSamples(
@@ -355,6 +356,7 @@ final class SchnackNativeWaveform: RCTEventEmitter {
     audioEngine = nil
     audioFile = nil
     activeSessionId = nil
+    pendingRecordingErrorSessionId = nil
 
     let outputURL = self.outputURL
     self.outputURL = nil
@@ -368,6 +370,39 @@ final class SchnackNativeWaveform: RCTEventEmitter {
 
     if deleteOutput, let outputURL {
       try? FileManager.default.removeItem(at: outputURL)
+    }
+  }
+
+  private func handleRecordingWriteError(sessionId: String, message: String) {
+    stateLock.lock()
+    let shouldHandleError =
+      activeSessionId == sessionId &&
+      pendingRecordingErrorSessionId != sessionId
+    if shouldHandleError {
+      pendingRecordingErrorSessionId = sessionId
+    }
+    stateLock.unlock()
+
+    guard shouldHandleError else {
+      return
+    }
+
+    DispatchQueue.main.async {
+      guard self.activeSessionId == sessionId else {
+        self.stateLock.lock()
+        if self.pendingRecordingErrorSessionId == sessionId {
+          self.pendingRecordingErrorSessionId = nil
+        }
+        self.stateLock.unlock()
+        return
+      }
+
+      self.emitEvent([
+        "type": "error",
+        "sessionId": sessionId,
+        "message": message,
+      ])
+      self.cleanupRecording(deleteOutput: true)
     }
   }
 

@@ -468,8 +468,14 @@ export function useVoicePipeline(
         if (!transcription) {
           showToast(t("couldntCatchThatTryAgain"));
         }
-      } catch {
-        // Errors are surfaced through the toast callback above.
+      } catch (error) {
+        if (abortRef.current?.signal.aborted) {
+          return;
+        }
+
+        const message =
+          error instanceof Error ? error.message : t("couldntProcessVoiceInput");
+        showToast(message);
       } finally {
         if (player.hasPendingPlaybackNow()) {
           setPipelinePhase("speaking");

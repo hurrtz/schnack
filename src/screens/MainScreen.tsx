@@ -685,6 +685,15 @@ export function MainScreen() {
   }, [nativeStt.clearLastError, nativeStt.lastError, showToast]);
 
   useEffect(() => {
+    if (!recorder.lastError) {
+      return;
+    }
+
+    showToast(recorder.lastError);
+    recorder.clearLastError();
+  }, [recorder.clearLastError, recorder.lastError, showToast]);
+
+  useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       if (nextAppState !== "background") {
         return;

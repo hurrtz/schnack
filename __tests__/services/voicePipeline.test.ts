@@ -7,6 +7,10 @@ import {
 } from "../../src/services/llm";
 import { synthesizeSpeech } from "../../src/services/tts";
 
+jest.mock("expo-file-system/legacy", () => ({
+  deleteAsync: jest.fn(() => Promise.resolve()),
+}));
+
 jest.mock("../../src/services/whisper", () => ({
   transcribeAudio: jest.fn(),
 }));
@@ -222,6 +226,59 @@ describe("runVoicePipeline", () => {
         totalTokens: 104,
       }),
     );
+  });
+
+  it("deletes the captured audio file after provider STT completes", async () => {
+    const { deleteAsync } = jest.requireMock("expo-file-system/legacy") as {
+      deleteAsync: jest.Mock;
+    };
+
+    (transcribeAudio as jest.Mock).mockResolvedValueOnce("Explain wind.");
+    (streamChat as jest.Mock).mockImplementation(
+      async ({
+        onChunk,
+        onDone,
+      }: {
+        onChunk: (text: string) => void;
+        onDone: (text: string) => Promise<void>;
+      }) => {
+        onChunk("Wind is moving air.");
+        await onDone("Wind is moving air.");
+      },
+    );
+
+    const callbacks = {
+      onTranscription: jest.fn(),
+      onChunk: jest.fn(),
+      onResponseDone: jest.fn(),
+      onAudioReady: jest.fn(),
+      onSpeechTextReady: jest.fn(),
+      onError: jest.fn(),
+    };
+
+    await runVoicePipeline({
+      audioUri: "file:///tmp/recording.wav",
+      messages: [],
+      model: "gpt-5.4",
+      provider: "openai",
+      providerApiKey: "sk-test",
+      sttMode: "provider",
+      sttProvider: "openai",
+      sttApiKey: "sk-test",
+      sttModel: "gpt-4o-mini-transcribe",
+      ttsMode: "native",
+      ttsVoice: "alloy",
+      replyPlayback: "wait",
+      assistantInstructions: "You are a voice assistant.",
+      responseLength: "normal",
+      responseTone: "professional",
+      language: "en",
+      callbacks,
+    });
+
+    expect(deleteAsync).toHaveBeenCalledWith("file:///tmp/recording.wav", {
+      idempotent: true,
+    });
   });
 
   it("speaks a completed sentence immediately in stream mode", async () => {

@@ -59,4 +59,24 @@ describe("transcribeAudio", () => {
       "Couldn't reach Groq for speech transcription. Check the connection and try again."
     );
   });
+
+  it("aborts before starting the provider request when the signal is already cancelled", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      transcribeAudio({
+        fileUri: "/tmp/recording.m4a",
+        mode: "provider",
+        provider: "openai",
+        apiKey: "sk-test",
+        language: "en",
+        abortSignal: controller.signal,
+      })
+    ).rejects.toMatchObject({
+      name: "AbortError",
+    });
+
+    expect(fetch).not.toHaveBeenCalled();
+  });
 });
