@@ -3,13 +3,11 @@ import {
   AppState,
   Modal,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import * as Clipboard from "expo-clipboard";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
@@ -58,7 +56,6 @@ import { synthesizeSpeech } from "../services/tts";
 import { useTheme } from "../theme/ThemeContext";
 import { fonts } from "../theme/typography";
 import {
-  Conversation,
   Provider,
   ResponseMode,
   TtsListenLanguage,
@@ -66,7 +63,6 @@ import {
   VoiceVisualPhase,
   WaveformVisualizationVariant,
 } from "../types";
-import { formatConversationForCopy } from "../utils/conversationExport";
 import {
   getEnabledSttProviders,
   getEnabledTtsProviders,
@@ -81,6 +77,10 @@ import {
   formatTokenCount,
   formatUsd,
 } from "../utils/usageStats";
+import { ConversationMenu } from "./main/ConversationMenu";
+import { MainScreenTopBar } from "./main/MainScreenTopBar";
+import { useConversationActions } from "./main/useConversationActions";
+import { useMainScreenUiState } from "./main/useMainScreenUiState";
 
 function getResponseModeLabel(
   mode: ResponseMode,
@@ -139,25 +139,38 @@ export function MainScreen() {
     refreshPackStates: refreshLocalTtsPackStates,
   } = useLocalTtsPacks(settings);
 
-  const [settingsVisible, setSettingsVisible] = useState(false);
-  const [settingsFocusProvider, setSettingsFocusProvider] = useState<
-    Provider | undefined
-  >();
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [statusDetailsVisible, setStatusDetailsVisible] = useState(false);
-  const [transcriptVisible, setTranscriptVisible] = useState(false);
-  const [conversationMenuVisible, setConversationMenuVisible] = useState(false);
-  const [setupGuideVisible, setSetupGuideVisible] = useState(false);
-  const [memoryConversation, setMemoryConversation] =
-    useState<Conversation | null>(null);
-  const [memoryVisible, setMemoryVisible] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
     onRetry?: () => void;
   } | null>(null);
+  const {
+    settingsVisible,
+    settingsFocusProvider,
+    drawerVisible,
+    statusDetailsVisible,
+    transcriptVisible,
+    conversationMenuVisible,
+    setupGuideVisible,
+    memoryConversation,
+    memoryVisible,
+    setDrawerVisible,
+    setSetupGuideVisible,
+    setMemoryConversation,
+    openSettings,
+    closeSettings,
+    openMemoryConversation,
+    closeMemory,
+    openTranscript,
+    closeTranscript,
+    openStatusDetails,
+    closeStatusDetails,
+    closeConversationMenu,
+    toggleConversationMenu,
+    runAfterDrawerDismiss,
+    handleDrawerDismiss,
+  } = useMainScreenUiState();
 
   const recordingStartedRef = useRef<Promise<void> | null>(null);
-  const pendingDrawerDismissActionRef = useRef<null | (() => void)>(null);
   const voiceTurnSessionRef = useRef(0);
   const voiceTurnSnapshotRef = useRef<ReturnType<
     typeof captureActiveConversationSnapshot
@@ -423,114 +436,6 @@ export function MainScreen() {
     [installLanguagePack, language, showToast, t],
   );
 
-  const copyText = useCallback(
-    async (text: string, successMessage: string) => {
-      if (!text.trim()) {
-        showToast(t("nothingToCopyYet"));
-        return;
-      }
-
-      try {
-        await Clipboard.setStringAsync(text);
-        showToast(successMessage);
-      } catch {
-        showToast(t("couldntCopyText"));
-      }
-    },
-    [showToast, t],
-  );
-
-  const handleCopyMessage = useCallback(
-    async (content: string) => {
-      await copyText(content.trim(), t("messageCopied"));
-    },
-    [copyText, t],
-  );
-
-  const handleCopyThread = useCallback(
-    async (conversationId?: string) => {
-      const conversation = conversationId
-        ? await getConversationById(conversationId)
-        : activeConversation;
-
-      if (!conversation || conversation.messages.length === 0) {
-        showToast(t("noConversationToCopyYet"));
-        return;
-      }
-
-      await copyText(
-        formatConversationForCopy(conversation, language),
-        t("threadCopied"),
-      );
-    },
-    [activeConversation, copyText, getConversationById, language, showToast, t],
-  );
-
-  const handleShareThread = useCallback(
-    async (conversationId?: string) => {
-      const conversation = conversationId
-        ? await getConversationById(conversationId)
-        : activeConversation;
-
-      if (!conversation || conversation.messages.length === 0) {
-        showToast(t("noConversationToShareYet"));
-        return;
-      }
-
-      const title = conversation.title.trim() || t("untitledConversation");
-      const message = formatConversationForCopy(conversation, language);
-
-      try {
-        await Share.share(
-          {
-            title,
-            message,
-          },
-          {
-            dialogTitle: title,
-          },
-        );
-      } catch {
-        showToast(t("couldntShareText"));
-      }
-    },
-    [activeConversation, getConversationById, language, showToast, t],
-  );
-
-  const handleShareMessage = useCallback(
-    async (content: string) => {
-      const trimmed = content.trim();
-
-      if (!trimmed) {
-        showToast(t("nothingToShareYet"));
-        return;
-      }
-
-      try {
-        await Share.share({ message: trimmed });
-      } catch {
-        showToast(t("couldntShareText"));
-      }
-    },
-    [showToast, t],
-  );
-
-  const handleRenameThread = useCallback(
-    async (conversationId: string, nextTitle: string) => {
-      await renameConversation(conversationId, nextTitle);
-      showToast(t("threadRenamed"));
-    },
-    [renameConversation, showToast, t],
-  );
-
-  const handleTogglePinned = useCallback(
-    (conversationId: string) => {
-      const pinned = toggleConversationPinned(conversationId);
-      showToast(pinned ? t("threadPinned") : t("threadUnpinned"));
-    },
-    [showToast, t, toggleConversationPinned],
-  );
-
   const handleRepeatMessage = useCallback(
     async (message: { id: string; content: string }) => {
       if (activeReplayMessageId === message.id) {
@@ -582,28 +487,34 @@ export function MainScreen() {
     voiceTurnSnapshotRef,
   ]);
 
-  const handleSelectConversation = useCallback(
-    async (conversationId: string) => {
-      await resetVoiceSessionState();
-      await selectConversation(conversationId);
-    },
-    [resetVoiceSessionState, selectConversation],
-  );
-
-  const handleStartNewSession = useCallback(async () => {
-    await resetVoiceSessionState();
-    clearActiveConversation();
-  }, [clearActiveConversation, resetVoiceSessionState]);
-
-  const openSettings = useCallback((focusProvider?: Provider) => {
-    setSettingsFocusProvider(focusProvider);
-    setSettingsVisible(true);
-  }, []);
-
-  const closeSettings = useCallback(() => {
-    setSettingsVisible(false);
-    setSettingsFocusProvider(undefined);
-  }, []);
+  const {
+    handleCopyMessage,
+    handleCopyThread,
+    handleShareThread,
+    handleShareMessage,
+    handleRenameThread,
+    handleTogglePinned,
+    handleSelectConversation,
+    handleStartNewSession,
+    openMemory,
+    handleCopyMemory,
+    handleClearMemory,
+  } = useConversationActions({
+    activeConversation,
+    memoryConversation,
+    getConversationById,
+    renameConversation,
+    toggleConversationPinned,
+    clearConversationMemory,
+    selectConversation,
+    clearActiveConversation,
+    resetVoiceSessionState,
+    openMemoryConversation,
+    setMemoryConversation,
+    showToast,
+    language,
+    t,
+  });
 
   useEffect(() => {
     if (!loaded || providerApiKey) {
@@ -1274,214 +1185,6 @@ export function MainScreen() {
       ? formatUsd(conversationUsageTotals.totalCostUsd)
       : null;
 
-  const openMemory = useCallback(
-    async (conversationId?: string) => {
-      const conversation = conversationId
-        ? await getConversationById(conversationId)
-        : activeConversation;
-
-      if (!conversation) {
-        showToast(t("noConversationToManageYet"));
-        return;
-      }
-
-      setMemoryConversation(conversation);
-      setMemoryVisible(true);
-    },
-    [activeConversation, getConversationById, showToast, t],
-  );
-
-  const runAfterDrawerDismiss = useCallback((action: () => void) => {
-    if (!drawerVisible) {
-      action();
-      return;
-    }
-
-    pendingDrawerDismissActionRef.current = action;
-    setDrawerVisible(false);
-  }, [drawerVisible]);
-
-  const handleDrawerDismiss = useCallback(() => {
-    const pendingAction = pendingDrawerDismissActionRef.current;
-    pendingDrawerDismissActionRef.current = null;
-    pendingAction?.();
-  }, []);
-
-  const closeMemory = useCallback(() => {
-    setMemoryVisible(false);
-    setMemoryConversation(null);
-  }, []);
-
-  const handleCopyMemory = useCallback(async () => {
-    const summary = memoryConversation?.contextSummary?.trim() ?? "";
-
-    if (!summary) {
-      showToast(t("noConversationToManageYet"));
-      return;
-    }
-
-    await copyText(summary, t("memoryCopied"));
-  }, [copyText, memoryConversation?.contextSummary, showToast, t]);
-
-  const handleClearMemory = useCallback(async () => {
-    if (!memoryConversation) {
-      return;
-    }
-
-    const updatedConversation = await clearConversationMemory(
-      memoryConversation.id,
-    );
-
-    setMemoryConversation(updatedConversation);
-    showToast(t("memoryCleared"));
-  }, [clearConversationMemory, memoryConversation, showToast, t]);
-
-  const openTranscript = useCallback(() => {
-    setConversationMenuVisible(false);
-    setTranscriptVisible(true);
-  }, []);
-
-  const closeTranscript = useCallback(() => {
-    setConversationMenuVisible(false);
-    setTranscriptVisible(false);
-  }, []);
-
-  const openStatusDetails = useCallback(() => {
-    setStatusDetailsVisible(true);
-  }, []);
-
-  const closeStatusDetails = useCallback(() => {
-    setStatusDetailsVisible(false);
-  }, []);
-
-  const closeConversationMenu = useCallback(() => {
-    setConversationMenuVisible(false);
-  }, []);
-
-  const toggleConversationMenu = useCallback(() => {
-    setConversationMenuVisible((previous) => !previous);
-  }, []);
-
-  const renderTopBar = (compact = false) => (
-    <View style={styles.topBar}>
-      <TouchableOpacity
-        style={[
-          styles.iconButton,
-          {
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-            shadowColor: colors.glow,
-          },
-        ]}
-        onPress={() => setDrawerVisible(true)}
-      >
-        <Feather
-          name="message-square"
-          size={18}
-          color={colors.textSecondary}
-        />
-      </TouchableOpacity>
-
-      {compact ? (
-        <View
-          style={[
-            styles.compactBrand,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <Text style={[styles.compactBrandText, { color: colors.text }]}>
-            SchnackAI
-          </Text>
-        </View>
-      ) : (
-        <View style={styles.wordmark}>
-          <Text style={[styles.wordmarkText, { color: colors.text }]}>
-            SchnackAI
-          </Text>
-        </View>
-      )}
-
-      <TouchableOpacity
-        style={[
-          styles.iconButton,
-          {
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-            shadowColor: colors.glow,
-          },
-        ]}
-        onPress={() => openSettings()}
-      >
-        <Feather name="settings" size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderConversationMenu = () =>
-    conversationMenuVisible ? (
-      <>
-        <TouchableOpacity
-          style={styles.conversationMenuBackdrop}
-          onPress={closeConversationMenu}
-          activeOpacity={1}
-        />
-        <View
-          style={[
-            styles.conversationMenu,
-            styles.conversationMenuModal,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              shadowColor: colors.glow,
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={styles.conversationMenuItem}
-            onPress={() => {
-              closeConversationMenu();
-              void openMemory();
-            }}
-            activeOpacity={0.85}
-          >
-            <Feather name="archive" size={15} color={colors.accent} />
-            <Text style={[styles.conversationMenuText, { color: colors.text }]}>
-              {t("memory")}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.conversationMenuItem}
-            onPress={() => {
-              closeConversationMenu();
-              void handleCopyThread();
-            }}
-            activeOpacity={0.85}
-          >
-            <Feather name="copy" size={15} color={colors.accent} />
-            <Text style={[styles.conversationMenuText, { color: colors.text }]}>
-              {t("copyThread")}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.conversationMenuItem}
-            onPress={() => {
-              closeConversationMenu();
-              void handleShareThread();
-            }}
-            activeOpacity={0.85}
-          >
-            <Feather name="share" size={15} color={colors.accent} />
-            <Text style={[styles.conversationMenuText, { color: colors.text }]}>
-              {t("shareThread")}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </>
-    ) : null;
-
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -1522,7 +1225,11 @@ export function MainScreen() {
       />
 
       <View style={styles.defaultLayout}>
-        {renderTopBar(false)}
+        <MainScreenTopBar
+          colors={colors}
+          onOpenDrawer={() => setDrawerVisible(true)}
+          onOpenSettings={() => openSettings()}
+        />
 
         <ScrollView
           style={styles.defaultScroll}
@@ -2015,7 +1722,24 @@ export function MainScreen() {
                   />
                 </TouchableOpacity>
               </View>
-              {renderConversationMenu()}
+              <ConversationMenu
+                visible={conversationMenuVisible}
+                colors={colors}
+                t={t}
+                onClose={closeConversationMenu}
+                onManageMemory={() => {
+                  closeConversationMenu();
+                  void openMemory();
+                }}
+                onCopyThread={() => {
+                  closeConversationMenu();
+                  void handleCopyThread();
+                }}
+                onShareThread={() => {
+                  closeConversationMenu();
+                  void handleShareThread();
+                }}
+              />
 
               <Text
                 style={[
@@ -2304,49 +2028,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingBottom: 12,
   },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: 8,
-    paddingBottom: 14,
-  },
-  iconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 6,
-  },
-  wordmark: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 1,
-  },
-  wordmarkText: {
-    fontSize: 24,
-    letterSpacing: 0.8,
-    fontFamily: fonts.displayHeavy,
-  },
-  compactBrand: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  compactBrandText: {
-    fontSize: 14,
-    letterSpacing: 0.6,
-    fontFamily: fonts.displayHeavy,
-  },
   heroCard: {
     borderRadius: 28,
     borderWidth: 1,
@@ -2537,39 +2218,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-  },
-  conversationMenu: {
-    position: "absolute",
-    right: 16,
-    width: 196,
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 8,
-    gap: 2,
-    zIndex: 5,
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.16,
-    shadowRadius: 28,
-    elevation: 10,
-  },
-  conversationMenuBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 4,
-  },
-  conversationMenuModal: {
-    top: 52,
-  },
-  conversationMenuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    borderRadius: 16,
-  },
-  conversationMenuText: {
-    fontSize: 14,
-    fontFamily: fonts.body,
   },
   expandButton: {
     flexDirection: "row",
