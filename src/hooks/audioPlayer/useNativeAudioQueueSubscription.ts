@@ -17,6 +17,11 @@ import {
   recordSpeechDiagnostic,
 } from "../../services/speech/diagnostics";
 import { logWaveformDebug } from "../../utils/waveformDebug";
+import {
+  type AudioQueueItem,
+  type NativeAudioQueueContext,
+  type NativeSpeechQueueItem,
+} from "./types";
 
 export function useNativeAudioQueueSubscription(params: {
   usingNativeAudioQueue: boolean;
@@ -30,35 +35,19 @@ export function useNativeAudioQueueSubscription(params: {
   ) => void;
   stopNativeOutputWaveform: () => void;
   setNativeAudioQueuePlaying: Dispatch<SetStateAction<boolean>>;
-  currentAudioRef: MutableRefObject<{
-    id: string;
-    uri: string;
-    diagnostics?: SpeechDiagnosticsContext;
-  } | null>;
+  currentAudioRef: MutableRefObject<AudioQueueItem | null>;
   cancelledRef: MutableRefObject<boolean>;
   playingRef: MutableRefObject<boolean>;
   hasSeenAudioPlayingRef: MutableRefObject<boolean>;
   nativeOutputWaveformItemIdRef: MutableRefObject<string | null>;
   nativeOutputWaveformStartedAtRef: MutableRefObject<number | null>;
   nativeAudioQueueContextsRef: MutableRefObject<
-    Map<
-      string,
-      {
-        uri: string;
-        diagnostics?: SpeechDiagnosticsContext;
-        waveformAnalysis?: Promise<NativeWaveformAnalysis | null>;
-      }
-    >
+    Map<string, NativeAudioQueueContext>
   >;
   nativeAudioQueuePendingCountRef: MutableRefObject<number>;
   nativeAudioQueuePlayingRef: MutableRefObject<boolean>;
   nativeQueueRef: MutableRefObject<
-    Array<{
-      id: string;
-      text: string;
-      voice?: string;
-      diagnostics?: SpeechDiagnosticsContext;
-    }>
+    NativeSpeechQueueItem[]
   >;
 }) {
   const {

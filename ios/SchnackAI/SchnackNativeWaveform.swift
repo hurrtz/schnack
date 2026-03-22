@@ -12,6 +12,9 @@ final class SchnackNativeWaveform: RCTEventEmitter {
   private static let inputReferenceFloor: Float = 0.11
 
   private let stateLock = NSLock()
+  private let inputProcessor = SchnackWaveformInputProcessor(
+    referenceFloor: SchnackNativeWaveform.inputReferenceFloor
+  )
   private var hasListeners = false
   private var audioEngine: AVAudioEngine?
   private var audioFile: AVAudioFile?
@@ -24,9 +27,6 @@ final class SchnackNativeWaveform: RCTEventEmitter {
   )
   private var rollingCursor = 0
   private var rollingFilled = false
-  private var inputReferenceLevel = SchnackNativeWaveform.inputReferenceFloor
-  private var inputVisualGain: Float = 1
-  private var inputEnvelopeLevel: Float = 0
   private var pendingRecordingErrorSessionId: String?
 
   override static func requiresMainQueueSetup() -> Bool {
@@ -148,7 +148,7 @@ final class SchnackNativeWaveform: RCTEventEmitter {
           }
 
           self.appendRollingSamples(
-            self.extractInputEnvelopeSamples(
+            self.inputProcessor.extractEnvelopeSamples(
               from: buffer,
               targetCount: Self.inputSampleChunkCount
             )
@@ -251,7 +251,10 @@ final class SchnackNativeWaveform: RCTEventEmitter {
 
         try audioFile.read(into: buffer)
 
-        let samples = self.extractPeakSamples(from: buffer, targetCount: targetCount)
+        let samples = SchnackWaveformAudioAnalysis.extractPeakSamples(
+          from: buffer,
+          targetCount: targetCount
+        )
         let durationMs =
           Double(audioFile.length) / audioFile.processingFormat.sampleRate * 1000
 
@@ -458,27 +461,23 @@ final class SchnackNativeWaveform: RCTEventEmitter {
     )
     rollingCursor = 0
     rollingFilled = false
-    inputReferenceLevel = Self.inputReferenceFloor
-    inputVisualGain = 1
-    inputEnvelopeLevel = 0
     stateLock.unlock()
 
+    inputProcessor.reset()
     SchnackWaveformCoordinator.shared.clear(channel: .input)
   }
 
   private func appendRollingSamples(_ samples: [Float]) {
-    let shapedSamples = shapeInputSamples(samples)
+    let shapedSamples = inputProcessor.shape(samples: samples)
 
     stateLock.lock()
-
     for sample in shapedSamples {
-      rollingSamples[rollingCursor] = clampSample(sample)
+      rollingSamples[rollingCursor] = SchnackWaveformAudioAnalysis.clamp(sample: sample)
       rollingCursor = (rollingCursor + 1) % rollingSamples.count
       if rollingCursor == 0 {
         rollingFilled = true
       }
     }
-
     let orderedSamples = orderedRollingSamplesLocked()
     stateLock.unlock()
 
@@ -487,123 +486,6 @@ final class SchnackNativeWaveform: RCTEventEmitter {
       samples: orderedSamples,
       appendedCount: shapedSamples.count
     )
-  }
-
-  private func shapeInputSamples(_ samples: [Float]) -> [Float] {
-    guard !samples.isEmpty else {
-      return samples
-    }
-
-    let averageMagnitude =
-      samples.reduce(Float.zero) { partialResult, sample in
-        partialResult + sample
-      } / Float(max(1, samples.count))
-
-    let isNearSilence = averageMagnitude < 0.01
-    let detectedLevel =
-      isNearSilence
-        ? Float.zero
-        : averageMagnitude * 2.85
-
-    if isNearSilence {
-      inputReferenceLevel = max(Self.inputReferenceFloor, inputReferenceLevel * 0.992)
-    } else {
-      inputReferenceLevel = max(
-        Self.inputReferenceFloor,
-        detectedLevel > inputReferenceLevel
-          ? inputReferenceLevel * 0.94 + detectedLevel * 0.06
-          : inputReferenceLevel * 0.985 + detectedLevel * 0.015
-      )
-    }
-
-    let targetGain =
-      isNearSilence
-        ? Float(1)
-        : min(
-            Float(8.8),
-            max(
-              Float(2.1),
-              Float(0.8) / max(Self.inputReferenceFloor, inputReferenceLevel)
-            )
-          )
-
-    if abs(targetGain - inputVisualGain) > 0.025 {
-      inputVisualGain =
-        targetGain > inputVisualGain
-          ? inputVisualGain * 0.968 + targetGain * 0.032
-          : inputVisualGain * 0.989 + targetGain * 0.011
-    }
-
-    let shapedSamples = samples.map { sample -> Float in
-      guard sample >= 0.0035 else {
-        return Float.zero
-      }
-
-      let shapedMagnitude = powf(sample, 0.68)
-      return clampSample(shapedMagnitude * inputVisualGain)
-    }
-
-    return shapedSamples.enumerated().map { index, sample in
-      let previous = shapedSamples[index - 1 >= 0 ? index - 1 : index]
-      let next = shapedSamples[index + 1 < shapedSamples.count ? index + 1 : index]
-      return clampSample(previous * 0.26 + sample * 0.48 + next * 0.26)
-    }
-  }
-
-  private func extractInputEnvelopeSamples(
-    from buffer: AVAudioPCMBuffer,
-    targetCount: Int
-  ) -> [Float] {
-    let frameCount = Int(buffer.frameLength)
-    guard frameCount > 0, targetCount > 0 else {
-      return Array(repeating: 0, count: max(0, targetCount))
-    }
-
-    let channelCount = Int(buffer.format.channelCount)
-    let chunkSize = max(1, frameCount / targetCount)
-    var nextEnvelopeLevel = inputEnvelopeLevel
-
-    let samples = (0..<targetCount).map { index in
-      let start = index * chunkSize
-      let end =
-        index == targetCount - 1
-          ? frameCount
-          : min(frameCount, start + chunkSize)
-
-      guard start < end else {
-        return nextEnvelopeLevel
-      }
-
-      var energySum: Float = 0
-      var peakMagnitude: Float = 0
-      var sampleCount = 0
-
-      for frameIndex in start..<end {
-        let sample =
-          (0..<channelCount).reduce(Float.zero) { partialResult, channelIndex in
-            partialResult + sampleValue(in: buffer, channel: channelIndex, frame: frameIndex)
-          } / Float(max(1, channelCount))
-
-        let magnitude = abs(sample)
-        energySum += magnitude * magnitude
-        peakMagnitude = max(peakMagnitude, magnitude)
-        sampleCount += 1
-      }
-
-      guard sampleCount > 0 else {
-        return nextEnvelopeLevel
-      }
-
-      let rms = sqrtf(energySum / Float(sampleCount))
-      let targetEnvelope = min(1, max(rms * 2.2, peakMagnitude * 0.65))
-      let attack: Float = targetEnvelope > nextEnvelopeLevel ? 0.32 : 0.08
-      nextEnvelopeLevel += (targetEnvelope - nextEnvelopeLevel) * attack
-
-      return clampSample(nextEnvelopeLevel)
-    }
-
-    inputEnvelopeLevel = nextEnvelopeLevel
-    return samples
   }
 
   private func snapshotRollingSamples() -> [Double] {
@@ -623,73 +505,6 @@ final class SchnackNativeWaveform: RCTEventEmitter {
     return
       Array(repeating: 0, count: rollingSamples.count - rollingCursor) +
       Array(rollingSamples[..<rollingCursor])
-  }
-
-  private func extractPeakSamples(
-    from buffer: AVAudioPCMBuffer,
-    targetCount: Int
-  ) -> [Float] {
-    let frameCount = Int(buffer.frameLength)
-    guard frameCount > 0, targetCount > 0 else {
-      return Array(repeating: 0, count: max(0, targetCount))
-    }
-
-    let channelCount = Int(buffer.format.channelCount)
-    let chunkSize = max(1, frameCount / targetCount)
-
-    return (0..<targetCount).map { index in
-      let start = index * chunkSize
-      let end =
-        index == targetCount - 1
-          ? frameCount
-          : min(frameCount, start + chunkSize)
-
-      var peakSample: Float = 0
-
-      if start >= end {
-        return peakSample
-      }
-
-      for frameIndex in start..<end {
-        let sample =
-          (0..<channelCount).reduce(Float.zero) { partialResult, channelIndex in
-            partialResult + sampleValue(in: buffer, channel: channelIndex, frame: frameIndex)
-          } / Float(max(1, channelCount))
-
-        if abs(sample) > abs(peakSample) {
-          peakSample = sample
-        }
-      }
-
-      return clampSample(peakSample * 1.5)
-    }
-  }
-
-  private func sampleValue(
-    in buffer: AVAudioPCMBuffer,
-    channel: Int,
-    frame: Int
-  ) -> Float {
-    switch buffer.format.commonFormat {
-    case .pcmFormatFloat32:
-      return buffer.floatChannelData?[channel][frame] ?? 0
-    case .pcmFormatFloat64:
-      let audioBuffers = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
-      guard
-        channel < audioBuffers.count,
-        let data = audioBuffers[channel].mData?.assumingMemoryBound(to: Double.self)
-      else {
-        return 0
-      }
-
-      return Float(data[frame])
-    case .pcmFormatInt16:
-      return Float(buffer.int16ChannelData?[channel][frame] ?? 0) / Float(Int16.max)
-    case .pcmFormatInt32:
-      return Float(buffer.int32ChannelData?[channel][frame] ?? 0) / Float(Int32.max)
-    default:
-      return 0
-    }
   }
 
   private func resolveOutputURL(from uri: String?) throws -> URL {
@@ -731,9 +546,5 @@ final class SchnackNativeWaveform: RCTEventEmitter {
     }
 
     return url
-  }
-
-  private func clampSample(_ sample: Float) -> Float {
-    min(1, max(-1, sample))
   }
 }

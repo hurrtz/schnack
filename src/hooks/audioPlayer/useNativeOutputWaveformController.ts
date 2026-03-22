@@ -1,6 +1,5 @@
 import { Dispatch, MutableRefObject, SetStateAction, useCallback, useRef } from "react";
 
-import { type SpeechDiagnosticsContext } from "../../services/speech/diagnostics";
 import {
   analyzeNativeAudioFile,
   type NativeWaveformAnalysis,
@@ -22,12 +21,7 @@ import {
   OSCILLOSCOPE_TICK_INTERVAL_MS,
   VISUAL_UPDATE_INTERVAL_MS,
 } from "./shared";
-
-type NativeAudioQueueContext = {
-  uri: string;
-  diagnostics?: SpeechDiagnosticsContext;
-  waveformAnalysis?: Promise<NativeWaveformAnalysis | null>;
-};
+import { type NativeAudioQueueContext } from "./types";
 
 interface UseNativeOutputWaveformControllerParams {
   nativeAudioQueueContextsRef: MutableRefObject<

@@ -1,21 +1,24 @@
-import { type MutableRefObject, useCallback, useState } from "react";
+import {
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+  useCallback,
+} from "react";
 
 import * as Speech from "expo-speech";
 
 import { SpeechDiagnosticsContext, recordSpeechDiagnostic } from "../../services/speech/diagnostics";
 import { nextPlaybackJobId } from "./shared";
+import { type AudioQueueItem, type NativeSpeechQueueItem } from "./types";
 
 export function useNativeSpeechPlayback(params: {
+  nativeSpeaking: boolean;
+  setNativeSpeaking: Dispatch<SetStateAction<boolean>>;
   nativeQueueRef: MutableRefObject<
-    Array<{
-      id: string;
-      text: string;
-      voice?: string;
-      diagnostics?: SpeechDiagnosticsContext;
-    }>
+    NativeSpeechQueueItem[]
   >;
   queueRef: MutableRefObject<
-    Array<{ id: string; uri: string; diagnostics?: SpeechDiagnosticsContext }>
+    AudioQueueItem[]
   >;
   currentAudioRef: MutableRefObject<{
     id: string;
@@ -34,6 +37,8 @@ export function useNativeSpeechPlayback(params: {
   updatePendingPlaybackState: () => void;
 }) {
   const {
+    nativeSpeaking,
+    setNativeSpeaking,
     nativeQueueRef,
     queueRef,
     currentAudioRef,
@@ -48,7 +53,6 @@ export function useNativeSpeechPlayback(params: {
     stopNativeMetering,
     updatePendingPlaybackState,
   } = params;
-  const [nativeSpeaking, setNativeSpeaking] = useState(false);
 
   const playNextNative = useCallback(async () => {
     if (
@@ -188,10 +192,11 @@ export function useNativeSpeechPlayback(params: {
       finalizeDrainedState();
     }
   }, [
-    cancelledRef,
+      cancelledRef,
     currentAudioRef,
     ensurePlaybackSession,
     finalizeDrainedState,
+    nativeSpeaking,
     nativeQueueRef,
     nativeSpeakingRef,
     playNextAudio,
@@ -248,8 +253,6 @@ export function useNativeSpeechPlayback(params: {
   );
 
   return {
-    nativeSpeaking,
-    setNativeSpeaking,
     playNextNative,
     speakText,
   };

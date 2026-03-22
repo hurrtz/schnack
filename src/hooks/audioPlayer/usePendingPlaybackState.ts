@@ -3,19 +3,7 @@ import { MutableRefObject, useCallback, useRef, useState } from "react";
 import { type SpeechDiagnosticsContext, recordSpeechDiagnostic } from "../../services/speech/diagnostics";
 
 import { PLAYBACK_ROUTE_SETTLE_MS } from "./shared";
-
-interface AudioQueueItem {
-  id: string;
-  uri: string;
-  diagnostics?: SpeechDiagnosticsContext;
-}
-
-interface NativeSpeechQueueItem {
-  id: string;
-  text: string;
-  voice?: string;
-  diagnostics?: SpeechDiagnosticsContext;
-}
+import { type AudioQueueItem, type NativeSpeechQueueItem } from "./types";
 
 interface UsePendingPlaybackStateParams {
   currentAudioRef: MutableRefObject<AudioQueueItem | null>;
