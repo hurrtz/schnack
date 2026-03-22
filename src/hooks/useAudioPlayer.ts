@@ -2,8 +2,6 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { Platform } from "react-native";
 import * as Speech from "expo-speech";
 import {
-  setAudioModeAsync,
-  setIsAudioActiveAsync,
   useAudioPlayer as useExpoAudioPlayer,
   useAudioSampleListener,
   useAudioPlayerStatus,
@@ -22,42 +20,29 @@ import {
   type NativeAudioQueueEvent,
 } from "../services/nativeAudioQueue";
 import {
-  analyzeNativeAudioFile,
   type NativeWaveformAnalysis,
-  startNativeOutputWaveformPlayback,
-  stopNativeOutputWaveformPlayback,
+  supportsNativeOutputWaveformPlayback,
 } from "../services/nativeWaveform";
 import { WaveformVisualizationVariant } from "../types";
 import {
   EMPTY_VISUAL_LEVELS,
-  OSCILLOSCOPE_SAMPLE_COUNT,
   averageLevels,
   averageSampleMagnitude,
   blendWaveformSamples,
   buildFallbackSpeechLevels,
   buildSampleWaveform,
-  getTrailingWaveformWindow,
   levelToMetering,
 } from "../utils/audioVisualization";
 import { logWaveformDebug } from "../utils/waveformDebug";
-import { supportsNativeOutputWaveformPlayback } from "../services/nativeWaveform";
-
-const PLAYER_STATUS_INTERVAL_MS = 250;
-const VISUAL_UPDATE_INTERVAL_MS = 150;
-const OSCILLOSCOPE_TICK_INTERVAL_MS = 16;
-const PLAYBACK_ROUTE_SETTLE_MS = 650;
-
-export interface PlayerState {
-  isPlaying: boolean;
-  hasPendingPlayback: boolean;
-  meteringData: number;
-  waveformData: number[];
-  waveformVariant: WaveformVisualizationVariant;
-}
-
-function nextPlaybackJobId(prefix: "audio" | "native") {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
+import {
+  nextPlaybackJobId,
+  PLAYER_STATUS_INTERVAL_MS,
+  PlayerState,
+  VISUAL_UPDATE_INTERVAL_MS,
+} from "./audioPlayer/shared";
+import { useNativeOutputWaveformController } from "./audioPlayer/useNativeOutputWaveformController";
+import { usePendingPlaybackState } from "./audioPlayer/usePendingPlaybackState";
+import { usePlaybackSession } from "./audioPlayer/usePlaybackSession";
 
 export function useAudioPlayer() {
   const usingNativeAudioQueue =
@@ -73,7 +58,6 @@ export function useAudioPlayer() {
   const [waveformData, setWaveformData] = useState(EMPTY_VISUAL_LEVELS);
   const [waveformVariant, setWaveformVariant] =
     useState<WaveformVisualizationVariant>("bars");
-  const [hasPendingPlayback, setHasPendingPlayback] = useState(false);
   const queueRef = useRef<
     Array<{ id: string; uri: string; diagnostics?: SpeechDiagnosticsContext }>
   >([]);
@@ -99,9 +83,6 @@ export function useAudioPlayer() {
   >(new Map());
   const nativeAudioQueuePendingCountRef = useRef(0);
   const nativeAudioQueuePlayingRef = useRef(false);
-  const waveformAnalysisCacheRef = useRef<
-    Map<string, Promise<NativeWaveformAnalysis | null>>
-  >(new Map());
   const nativeQueueRef = useRef<
     Array<{
       id: string;
@@ -111,17 +92,50 @@ export function useAudioPlayer() {
     }>
   >([]);
   const nativeSpeakingRef = useRef(false);
-  const nativeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const nativeOutputWaveformIntervalRef =
-    useRef<ReturnType<typeof setInterval> | null>(null);
-  const nativeOutputWaveformItemIdRef = useRef<string | null>(null);
-  const nativeOutputWaveformStartedAtRef = useRef<number | null>(null);
-  const audioSessionReadyRef = useRef(false);
-  const audioSessionPromiseRef = useRef<Promise<void> | null>(null);
-  const drainResolversRef = useRef<Array<() => void>>([]);
-  const lastPlaybackEndedAtRef = useRef(0);
   const [nativeSpeaking, setNativeSpeaking] = useState(false);
-  const [nativeAudioQueuePlaying, setNativeAudioQueuePlaying] = useState(false);
+  const [nativeAudioQueuePlaying, setNativeAudioQueuePlaying] =
+    useState(false);
+  const { ensurePlaybackSession, resetPlaybackSession } =
+    usePlaybackSession();
+  const {
+    clearNativeAudioQueueState,
+    getWaveformAnalysis,
+    nativeOutputWaveformItemIdRef,
+    nativeOutputWaveformStartedAtRef,
+    startNativeMetering,
+    startNativeOutputWaveform,
+    stopNativeMetering,
+    stopNativeOutputWaveform,
+  } = useNativeOutputWaveformController({
+    nativeAudioQueueContextsRef,
+    nativeAudioQueuePendingCountRef,
+    nativeAudioQueuePlayingRef,
+    setMeteringData,
+    setNativeAudioQueuePlaying,
+    setWaveformData,
+    setWaveformVariant,
+    supportsNativeOutputWaveform,
+    usingNativeAudioQueue,
+  });
+  const {
+    hasPendingPlayback,
+    hasPendingPlaybackNow,
+    markPlaybackEnded,
+    resolveDrainWaiters,
+    updatePendingPlaybackState,
+    waitForDrain,
+    waitForPlaybackRouteSettle: waitForPlaybackRouteSettleInternal,
+  } = usePendingPlaybackState({
+    currentAudioRef,
+    nativeAudioQueuePendingCountRef,
+    nativeAudioQueuePlayingRef,
+    nativeQueueRef,
+    nativeSpeakingRef,
+    playingRef,
+    queueRef,
+    startingRef,
+    usingNativeAudioQueue,
+  });
 
   useEffect(() => {
     logWaveformDebug("audio-player-init", {
@@ -138,44 +152,6 @@ export function useAudioPlayer() {
     setWaveformVariant("bars");
   }, []);
 
-  const stopNativeMetering = useCallback(() => {
-    if (nativeIntervalRef.current) {
-      clearInterval(nativeIntervalRef.current);
-      nativeIntervalRef.current = null;
-    }
-  }, []);
-
-  const stopNativeOutputWaveform = useCallback(() => {
-    if (usingNativeAudioQueue) {
-      logWaveformDebug("output-waveform-stop-requested", {
-        itemId: nativeOutputWaveformItemIdRef.current ?? null,
-        usingNativeAudioQueue,
-        supportsNativeOutputWaveform,
-      });
-      void stopNativeOutputWaveformPlayback(
-        nativeOutputWaveformItemIdRef.current ?? null
-      );
-    }
-
-    if (nativeOutputWaveformIntervalRef.current) {
-      clearInterval(nativeOutputWaveformIntervalRef.current);
-      nativeOutputWaveformIntervalRef.current = null;
-    }
-
-    nativeOutputWaveformItemIdRef.current = null;
-    nativeOutputWaveformStartedAtRef.current = null;
-    setWaveformVariant("bars");
-  }, [supportsNativeOutputWaveform, usingNativeAudioQueue]);
-
-  const clearNativeAudioQueueState = useCallback(() => {
-    nativeAudioQueueContextsRef.current.clear();
-    nativeAudioQueuePendingCountRef.current = 0;
-    nativeAudioQueuePlayingRef.current = false;
-    waveformAnalysisCacheRef.current.clear();
-    setNativeAudioQueuePlaying(false);
-    stopNativeOutputWaveform();
-  }, [stopNativeOutputWaveform]);
-
   const removeLoadedAudio = useCallback(() => {
     if (!loadedSourceRef.current) {
       return;
@@ -184,143 +160,6 @@ export function useAudioPlayer() {
     player.remove();
     loadedSourceRef.current = false;
   }, [player]);
-
-  const startNativeMetering = useCallback(() => {
-    stopNativeMetering();
-    setWaveformVariant("bars");
-
-    const baseTime = Date.now() / 1000;
-    nativeIntervalRef.current = setInterval(() => {
-      const levels = buildFallbackSpeechLevels(baseTime + Date.now() / 700);
-      setWaveformData(levels);
-      setMeteringData(levelToMetering(averageLevels(levels)));
-    }, VISUAL_UPDATE_INTERVAL_MS);
-  }, [stopNativeMetering]);
-
-  const getWaveformAnalysis = useCallback((uri: string) => {
-    const cached = waveformAnalysisCacheRef.current.get(uri);
-    if (cached) {
-      return cached;
-    }
-
-    const next = analyzeNativeAudioFile({
-      uri,
-      sampleCount: 960,
-    }).catch(() => null);
-
-    waveformAnalysisCacheRef.current.set(uri, next);
-    return next;
-  }, []);
-
-  const startNativeOutputWaveform = useCallback(
-    (itemId: string, analysis: NativeWaveformAnalysis) => {
-      if (!analysis.samples.length || analysis.durationMs <= 0) {
-        logWaveformDebug("output-waveform-skipped", {
-          itemId,
-          reason: "empty-analysis",
-          durationMs: analysis.durationMs,
-          sampleCount: analysis.samples.length,
-        });
-        return;
-      }
-
-      logWaveformDebug("output-waveform-primed", {
-        itemId,
-        durationMs: analysis.durationMs,
-        sampleCount: analysis.samples.length,
-        usingNativeAudioQueue,
-        supportsNativeOutputWaveform,
-      });
-      stopNativeOutputWaveform();
-      nativeOutputWaveformItemIdRef.current = itemId;
-      nativeOutputWaveformStartedAtRef.current = Date.now();
-      setWaveformVariant("oscilloscope");
-      void startNativeOutputWaveformPlayback({
-        itemId,
-        samples: analysis.samples,
-        durationMs: analysis.durationMs,
-      });
-
-      const tick = () => {
-        if (nativeOutputWaveformItemIdRef.current !== itemId) {
-          return;
-        }
-
-        const startedAt = nativeOutputWaveformStartedAtRef.current ?? Date.now();
-        const progress = Math.min(
-          1,
-          Math.max(0, (Date.now() - startedAt) / Math.max(1, analysis.durationMs))
-        );
-        const samples = getTrailingWaveformWindow(
-          analysis.samples,
-          progress,
-          OSCILLOSCOPE_SAMPLE_COUNT
-        );
-
-        setWaveformData(samples);
-        setMeteringData(levelToMetering(averageSampleMagnitude(samples)));
-      };
-
-      tick();
-      nativeOutputWaveformIntervalRef.current = setInterval(
-        tick,
-        OSCILLOSCOPE_TICK_INTERVAL_MS
-      );
-    },
-    [stopNativeOutputWaveform, supportsNativeOutputWaveform, usingNativeAudioQueue]
-  );
-
-  const hasPendingPlaybackNow = useCallback(() => {
-    const hasAudioQueuePending = usingNativeAudioQueue
-      ? nativeAudioQueuePendingCountRef.current > 0 ||
-        nativeAudioQueuePlayingRef.current
-      : startingRef.current ||
-        playingRef.current ||
-        currentAudioRef.current !== null ||
-        queueRef.current.length > 0;
-
-    return (
-      hasAudioQueuePending ||
-      nativeSpeakingRef.current ||
-      nativeQueueRef.current.length > 0
-    );
-  }, [usingNativeAudioQueue]);
-
-  const resolveDrainWaiters = useCallback(() => {
-    if (drainResolversRef.current.length === 0) {
-      return;
-    }
-
-    recordSpeechDiagnostic({
-      source: "unknown",
-      stage: "playback-drained",
-    });
-
-    const resolvers = [...drainResolversRef.current];
-    drainResolversRef.current = [];
-    resolvers.forEach((resolve) => resolve());
-  }, []);
-
-  const updatePendingPlaybackState = useCallback(() => {
-    const nextState = hasPendingPlaybackNow();
-    setHasPendingPlayback(nextState);
-
-    if (!nextState) {
-      resolveDrainWaiters();
-    }
-  }, [hasPendingPlaybackNow, resolveDrainWaiters]);
-
-  const resetPlaybackSession = useCallback(() => {
-    audioSessionReadyRef.current = false;
-    audioSessionPromiseRef.current = null;
-    void setIsAudioActiveAsync(false).catch(() => {
-      // Ignore audio-session teardown failures; the next playback attempt will re-prime it.
-    });
-  }, []);
-
-  const markPlaybackEnded = useCallback(() => {
-    lastPlaybackEndedAtRef.current = Date.now();
-  }, []);
 
   const finalizeDrainedState = useCallback(() => {
     markPlaybackEnded();
@@ -341,30 +180,6 @@ export function useAudioPlayer() {
     stopNativeOutputWaveform,
     updatePendingPlaybackState,
   ]);
-
-  const ensurePlaybackSession = useCallback(async () => {
-    if (audioSessionReadyRef.current) {
-      return;
-    }
-
-    if (!audioSessionPromiseRef.current) {
-      audioSessionPromiseRef.current = setIsAudioActiveAsync(true)
-        .then(() =>
-          setAudioModeAsync({
-            allowsRecording: false,
-            playsInSilentMode: true,
-          })
-        )
-        .then(() => {
-          audioSessionReadyRef.current = true;
-        })
-        .finally(() => {
-          audioSessionPromiseRef.current = null;
-        });
-    }
-
-    await audioSessionPromiseRef.current;
-  }, []);
 
   const ensureAudioQueuePlaybackSession = useCallback(async () => {
     if (!usingNativeAudioQueue) {
@@ -1118,32 +933,13 @@ export function useAudioPlayer() {
     [playNextNative, updatePendingPlaybackState],
   );
 
-  const waitForDrain = useCallback(() => {
-    if (!hasPendingPlaybackNow()) {
-      return Promise.resolve();
-    }
-
-    return new Promise<void>((resolve) => {
-      drainResolversRef.current.push(resolve);
-    });
-  }, [hasPendingPlaybackNow]);
-
   const waitForPlaybackRouteSettle = useCallback(async () => {
     if (Platform.OS !== "ios") {
       return;
     }
 
-    const elapsed = Date.now() - lastPlaybackEndedAtRef.current;
-    const remaining = PLAYBACK_ROUTE_SETTLE_MS - elapsed;
-
-    if (remaining <= 0) {
-      return;
-    }
-
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, remaining);
-    });
-  }, []);
+    await waitForPlaybackRouteSettleInternal();
+  }, [waitForPlaybackRouteSettleInternal]);
 
   const stopPlayback = useCallback(async () => {
     const hadPlayback =
