@@ -1,35 +1,18 @@
 import React, { useState, useCallback, useEffect } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { ChatTranscript } from "../components/ChatTranscript";
 import { ConversationMemoryModal } from "../components/ConversationMemoryModal";
 import { ConversationDrawer } from "../components/ConversationDrawer";
-import { ResponseModeToggle } from "../components/ResponseModeToggle";
 import { SettingsModal } from "../components/SettingsModal";
 import { SetupGuideModal } from "../components/SetupGuideModal";
 import { Toast } from "../components/Toast";
-import { ProviderIcon } from "../components/ProviderIcon";
-import { WaveformCircle } from "../components/WaveformCircle";
 import { getTtsListenLanguageLabel } from "../constants/localTts";
 import {
-  getProviderSttModelOptions,
-  getProviderTtsModelOptions,
-  getSttModelLabel,
-  getTtsVoiceLabel,
-  getTtsModelLabel,
-  getProviderModelName,
   PROVIDER_DEFAULT_STT_MODELS,
   PROVIDER_DEFAULT_TTS_MODELS,
   PROVIDER_DEFAULT_TTS_VOICES,
@@ -49,7 +32,6 @@ import {
   Provider,
   ResponseMode,
   TtsListenLanguage,
-  VoiceVisualPhase,
   WaveformVisualizationVariant,
 } from "../types";
 import {
@@ -61,34 +43,19 @@ import {
   getProviderValidationModel,
 } from "../utils/responseModes";
 import { MainScreenTopBar } from "./main/MainScreenTopBar";
+import { MainScreenRouteCard } from "./main/MainScreenRouteCard";
+import { MainScreenVoiceStage } from "./main/MainScreenVoiceStage";
 import { StatusDetailsModal } from "./main/StatusDetailsModal";
+import { TranscriptPreviewCard } from "./main/TranscriptPreviewCard";
+import { getMainScreenViewModel } from "./main/mainScreenViewModel";
 import { TranscriptModal } from "./main/TranscriptModal";
-import {
-  getStatusDisplayData,
-  getStatusIndicatorTone,
-} from "./main/statusSelectors";
 import { styles } from "./main/styles";
-import { getConversationUsageDisplayData } from "./main/usageSelectors";
 import { useConversationActions } from "./main/useConversationActions";
 import { useMainScreenUiState } from "./main/useMainScreenUiState";
 import { usePreviewVoiceController } from "./main/usePreviewVoiceController";
 import { useProviderAvailabilityGuards } from "./main/useProviderAvailabilityGuards";
 import { useSetupGuideController } from "./main/useSetupGuideController";
 import { useVoiceSessionController } from "./main/useVoiceSessionController";
-
-function getResponseModeLabel(
-  mode: ResponseMode,
-  t: ReturnType<typeof useLocalization>["t"],
-) {
-  switch (mode) {
-    case "quick":
-      return t("quickAndShallow");
-    case "normal":
-      return t("normal");
-    case "deep":
-      return t("deepThinking");
-  }
-}
 
 export function MainScreen() {
   const { colors, isDark } = useTheme();
@@ -182,17 +149,6 @@ export function MainScreen() {
       PROVIDER_DEFAULT_STT_MODELS[sttProvider] ||
       ""
     : "";
-  const sttStatusLabel =
-    settings.sttMode === "native"
-      ? t("appNative")
-      : sttProvider
-        ? `${PROVIDER_LABELS[sttProvider]}${
-            getProviderSttModelOptions(sttProvider).length > 1 &&
-            selectedSttModel
-              ? ` · ${getSttModelLabel(sttProvider, selectedSttModel)}`
-              : ""
-          }`
-        : t("noProviderYet");
   const selectedTtsVoice = ttsProvider
     ? settings.providerTtsVoices[ttsProvider] ||
       PROVIDER_DEFAULT_TTS_VOICES[ttsProvider] ||
@@ -204,8 +160,6 @@ export function MainScreen() {
       ""
     : "";
   const providerLabel = PROVIDER_LABELS[provider];
-  const modelLabel = getProviderModelName(provider, model);
-  const responseModeLabel = getResponseModeLabel(activeResponseMode, t);
   const isRecording =
     settings.sttMode === "native"
       ? nativeStt.isRecording
@@ -222,64 +176,6 @@ export function MainScreen() {
     settings.sttMode === "native"
       ? (nativeStt.waveformVariant as WaveformVisualizationVariant)
       : (recorder.waveformVariant as WaveformVisualizationVariant);
-  const ttsStatusLabel =
-    settings.ttsMode === "native"
-      ? t("systemVoice")
-      : settings.ttsMode === "local"
-        ? `${t("localTts")} · ${settings.ttsListenLanguages
-            .map((entry) => getTtsListenLanguageLabel(entry, language))
-            .join(", ")}`
-        : ttsProvider
-          ? `${PROVIDER_LABELS[ttsProvider]}${
-              getProviderTtsModelOptions(ttsProvider).length > 1 &&
-              selectedTtsModel
-                ? ` · ${getTtsModelLabel(ttsProvider, selectedTtsModel)}`
-                : ""
-            } · ${getTtsVoiceLabel(ttsProvider, selectedTtsVoice, language)}`
-          : t("noTtsProvider");
-  const readyLocalFallbackLanguages = settings.ttsListenLanguages.filter(
-    (entry) =>
-      localTtsPackStates[entry]?.supported &&
-      localTtsPackStates[entry]?.downloaded &&
-      localTtsPackStates[entry]?.verified,
-  );
-  const localFallbackStatusLabel =
-    readyLocalFallbackLanguages.length > 0
-      ? `${t("localTts")} · ${readyLocalFallbackLanguages
-          .map((entry) => getTtsListenLanguageLabel(entry, language))
-          .join(", ")}`
-      : null;
-  const providerFallbackStatusLabel =
-    ttsProvider &&
-    availableTtsProviders.includes(ttsProvider) &&
-    ttsApiKey
-      ? `${PROVIDER_LABELS[ttsProvider]}${
-          getProviderTtsModelOptions(ttsProvider).length > 1 && selectedTtsModel
-            ? ` · ${getTtsModelLabel(ttsProvider, selectedTtsModel)}`
-            : ""
-        } · ${getTtsVoiceLabel(ttsProvider, selectedTtsVoice, language)}`
-      : null;
-  const fallbackTtsStatusLabel =
-    settings.ttsMode === "local"
-      ? providerFallbackStatusLabel
-      : settings.ttsMode === "provider"
-        ? localFallbackStatusLabel
-        : null;
-  const metering = isRecording
-    ? recordingMetering
-    : player.isPlaying
-      ? player.meteringData
-      : -160;
-  const signalLevels = isRecording
-    ? recordingLevels
-    : player.isPlaying
-      ? player.waveformData
-      : undefined;
-  const signalWaveformVariant: WaveformVisualizationVariant = isRecording
-    ? recordingWaveformVariant
-    : player.isPlaying
-      ? (player.waveformVariant as WaveformVisualizationVariant)
-      : "bars";
 
   const showToast = useCallback((message: string, onRetry?: () => void) => {
     setToast({ message, onRetry });
@@ -328,18 +224,6 @@ export function MainScreen() {
   });
 
   const isBusy = pipelinePhase !== "idle";
-  const visualPhase: VoiceVisualPhase = isRecording
-    ? "recording"
-    : pipelinePhase === "transcribing"
-      ? "transcribing"
-      : player.isPlaying
-        ? "speaking"
-        : pipelinePhase === "synthesizing"
-          ? "synthesizing"
-        : pipelinePhase === "thinking"
-          ? "thinking"
-          : "idle";
-  const isActive = visualPhase !== "idle";
 
   const handleInstallLocalTtsLanguage = useCallback(
     async (languageCode: TtsListenLanguage) => {
@@ -505,49 +389,49 @@ export function MainScreen() {
     [language, settings],
   );
 
-  const baseMessages = activeConversation?.messages || [];
-  const lastAssistantReply =
-    [...baseMessages]
-      .reverse()
-      .find((message) => message.role === "assistant" && message.content.trim())
-      ?.content.trim() || "";
+  const {
+    activeConversationTitle,
+    fallbackTtsStatusLabel,
+    isActive,
+    lastAssistantReply,
+    messages,
+    metering,
+    routeModelLabel,
+    signalLevels,
+    signalWaveformVariant,
+    statusDisplay,
+    statusIndicatorTone,
+    sttStatusLabel,
+    ttsStatusLabel,
+    usageDisplay,
+    visualPhase,
+  } = getMainScreenViewModel({
+    activeConversation,
+    availableTtsProviders,
+    isRecording,
+    language,
+    localTtsPackStates,
+    model,
+    pipelinePhase,
+    player,
+    provider,
+    recordingMetering,
+    recordingLevels,
+    recordingWaveformVariant,
+    selectedSttModel,
+    selectedTtsModel,
+    selectedTtsVoice,
+    settings,
+    streamingText,
+    sttProvider,
+    t,
+    ttsApiKey,
+    ttsProvider,
+  });
 
   useEffect(() => {
     lastCompletedReplyRef.current = lastAssistantReply;
-  }, [lastAssistantReply]);
-
-  const messages = streamingText
-    ? [
-        ...baseMessages,
-        {
-          id: "streaming",
-          role: "assistant" as const,
-          content: streamingText,
-          model,
-          provider,
-          timestamp: new Date().toISOString(),
-        },
-      ]
-    : baseMessages;
-
-  const routeModelLabel = `${responseModeLabel} · ${providerLabel} · ${modelLabel}`;
-  const statusDisplay = getStatusDisplayData({
-    inputMode: settings.inputMode,
-    messageCount: messages.length,
-    pipelinePhase,
-    providerLabel,
-    t,
-    ttsProviderLabel: ttsProvider ? PROVIDER_LABELS[ttsProvider] : providerLabel,
-    visualPhase,
-  });
-  const statusIndicatorTone = getStatusIndicatorTone(visualPhase, pipelinePhase);
-  const activeConversationTitle =
-    activeConversation?.title.trim() || t("untitledConversation");
-  const usageDisplay = getConversationUsageDisplayData({
-    conversation: activeConversation,
-    showUsageStats: settings.showUsageStats,
-    t,
-  });
+  }, [lastAssistantReply, lastCompletedReplyRef]);
 
   return (
     <SafeAreaView
@@ -600,205 +484,44 @@ export function MainScreen() {
           contentContainerStyle={styles.defaultLayoutContent}
           showsVerticalScrollIndicator={false}
         >
-          <View
-            style={[
-              styles.heroCard,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                shadowColor: colors.glow,
-              },
-            ]}
-          >
-            <LinearGradient
-              colors={[colors.accentSoft, "rgba(255,255,255,0)"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.heroCardGlow}
-            />
-            {loaded && availableResponseModes.length > 0 ? (
-              <ResponseModeToggle
-                selected={activeResponseMode}
-                onSelect={handleResponseModeChange}
-                routes={settings.responseModes}
-                readyModes={availableResponseModes}
-              />
-            ) : (
-              <TouchableOpacity
-                style={[
-                  styles.providerEmptyState,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-                onPress={() => openSettings("groq")}
-                activeOpacity={0.9}
-              >
-                <View style={styles.providerEmptyHeader}>
-                  <View
-                    style={[
-                      styles.providerEmptyBadge,
-                      {
-                        backgroundColor: colors.backgroundSecondary,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  >
-                    <ProviderIcon provider="groq" color={colors.text} />
-                    <Text
-                      style={[
-                        styles.providerEmptyBadgeText,
-                        { color: colors.text },
-                      ]}
-                    >
-                      Groq
-                    </Text>
-                  </View>
-                  <Feather
-                    name="arrow-up-right"
-                    size={16}
-                    color={colors.accent}
-                  />
-                </View>
-                <Text
-                  style={[styles.providerEmptyTitle, { color: colors.text }]}
-                >
-                  {t("startWithGroq")}
-                </Text>
-                <Text
-                  style={[
-                    styles.providerEmptyText,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  {t("groqStarterDescription")}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <MainScreenRouteCard
+            activeResponseMode={activeResponseMode}
+            availableResponseModes={loaded ? availableResponseModes : []}
+            colors={colors}
+            onOpenGroqSettings={() => openSettings("groq")}
+            onSelectResponseMode={handleResponseModeChange}
+            responseModes={settings.responseModes}
+            t={t}
+          />
 
-          <View style={styles.stageBlock}>
-            <View
-              style={[styles.stageHalo, { backgroundColor: colors.glowStrong }]}
-            />
-            <WaveformCircle
-              metering={metering}
-              levels={signalLevels}
-              isActive={isActive}
-              phase={visualPhase}
-              providerLabel={providerLabel}
-              waveformVariant={signalWaveformVariant}
-              inputMode={settings.inputMode}
-              onPressIn={handlePressIn}
-              onPressOut={handlePressOut}
-              onPress={handleTogglePress}
-            />
-            <View
-              style={[
-                styles.statusStrip,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  shadowColor: colors.glow,
-                },
-              ]}
-            >
-              <View style={styles.statusStripCopy}>
-                <View style={styles.statusStripLead}>
-                  <View
-                    style={[
-                      styles.statusStripDot,
-                      {
-                        backgroundColor:
-                          statusIndicatorTone === "danger"
-                            ? colors.danger
-                            : statusIndicatorTone === "accent"
-                              ? colors.accent
-                              : statusIndicatorTone === "muted"
-                                ? colors.textMuted
-                                : statusIndicatorTone === "success"
-                                  ? colors.success
-                                  : colors.accentWarm,
-                      },
-                    ]}
-                  />
-                  <Text
-                    style={[styles.statusStripTitle, { color: colors.text }]}
-                  >
-                    {statusDisplay.actionLabel}
-                  </Text>
-                </View>
-                <Text
-                  style={[
-                    styles.statusStripDetail,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  {statusDisplay.statusDetail}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={[
-                  styles.statusStripInfoButton,
-                  {
-                    backgroundColor: colors.surfaceElevated,
-                    borderColor: colors.border,
-                  },
-                ]}
-                onPress={openStatusDetails}
-                activeOpacity={0.85}
-              >
-                <Feather name="info" size={16} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-          </View>
+          <MainScreenVoiceStage
+            colors={colors}
+            inputMode={settings.inputMode}
+            isActive={isActive}
+            metering={metering}
+            onOpenStatusDetails={openStatusDetails}
+            onPress={handleTogglePress}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            providerLabel={providerLabel}
+            signalLevels={signalLevels}
+            signalWaveformVariant={signalWaveformVariant}
+            statusDetail={statusDisplay.statusDetail}
+            statusIndicatorTone={statusIndicatorTone}
+            statusTitle={statusDisplay.actionLabel}
+            visualPhase={visualPhase}
+          />
 
-          {messages.length > 0 ? (
-            <View
-              style={[
-                styles.transcriptShell,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  shadowColor: colors.glow,
-                },
-              ]}
-            >
-              <View style={styles.transcriptHeader}>
-                <TouchableOpacity
-                  style={[
-                    styles.expandButton,
-                    {
-                      backgroundColor: colors.surfaceElevated,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={openTranscript}
-                >
-                  <Text
-                    style={[styles.expandButtonText, { color: colors.text }]}
-                  >
-                    {t("showTranscript")}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.transcriptBody}>
-                <ChatTranscript
-                  messages={messages}
-                  emptyTitle={t("noTranscriptYet")}
-                  emptyDescription={t("previewTranscriptEmptyDescription")}
-                  contentContainerStyle={styles.previewTranscriptContent}
-                  scrollEnabled={false}
-                  showUsageStats={settings.showUsageStats}
-                  onCopyMessage={(message) => {
-                    void handleCopyMessage(message.content);
-                  }}
-                />
-              </View>
-            </View>
-          ) : null}
+          <TranscriptPreviewCard
+            colors={colors}
+            messages={messages}
+            onCopyMessage={(message) => {
+              void handleCopyMessage(message.content);
+            }}
+            onOpenTranscript={openTranscript}
+            showUsageStats={settings.showUsageStats}
+            t={t}
+          />
         </ScrollView>
       </View>
 
