@@ -21,6 +21,8 @@
 		7C4A2D4D5A9E4A6FB6500108 /* SchnackWaveformInputProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C4A2D4D5A9E4A6FB6500008 /* SchnackWaveformInputProcessor.swift */; };
 		7C4A2D4D5A9E4A6FB6500109 /* SchnackWaveformMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C4A2D4D5A9E4A6FB6500009 /* SchnackWaveformMath.swift */; };
 		7C4A2D4D5A9E4A6FB650010A /* SchnackWaveformRendering.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C4A2D4D5A9E4A6FB650000A /* SchnackWaveformRendering.swift */; };
+		7C4A2D4D5A9E4A6FB650010B /* SchnackWaveformFileAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C4A2D4D5A9E4A6FB650000C /* SchnackWaveformFileAnalyzer.swift */; };
+		7C4A2D4D5A9E4A6FB650010C /* SchnackWaveformRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C4A2D4D5A9E4A6FB650000D /* SchnackWaveformRecorder.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		E2385A0D49ADF64A271D5FFE /* libPods-SchnackAI.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C2E18CB4910ACB38E443AFE /* libPods-SchnackAI.a */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
@@ -43,6 +45,8 @@
 		7C4A2D4D5A9E4A6FB6500008 /* SchnackWaveformInputProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SchnackWaveformInputProcessor.swift; path = SchnackWaveformInputProcessor.swift; sourceTree = "<group>"; };
 		7C4A2D4D5A9E4A6FB6500009 /* SchnackWaveformMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SchnackWaveformMath.swift; path = SchnackWaveformMath.swift; sourceTree = "<group>"; };
 		7C4A2D4D5A9E4A6FB650000A /* SchnackWaveformRendering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SchnackWaveformRendering.swift; path = SchnackWaveformRendering.swift; sourceTree = "<group>"; };
+		7C4A2D4D5A9E4A6FB650000C /* SchnackWaveformFileAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SchnackWaveformFileAnalyzer.swift; path = SchnackWaveformFileAnalyzer.swift; sourceTree = "<group>"; };
+		7C4A2D4D5A9E4A6FB650000D /* SchnackWaveformRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SchnackWaveformRecorder.swift; path = SchnackWaveformRecorder.swift; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = SchnackAI/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		C52F9AF8602F178C80F51B50 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SchnackAI/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
@@ -92,6 +96,8 @@
 				7C4A2D4D5A9E4A6FB6500008 /* SchnackWaveformInputProcessor.swift */,
 				7C4A2D4D5A9E4A6FB6500009 /* SchnackWaveformMath.swift */,
 				7C4A2D4D5A9E4A6FB650000A /* SchnackWaveformRendering.swift */,
+				7C4A2D4D5A9E4A6FB650000C /* SchnackWaveformFileAnalyzer.swift */,
+				7C4A2D4D5A9E4A6FB650000D /* SchnackWaveformRecorder.swift */,
 			);
 			name = Waveform;
 			path = SchnackAI/Waveform;
@@ -404,6 +410,8 @@
 				7C4A2D4D5A9E4A6FB6500108 /* SchnackWaveformInputProcessor.swift in Sources */,
 				7C4A2D4D5A9E4A6FB6500109 /* SchnackWaveformMath.swift in Sources */,
 				7C4A2D4D5A9E4A6FB650010A /* SchnackWaveformRendering.swift in Sources */,
+				7C4A2D4D5A9E4A6FB650010B /* SchnackWaveformFileAnalyzer.swift in Sources */,
+				7C4A2D4D5A9E4A6FB650010C /* SchnackWaveformRecorder.swift in Sources */,
 				6BBAA95B51D3F6322E30BD0D /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
