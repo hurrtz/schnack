@@ -7,7 +7,7 @@ import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useLocalization } from "../i18n";
-import { AppLanguage, Provider } from "../types";
+import { AppLanguage, Provider, TtsListenLanguage } from "../types";
 import { useTheme } from "../theme/ThemeContext";
 
 import { TABS } from "./settings/constants";
@@ -49,9 +49,9 @@ export function SettingsModal(props: SettingsModalProps) {
     activeTab,
     setActiveTab,
     providerPreviewTexts,
-    setProviderPreviewTexts,
+    setProviderPreviewText,
     localPreviewTexts,
-    setLocalPreviewTexts,
+    setLocalPreviewText,
     nativePreviewText,
     setNativePreviewText,
     activePreview,
@@ -252,23 +252,10 @@ export function SettingsModal(props: SettingsModalProps) {
                 onStopPreviewVoice={onStopPreviewVoice}
                 onSetProviderPreviewText={(
                   provider: Provider,
-                  language: string,
+                  language: TtsListenLanguage,
                   text: string,
-                ) => {
-                  setProviderPreviewTexts((previous) => ({
-                    ...previous,
-                    [provider]: {
-                      ...previous[provider],
-                      [language]: text,
-                    },
-                  }));
-                }}
-                onSetLocalPreviewText={(language, text) => {
-                  setLocalPreviewTexts((previous) => ({
-                    ...previous,
-                    [language]: text,
-                  }));
-                }}
+                ) => setProviderPreviewText(provider, language, text)}
+                onSetLocalPreviewText={setLocalPreviewText}
                 onSetNativePreviewText={setNativePreviewText}
                 onPreviewProviderVoice={handlePreviewProviderVoice}
                 onPreviewLocalVoice={handlePreviewLocalVoice}

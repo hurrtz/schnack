@@ -59,6 +59,13 @@ export type ProviderValidationState = {
 
 export type PreviewButtonPhase = "idle" | "generating" | "playing";
 
+export type ProviderPreviewTexts = Record<
+  Provider,
+  Record<TtsListenLanguage, string>
+>;
+
+export type LocalPreviewTexts = Record<TtsListenLanguage, string>;
+
 export type NativeSpeechVoice = Awaited<
   ReturnType<typeof Speech.getAvailableVoicesAsync>
 >[number];

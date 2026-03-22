@@ -4,9 +4,7 @@ import {
   type AppStateStatus,
   View,
   TouchableOpacity,
-  StyleSheet,
   GestureResponderEvent,
-  Text,
   Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
@@ -24,10 +22,9 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalization } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
-import { fonts } from "../theme/typography";
 import { Waveform } from "./Waveform";
+import { styles } from "./WaveformCircle.styles";
 import { NativeWaveformView } from "./NativeWaveformView";
 import { supportsNativeOutputWaveformPlayback } from "../services/nativeWaveform";
 import {
@@ -50,108 +47,6 @@ interface WaveformCircleProps {
   onPress?: () => void;
 }
 
-function ProcessingDot({
-  delay,
-  color,
-  isAnimating,
-}: {
-  delay: number;
-  color: string;
-  isAnimating: boolean;
-}) {
-  const opacity = useSharedValue(0.32);
-  const scale = useSharedValue(0.76);
-
-  useEffect(() => {
-    if (!isAnimating) {
-      cancelAnimation(opacity);
-      cancelAnimation(scale);
-      opacity.value = 0.32;
-      scale.value = 0.76;
-      return;
-    }
-
-    opacity.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(
-          withTiming(1, { duration: 320, easing: Easing.out(Easing.ease) }),
-          withTiming(0.32, { duration: 560, easing: Easing.inOut(Easing.ease) })
-        ),
-        -1,
-        false
-      )
-    );
-    scale.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(
-          withTiming(1.08, { duration: 320, easing: Easing.out(Easing.ease) }),
-          withTiming(0.76, { duration: 560, easing: Easing.inOut(Easing.ease) })
-        ),
-        -1,
-        false
-      )
-    );
-  }, [delay, isAnimating, opacity, scale]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <Animated.View
-      style={[
-        styles.processingDot,
-        { backgroundColor: color },
-        animatedStyle,
-      ]}
-    />
-  );
-}
-
-function ProcessingIndicator({
-  phase,
-  providerLabel,
-  isAnimating,
-}: {
-  phase: VoiceVisualPhase;
-  providerLabel: string;
-  isAnimating: boolean;
-}) {
-  const isThinking = phase === "thinking";
-  const { t } = useLocalization();
-
-  return (
-    <View style={styles.processingWrap}>
-      <View style={styles.processingDots}>
-        <ProcessingDot
-          delay={0}
-          color="rgba(255, 255, 255, 0.96)"
-          isAnimating={isAnimating}
-        />
-        <ProcessingDot
-          delay={170}
-          color="rgba(255, 255, 255, 0.9)"
-          isAnimating={isAnimating}
-        />
-        <ProcessingDot
-          delay={340}
-          color="rgba(255, 255, 255, 0.84)"
-          isAnimating={isAnimating}
-        />
-      </View>
-      <Text style={styles.processingLabel}>
-        {isThinking ? t("waitingForReply") : t("parsingYourVoice")}
-      </Text>
-      {isThinking ? (
-        <Text style={styles.processingSubLabel}>{providerLabel}</Text>
-      ) : null}
-    </View>
-  );
-}
-
 function RippleRing({
   delay,
   color,
@@ -165,20 +60,77 @@ function RippleRing({
 }) {
   const isActiveSV = useSharedValue(isActive);
   const intensitySV = useSharedValue(intensity);
-  useEffect(() => { isActiveSV.value = isActive; }, [isActive]);
-  useEffect(() => { intensitySV.value = intensity; }, [intensity]);
+  useEffect(() => {
+    isActiveSV.value = isActive;
+  }, [isActive, isActiveSV]);
+  useEffect(() => {
+    intensitySV.value = intensity;
+  }, [intensity, intensitySV]);
 
   const duration = useDerivedValue(() => 2500 - intensitySV.value * 1300);
   const peakOpacity = useDerivedValue(() => 0.1 + intensitySV.value * 0.25);
 
   const animatedStyle = useAnimatedStyle(() => {
-    if (!isActiveSV.value) return { opacity: 0, transform: [{ scale: 0.8 }] };
+    if (!isActiveSV.value) {
+      return { opacity: 0, transform: [{ scale: 0.8 }] };
+    }
+
     return {
-      opacity: withDelay(delay, withRepeat(withSequence(withTiming(peakOpacity.value, { duration: 0, easing: Easing.linear }), withTiming(0, { duration: duration.value, easing: Easing.out(Easing.ease) })), -1)),
-      transform: [{ scale: withDelay(delay, withRepeat(withSequence(withTiming(0.7, { duration: 0, easing: Easing.linear }), withTiming(1.4, { duration: duration.value, easing: Easing.out(Easing.ease) })), -1)) }],
+      opacity: withDelay(
+        delay,
+        withRepeat(
+          withSequence(
+            withTiming(peakOpacity.value, {
+              duration: 0,
+              easing: Easing.linear,
+            }),
+            withTiming(0, {
+              duration: duration.value,
+              easing: Easing.out(Easing.ease),
+            }),
+          ),
+          -1,
+        ),
+      ),
+      transform: [
+        {
+          scale: withDelay(
+            delay,
+            withRepeat(
+              withSequence(
+                withTiming(0.7, { duration: 0, easing: Easing.linear }),
+                withTiming(1.4, {
+                  duration: duration.value,
+                  easing: Easing.out(Easing.ease),
+                }),
+              ),
+              -1,
+            ),
+          ),
+        },
+      ],
     };
   });
-  return <Animated.View style={[{ position: "absolute", width: 190, height: 190, borderRadius: 95, borderWidth: 1.5, borderColor: color }, animatedStyle]} />;
+
+  return (
+    <Animated.View
+      style={[styles.rippleRing, { borderColor: color }, animatedStyle]}
+    />
+  );
+}
+
+function clearPreviousGradient(
+  token: number,
+  gradientTransitionTokenRef: React.MutableRefObject<number>,
+  setPreviousGradientColors: React.Dispatch<
+    React.SetStateAction<[string, string, string] | null>
+  >,
+) {
+  if (gradientTransitionTokenRef.current !== token) {
+    return;
+  }
+
+  setPreviousGradientColors(null);
 }
 
 export function WaveformCircle({
@@ -437,11 +389,6 @@ export function WaveformCircle({
             ? 24
           : 28;
 
-  const clearPreviousGradient = (token: number) => {
-    if (gradientTransitionTokenRef.current !== token) return;
-    setPreviousGradientColors(null);
-  };
-
   useEffect(() => {
     if (!previousGradientKeyRef.current || !previousGradientColorsRef.current) {
       previousGradientKeyRef.current = gradientColorKey;
@@ -469,7 +416,11 @@ export function WaveformCircle({
       },
       (finished) => {
         if (finished) {
-          runOnJS(clearPreviousGradient)(token);
+          runOnJS(clearPreviousGradient)(
+            token,
+            gradientTransitionTokenRef,
+            setPreviousGradientColors,
+          );
         }
       },
     );
@@ -918,145 +869,3 @@ export function WaveformCircle({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    width: 260,
-    height: 260,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  staticRing: {
-    position: "absolute",
-    borderWidth: 1,
-    opacity: 0.7,
-  },
-  staticRingOuter: {
-    width: 244,
-    height: 244,
-    borderRadius: 122,
-  },
-  staticRingInner: {
-    width: 208,
-    height: 208,
-    borderRadius: 104,
-  },
-  circle: {
-    width: 188,
-    height: 188,
-    borderRadius: 94,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  innerFrame: {
-    position: "absolute",
-    top: 14,
-    right: 14,
-    bottom: 14,
-    left: 14,
-    borderRadius: 80,
-    borderWidth: 1,
-  },
-  processingWrap: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-  },
-  micIconWrap: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  waveformWrap: {
-    marginTop: 18,
-  },
-  waveformWrapOscilloscope: {
-    marginTop: 0,
-  },
-  nativeWaveform: {
-    alignSelf: "center",
-  },
-  nativeWaveformInput: {
-    width: 164,
-    height: 36,
-  },
-  nativeWaveformOutput: {
-    width: 156,
-    height: 32,
-  },
-  backgroundGradient: {
-    position: "absolute",
-    width: 248,
-    height: 248,
-    borderRadius: 124,
-    overflow: "hidden",
-  },
-  backgroundGradientFill: {
-    flex: 1,
-  },
-  coreAura: {
-    position: "absolute",
-    borderRadius: 999,
-    overflow: "hidden",
-  },
-  coreAuraTop: {
-    top: -18,
-    left: -6,
-    width: 126,
-    height: 126,
-  },
-  coreAuraBottom: {
-    right: -18,
-    bottom: -16,
-    width: 138,
-    height: 138,
-  },
-  auraFill: {
-    flex: 1,
-  },
-  sheen: {
-    position: "absolute",
-    top: 24,
-    left: 26,
-    width: 136,
-    height: 136,
-    borderRadius: 32,
-    overflow: "hidden",
-  },
-  recordingGradientOverlay: {
-    position: "absolute",
-    width: 232,
-    height: 232,
-    borderRadius: 116,
-    overflow: "hidden",
-  },
-  recordingGradientOverlayFill: {
-    flex: 1,
-  },
-  processingDots: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    marginBottom: 16,
-  },
-  processingDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-  },
-  processingLabel: {
-    color: "#F6FBFF",
-    fontSize: 16,
-    textAlign: "center",
-    fontFamily: fonts.display,
-  },
-  processingSubLabel: {
-    marginTop: 6,
-    color: "rgba(246, 251, 255, 0.82)",
-    fontSize: 11,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    fontFamily: fonts.mono,
-  },
-});
