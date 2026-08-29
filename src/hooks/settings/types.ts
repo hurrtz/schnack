@@ -59,6 +59,7 @@ export const LEGACY_MODEL_FIELD_KEYS: Partial<
 export type SettingsLoadResult = {
   storedSettings: LegacyStoredSettings | undefined;
   apiKeys: ProviderApiKeys;
+  publicSettingsCorrupt?: boolean;
 };
 
 export type StoredProviderModels = Partial<ProviderModelSelections>;

@@ -29,13 +29,16 @@ export function useSettings() {
         console.warn("[local-models] failed to remove retired LLM artifacts", error);
       }),
     ])
-      .then(async ([{ storedSettings, apiKeys }]) => {
+      .then(async ([{ storedSettings, apiKeys, publicSettingsCorrupt }]) => {
         if (!mounted) {
           return;
         }
 
         const normalizedSettings = mergeSettings(storedSettings, apiKeys);
         setSettings(normalizedSettings);
+        if (publicSettingsCorrupt) {
+          return;
+        }
         await persistNormalizedPublicSettings(
           storedSettings,
           normalizedSettings,
