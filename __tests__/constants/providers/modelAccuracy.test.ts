@@ -195,8 +195,6 @@ describe("provider model accuracy", () => {
         "gpt-5.6-sol",
         "gpt-5.6-terra",
         "gpt-5.6-luna",
-        "gpt-realtime-2.1",
-        "gpt-realtime-2.1-mini",
       ]),
     );
     expect(PROVIDER_DEFAULT_MODELS.openai).toBe("gpt-5.6-sol");
@@ -207,6 +205,9 @@ describe("provider model accuracy", () => {
       expect.arrayContaining(["gpt-5.5-2026-04-23", "gpt-5.4-2026-03-05"]),
     );
     expect(providerModelIds("openai")).not.toContain("gpt-realtime-1.5");
+    expect(providerModelIds("openai")).not.toEqual(
+      expect.arrayContaining(["gpt-realtime-2.1", "gpt-realtime-2.1-mini"]),
+    );
   });
 
   it("keeps code-specific xAI models out of the voice-chat picker", () => {

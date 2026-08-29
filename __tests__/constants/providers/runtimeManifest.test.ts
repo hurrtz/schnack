@@ -110,6 +110,19 @@ describe("runtime provider manifest integrity", () => {
     },
   );
 
+  it("does not offer incomplete OpenAI Realtime models in the picker", () => {
+    const openai = RUNTIME_PROVIDER_MANIFEST.openai.llm;
+    expect(modelIds(openai.models)).not.toEqual(
+      expect.arrayContaining(["gpt-realtime-2.1", "gpt-realtime-2.1-mini"]),
+    );
+    if (openai.support === "provider") {
+      expect(openai.realtimeModelIds).toEqual([
+        "gpt-realtime-2.1",
+        "gpt-realtime-2.1-mini",
+      ]);
+    }
+  });
+
   it("does not expose duplicate runtime model ids within a capability", () => {
     for (const provider of RUNTIME_PROVIDER_ORDER as readonly Provider[]) {
       const manifest = RUNTIME_PROVIDER_MANIFEST[provider];

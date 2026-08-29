@@ -14,7 +14,7 @@ validations:
 provenance:
   intent: owner-confirmed and history-backfilled
   validation: test-backed
-last_validated_sha: 7db5c94
+last_validated_sha: b33648e
 ---
 
 # Runtime Provider Manifest Specification
@@ -60,9 +60,13 @@ provider offers both for the same model. Keep an alias only when no distinct
 stable ID exists. This makes saved routes, diagnostics, and release evidence
 reproducible.
 
-OpenAI models currently use the implemented Chat Completions or Realtime shape;
-Anthropic uses Messages; Gemini uses Generate Content. A model requiring a
-different API is excluded until its service path exists.
+OpenAI models currently use the implemented Chat Completions shape; Anthropic
+uses Messages; Gemini uses Generate Content. A model requiring a different API
+is excluded until its service path exists. OpenAI Realtime model IDs remain
+mapped to the incomplete WebSocket adapter for leftover stored routes and
+tests, but they are withheld from the user-facing picker until the Realtime
+session protocol (`OpenAI-Beta: realtime=v1` and `session.update`) is
+implemented.
 
 ## Capability Boundaries
 
