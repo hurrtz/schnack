@@ -318,7 +318,7 @@ export async function streamChat({
       });
     })().catch((error) => {
       if (timedOut) {
-        return null;
+        throw timeoutError;
       }
 
       throw error;
@@ -334,7 +334,7 @@ export async function streamChat({
     ]);
 
     if (timedOut || !resolvedRequest) {
-      return;
+      throw timeoutError;
     }
 
     const {
