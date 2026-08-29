@@ -31,6 +31,8 @@ const PROVIDER_MODEL_ALIAS_MIGRATIONS: Partial<
     "gpt-5.4-nano": "gpt-5.4-nano-2026-03-17",
     "gpt-4.1": "gpt-4.1-2025-04-14",
     "gpt-4.1-mini": "gpt-4.1-mini-2025-04-14",
+    "gpt-realtime-2.1": "gpt-5.6-sol",
+    "gpt-realtime-2.1-mini": "gpt-5.4-mini-2026-03-17",
   },
   "alibaba-qwen-dashscope": {
     "qwen3.7-plus": "qwen3.7-plus-2026-05-26",
