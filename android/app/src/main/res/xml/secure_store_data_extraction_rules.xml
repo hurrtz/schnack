@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Auto Backup / device-transfer configuration for Android 12 and higher.
+     Matches expo-secure-store 57.0.1 so encrypted API keys never enter cloud backup or device transfer. -->
+<data-extraction-rules>
+  <cloud-backup>
+    <include domain="sharedpref" path="."/>
+    <exclude domain="sharedpref" path="SecureStore"/>
+  </cloud-backup>
+  <device-transfer>
+    <include domain="sharedpref" path="."/>
+    <exclude domain="sharedpref" path="SecureStore"/>
+  </device-transfer>
+</data-extraction-rules>

@@ -3,6 +3,7 @@
   "entry": [
     "app/_layout.tsx",
     "app/index.tsx",
+    "app/store-promos.tsx",
     "plugins/*.js",
     "scripts/*.{mjs,ts}"
   ],
@@ -21,5 +22,5 @@
     "artifacts/**",
     "coverage/**"
   ],
-  "ignoreDependencies": ["expo-updates"]
+  "ignoreDependencies": ["react-native-web", "react-dom"]
 }
