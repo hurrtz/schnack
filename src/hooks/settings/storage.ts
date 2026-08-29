@@ -216,10 +216,36 @@ export async function loadStoredSettingsSnapshot(): Promise<SettingsLoadResult> 
     loadStoredApiKeys(),
   ]);
 
-  return {
-    storedSettings: raw ? (JSON.parse(raw) as LegacyStoredSettings) : undefined,
-    apiKeys,
-  };
+  if (!raw) {
+    return { storedSettings: undefined, apiKeys };
+  }
+
+  try {
+    return {
+      storedSettings: JSON.parse(raw) as LegacyStoredSettings,
+      apiKeys,
+    };
+  } catch (error) {
+    recordDebugLogEvent({
+      event: "persistence-operation-failed",
+      level: "warn",
+      payload: {
+        domain: "settings",
+        error,
+        operation: "parse-public-settings",
+      },
+    });
+    console.error(
+      "[settings-storage] failed to parse stored settings",
+      error,
+    );
+    reportPersistenceAlert("settings", "load");
+    return {
+      storedSettings: undefined,
+      apiKeys,
+      publicSettingsCorrupt: true,
+    };
+  }
 }
 
 export async function persistApiKey(provider: Provider, apiKey: string) {

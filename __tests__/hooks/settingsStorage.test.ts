@@ -1,7 +1,13 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 
 import { RUNTIME_PROVIDER_IDS } from "../../src/constants/providers/runtimeState";
-import { loadStoredApiKeys } from "../../src/hooks/settings/storage";
+import { mergeSettings } from "../../src/hooks/settings/mergeStoredSettings";
+import {
+  loadStoredApiKeys,
+  loadStoredSettingsSnapshot,
+  persistNormalizedPublicSettings,
+} from "../../src/hooks/settings/storage";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn(() => Promise.resolve(null)),
@@ -98,5 +104,34 @@ describe("settings storage", () => {
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(
       "mrbroccoli.provider_key.grok",
     );
+  });
+
+  it("hydrates SecureStore keys when public settings JSON is corrupt without rewriting it", async () => {
+    const consoleError = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce("{not-json");
+    (SecureStore.getItemAsync as jest.Mock).mockImplementation(
+      async (key: string) => (key.endsWith(".openai") ? "openai-key" : null),
+    );
+
+    const snapshot = await loadStoredSettingsSnapshot();
+
+    expect(snapshot.storedSettings).toBeUndefined();
+    expect(snapshot.publicSettingsCorrupt).toBe(true);
+    expect(snapshot.apiKeys.openai).toBe("openai-key");
+
+    const normalized = mergeSettings(snapshot.storedSettings, snapshot.apiKeys);
+    expect(normalized.apiKeys.openai).toBe("openai-key");
+
+    await persistNormalizedPublicSettings(snapshot.storedSettings, normalized);
+
+    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith(
+      "[settings-storage] failed to parse stored settings",
+      expect.any(SyntaxError),
+    );
+
+    consoleError.mockRestore();
   });
 });
