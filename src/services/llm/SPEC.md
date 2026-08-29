@@ -13,7 +13,7 @@ validations:
 provenance:
   intent: history-backfilled
   validation: test-backed
-last_validated_sha: 7db5c94
+last_validated_sha: b33648e
 ---
 
 # LLM Service Specification
@@ -108,7 +108,8 @@ transport that accepts a request but never returns data cannot hold a turn
 indefinitely. After activity begins, replies use a ten-minute inactivity
 timeout. Any stream activity resets that timer on every streaming transport,
 including thinking-only phases; an abort signal ends parsing and downstream
-callbacks.
+callbacks. A timeout always reports through `onError`; it must not lose the
+race to a null abort result and return silently.
 Chunks may render immediately and feed paragraph TTS, while only the completed
 guarded response is persisted.
 

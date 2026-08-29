@@ -14,7 +14,7 @@ validations:
 provenance:
   intent: history-backfilled
   validation: test-backed
-last_validated_sha: 7db5c94
+last_validated_sha: b33648e
 ---
 
 # Settings Persistence Specification
@@ -47,6 +47,11 @@ alert; they do not silently pretend success.
 
 Startup loads public settings, SecureStore keys, and runtime capability
 overrides before producing the normalized settings snapshot.
+
+A public-settings JSON parse failure is isolated from SecureStore hydration.
+Corrupt public JSON still loads provider keys, reports a persistence alert,
+and must not be overwritten with defaults. In-memory settings then use current
+defaults plus the hydrated keys until the stored public file is valid again.
 
 It also performs a best-effort one-time cleanup of the retired local-response
 directory. Cleanup targets only `local-models/llm`; downloaded STT and TTS

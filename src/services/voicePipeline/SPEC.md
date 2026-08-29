@@ -15,7 +15,7 @@ validations:
 provenance:
   intent: history-backfilled
   validation: test-backed
-last_validated_sha: 7db5c94
+last_validated_sha: b33648e
 ---
 
 # Voice Pipeline Specification
@@ -134,8 +134,9 @@ participant call.
 
 ## Response and Speech
 
-The final response uses either `streamLocalChat` or hosted `streamChat`. Stream
-chunks update the transcript only after the context-leak guard accepts them.
+The final response uses hosted `streamChat`. Local response generation is not
+part of this pipeline. Stream chunks update the transcript only after the
+context-leak guard accepts them.
 
 When playback is streaming, complete paragraphs enter the TTS queue as they
 arrive. Provider/local synthesis prefetches with bounded concurrency while an
